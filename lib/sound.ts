@@ -106,19 +106,6 @@ export function playSound(name: SfxName) {
   }
 }
 
-/* Reactive components can subscribe to sound preferences */
-export function useSoundToggle() {
-  // Lazy hook — only available in client components
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { useState, useEffect } = require("react");
-  const [on, setOn] = useState<boolean>(soundEnabled());
-  useEffect(() => {
-    const h = () => setOn(soundEnabled());
-    window.addEventListener("storage", h);
-    return () => window.removeEventListener("storage", h);
-  }, []);
-  return {
-    on,
-    toggle: () => { const next = !on; setSoundEnabled(next); setOn(next); if (next) playSound("click"); },
-  };
-}
+/* useSoundToggle was here — removed because <SoundToggle/> has its own
+ * implementation using proper ES imports; the require()-based version
+ * caused a TypeScript build error and was unused. */
