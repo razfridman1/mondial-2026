@@ -4,6 +4,7 @@ import { MATCHES, TEAMS } from "@/lib/data";
 import { scorePrediction } from "@/lib/scoring";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 /* =====================================================================
@@ -103,69 +104,4 @@ export async function POST(req: Request) {
     targets = [{ uid: decoded.uid, displayName: callerName, avatarId: callerProf.avatarId || "messi" }];
   } else if (mode === "friend") {
     if (!body.targetUid) return NextResponse.json({ error: "targetUid required" }, { status: 400 });
-    const p = (await db.collection("profiles").doc(body.targetUid).get()).data() as any || {};
-    targets = [{ uid: body.targetUid, displayName: p.displayName || "חבר", avatarId: p.avatarId || "messi" }];
-  } else if (mode === "all") {
-    if (!body.groupId) return NextResponse.json({ error: "groupId required for mode=all" }, { status: 400 });
-    const mems = await db.collection("group_memberships").where("groupId", "==", body.groupId).get();
-    const uids = mems.docs.map(d => d.data().uid as string).filter(u => u !== decoded.uid);
-    for (const uid of uids.slice(0, 8)) { // cap at 8 to control AI cost
-      const p = (await db.collection("profiles").doc(uid).get()).data() as any || {};
-      targets.push({ uid, displayName: p.displayName || "חבר", avatarId: p.avatarId || "messi" });
-    }
-  }
-
-  if (!targets.length) return NextResponse.json({ markdown: "אין יעד לעקוץ — צרף חברים לקבוצה ונסה שוב." });
-
-  /* Build prompt with prediction data per target */
-  const dataBlocks = await Promise.all(targets.map(async t => {
-    const worst = await buildWorstPredsFor(db, t.uid);
-    return { name: t.displayName, worstPredictions: worst };
-  }));
-
-  const userMsg = mode === "all"
-    ? `בנה עקיצה קצרה משותפת לחברי הקבוצה הבאים, על סמך הניחושים הגרועים שלהם:\n${JSON.stringify(dataBlocks, null, 2)}\n\nציין את "המנצח" של הניחושים הגרועים ביותר.`
-    : `כתוב עקיצה ידידותית ל-${dataBlocks[0].name}:\n${JSON.stringify(dataBlocks[0], null, 2)}`;
-
-  let markdown = "";
-  try { markdown = await callClaude(userMsg); }
-  catch (e: any) {
-    return NextResponse.json({ error: "ai_failed", details: e.message }, { status: 502 });
-  }
-
-  /* Persist roast(s) to Firestore so everyone sees it in the feed */
-  const ts = Date.now();
-  const ids: string[] = [];
-  const groupId = body.groupId || null;
-
-  if (mode === "all") {
-    const ref = db.collection("roasts").doc();
-    await ref.set({
-      mode, groupId,
-      targets: targets.map(t => ({ uid: t.uid, displayName: t.displayName, avatarId: t.avatarId })),
-      byUid: decoded.uid,
-      byName: callerName,
-      byAvatarId: callerProf.avatarId || "messi",
-      markdown,
-      ts,
-    });
-    ids.push(ref.id);
-  } else {
-    const t = targets[0];
-    const ref = db.collection("roasts").doc();
-    await ref.set({
-      mode, groupId,
-      targetUid: t.uid,
-      targetName: t.displayName,
-      targetAvatarId: t.avatarId,
-      byUid: decoded.uid,
-      byName: callerName,
-      byAvatarId: callerProf.avatarId || "messi",
-      markdown,
-      ts,
-    });
-    ids.push(ref.id);
-  }
-
-  return NextResponse.json({ markdown, ids, targets });
-}
+    const p = (await db.collection("prof

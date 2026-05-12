@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* =====================================================================
  *  PATCH  /api/admin/users/{uid}   → update displayName / role / disabled / password

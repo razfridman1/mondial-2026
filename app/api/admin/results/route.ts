@@ -3,6 +3,7 @@ import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { MATCHES } from "@/lib/data";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 async function authedAdmin(req: Request) {
   const auth = req.headers.get("authorization") || "";

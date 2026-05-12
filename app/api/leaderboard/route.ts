@@ -4,6 +4,7 @@ import { userTotals } from "@/lib/scoring";
 import type { LeaderRow } from "@/lib/types";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* GET /api/leaderboard?groupId=...
  * Returns the leaderboard scoped to a group (or global if omitted). */

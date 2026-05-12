@@ -4,6 +4,7 @@ import { MATCHES, TEAMS } from "@/lib/data";
 import { applyOverride } from "@/lib/utils";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 /* =====================================================================

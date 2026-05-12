@@ -4,6 +4,7 @@ import { MATCHES } from "@/lib/data";
 import { buildSimConfig, SIM_PRESETS } from "@/lib/sim";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* =====================================================================
  *  GET    /api/admin/simulation       → current sim config

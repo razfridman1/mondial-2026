@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
  * ===================================================================*/
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const SYSTEM_PROMPT = `אתה עוזר חכם של אפליקציית "מונדיאל 2026" — מומחה לכדורגל ולמונדיאל.

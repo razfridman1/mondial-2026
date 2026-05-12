@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 async function authedAdmin(req: Request) {
   const auth = req.headers.get("authorization") || "";

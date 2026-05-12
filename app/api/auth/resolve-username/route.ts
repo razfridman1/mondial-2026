@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* =====================================================================
  * Public-but-rate-limited username → email resolver. Used by the login

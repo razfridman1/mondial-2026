@@ -6,6 +6,7 @@ import { sendEmail, reminderEmailHtml } from "@/lib/email";
 import { effectiveUtc, type SimConfig } from "@/lib/sim";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /* =====================================================================
@@ -133,17 +134,4 @@ export async function GET(req: Request) {
     });
 
     await logRef.set({
-      uid: row.uid,
-      matchId: row.matchId,
-      kind: row.kind,
-      sentAt: now,
-      ok: result.ok,
-      error: result.error || null,
-      providerId: result.id || null,
-    });
-
-    if (result.ok) sent.push(logId);
-  }
-
-  return NextResponse.json({ scanned: pending.length, sent: sent.length, ids: sent });
-}
+      uid: row.u

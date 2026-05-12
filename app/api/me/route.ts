@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 
+export const dynamic = "force-dynamic";
+
+
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization") || "";
   const m = auth.match(/^Bearer (.+)$/);

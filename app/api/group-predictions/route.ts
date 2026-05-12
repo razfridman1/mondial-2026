@@ -5,6 +5,7 @@ import { effectiveUtc, type SimConfig } from "@/lib/sim";
 import { applyOverride } from "@/lib/utils";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* =====================================================================
  * GET /api/group-predictions?groupId=...

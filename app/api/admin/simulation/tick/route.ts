@@ -5,6 +5,7 @@ import { effectiveUtc, randomResult, type SimConfig } from "@/lib/sim";
 import { applyOverride } from "@/lib/utils";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /* =====================================================================

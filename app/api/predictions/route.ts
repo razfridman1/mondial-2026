@@ -5,6 +5,7 @@ import { canUseJoker, recordJokerUsage, type JokerUsage } from "@/lib/joker";
 import { effectiveUtc, type SimConfig } from "@/lib/sim";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* GET /api/predictions?uid=...  → list predictions for a user
  * (publicly readable so the user's own client can hydrate quickly) */
@@ -44,58 +45,4 @@ export async function POST(req: Request) {
 
   const h = Number(homeScore);
   const a = Number(awayScore);
-  if (!Number.isFinite(h) || !Number.isFinite(a) || h < 0 || a < 0 || h > 20 || a > 20) {
-    return NextResponse.json({ error: "invalid scores" }, { status: 400 });
-  }
-
-  const { db } = getAdmin();
-  const docId = `${decoded.uid}_${matchId}`;
-
-  /* Handle Joker — guard against double-spending */
-  let appliedJoker = false;
-  const existingPredSnap = await db.collection("predictions").doc(docId).get();
-  const existingPred: any = existingPredSnap.data() || {};
-  const wantJoker = !!joker;
-  const hadJoker = !!existingPred.joker;
-
-  if (wantJoker && !hadJoker) {
-    // Trying to ENABLE joker now
-    const usageRef = db.collection("joker_usage").doc(decoded.uid);
-    const usageSnap = await usageRef.get();
-    const usage = (usageSnap.data() as JokerUsage) || null;
-    const check = canUseJoker(usage, match.stage);
-    if (!check.ok) {
-      return NextResponse.json({ error: "joker_blocked", message: check.reason }, { status: 403 });
-    }
-    appliedJoker = true;
-    const next = recordJokerUsage(usage, match.stage);
-    await usageRef.set(next, { merge: true });
-  } else if (!wantJoker && hadJoker) {
-    // Trying to DISABLE joker — refund a slot (only before kickoff)
-    const usageRef = db.collection("joker_usage").doc(decoded.uid);
-    const usageSnap = await usageRef.get();
-    const usage = (usageSnap.data() as JokerUsage) || null;
-    if (usage?.perStage?.[match.stage]) {
-      const stageKey = match.stage as keyof typeof usage.perStage;
-      const refunded: JokerUsage = {
-        perStage: { ...usage.perStage, [stageKey]: Math.max(0, (usage.perStage[stageKey] || 0) - 1) },
-        lastUsedAt: usage.lastUsedAt,
-      };
-      await usageRef.set(refunded, { merge: true });
-    }
-    appliedJoker = false;
-  } else {
-    appliedJoker = hadJoker;
-  }
-
-  await db.collection("predictions").doc(docId).set({
-    uid: decoded.uid,
-    matchId,
-    homeScore: h,
-    awayScore: a,
-    joker: appliedJoker,
-    updatedAt: Date.now(),
-  }, { merge: true });
-
-  return NextResponse.json({ ok: true, joker: appliedJoker });
-}
+  if (!Number.isFinite(h) || !Number.isFinite(a) || h < 0 || a < 0 || h > 20

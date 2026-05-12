@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* GET /api/roasts?groupId=...&limit=30 — public read for the side feed */
 export async function GET(req: Request) {

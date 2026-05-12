@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* GET /api/activity?groupId=...&limit=50  */
 export async function GET(req: Request) {

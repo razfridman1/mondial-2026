@@ -5,6 +5,7 @@ import { applyOverride } from "@/lib/utils";
 import { effectiveUtc, type SimConfig } from "@/lib/sim";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /* =====================================================================
@@ -67,18 +68,4 @@ export async function GET(req: Request) {
         auto: true,
       });
       inserted++;
-      // Activity entry — visible to all groups the user is in
-      await db.collection("activity").add({
-        kind: "prediction.auto",
-        uid,
-        displayName: (profSnap.docs.find(d => d.id === uid)?.data() as any)?.displayName || "משתמש",
-        avatarId: (profSnap.docs.find(d => d.id === uid)?.data() as any)?.avatarId || "messi",
-        matchId: m.id,
-        payload: { home: h, away: a },
-        ts: now,
-      });
-    }
-  }
-
-  return NextResponse.json({ scanned: just.length, inserted });
-}
+      // Activity entry — visible to all group

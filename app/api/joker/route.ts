@@ -3,6 +3,7 @@ import { getAdmin, verifyIdToken } from "@/lib/firebase-admin";
 import { JOKER_LIMITS, JOKER_COOLDOWN_MS, type JokerUsage } from "@/lib/joker";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* GET /api/joker — current joker availability for the authenticated user */
 export async function GET(req: Request) {

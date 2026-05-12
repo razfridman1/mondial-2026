@@ -6,6 +6,7 @@ import { applyOverride } from "@/lib/utils";
 import { getAdmin } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* GET /api/lineups?matchId=M001
  *
