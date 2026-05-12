@@ -9,12 +9,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/* =====================================================================
- * Vercel Cron handler. Configured in vercel.json to run every 5 minutes.
- * Scans pending email reminders and sends those whose trigger time has
- * arrived. De-dupes via the `email_log` collection.
- * ===================================================================*/
-
 const SECRET = process.env.CRON_SECRET || "";
 
 interface ReminderRow {
@@ -24,10 +18,9 @@ interface ReminderRow {
   kind: "h60" | "m15" | "betsClose";
 }
 
-const WINDOW_MS = 6 * 60 * 1000; // 6-minute window — slightly larger than cron interval (5 min)
+const WINDOW_MS = 6 * 60 * 1000;
 
 export async function GET(req: Request) {
-  // Optional shared-secret protection
   if (SECRET) {
     const auth = req.headers.get("authorization") || "";
     if (!auth.endsWith(SECRET)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -36,7 +29,6 @@ export async function GET(req: Request) {
   const { db } = getAdmin();
   const now = Date.now();
 
-  /* 1. Load all overrides once for accurate match times */
   const ovSnap = await db.collection("broadcast_overrides").get();
   const overrides: Record<string, any> = {};
   ovSnap.forEach(d => { overrides[d.id] = d.data(); });
@@ -47,7 +39,6 @@ export async function GET(req: Request) {
     return { ...withOverride, utc: effectiveUtc(withOverride.utc, sim) };
   });
 
-  /* 2. Load email prefs (only users with enabled=true) */
   const prefsSnap = await db.collection("email_prefs").where("enabled", "==", true).get();
   const usersWithPrefs = prefsSnap.docs.map(d => d.data());
 
@@ -55,7 +46,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ sent: 0, reason: "no enabled users" });
   }
 
-  /* 3. Load all per-user reminder toggles (h60 / m15 / betsClose) and favorites */
   const remindersSnap = await db.collection("user_reminders").get();
   const favSnap = await db.collection("user_favorites").get();
   const remindersByUid: Record<string, any> = {};
@@ -63,7 +53,6 @@ export async function GET(req: Request) {
   const favsByUid: Record<string, string[]> = {};
   favSnap.forEach(d => { favsByUid[d.id] = d.data()?.teams || []; });
 
-  /* 4. Build list of pending sends */
   const pending: ReminderRow[] = [];
   for (const u of usersWithPrefs) {
     if (!u.email) continue;
@@ -72,20 +61,20 @@ export async function GET(req: Request) {
 
     for (const m of matchesEff) {
       const start = new Date(m.utc).getTime();
-      if (start <= now) continue;                    // past kickoff
-      if (start - now > 24 * 60 * 60 * 1000) continue; // skip more than 24h ahead
+      if (start <= now) continue;
+      if (start - now > 24 * 60 * 60 * 1000) continue;
 
       if (u.favoritesOnly && !(favs.has(m.home) || favs.has(m.away))) continue;
 
-      const checks: Array<[ "h60" | "m15" | "betsClose", number ]> = [
-        ["h60",      start - 60 * 60 * 1000],
-        ["m15",      start - 15 * 60 * 1000],
-        ["betsClose",start - 10 * 60 * 1000],
+      const checks: Array<["h60" | "m15" | "betsClose", number]> = [
+        ["h60", start - 60 * 60 * 1000],
+        ["m15", start - 15 * 60 * 1000],
+        ["betsClose", start - 10 * 60 * 1000],
       ];
 
       for (const [kind, when] of checks) {
-        if (!u[kind]) continue;                   // user disabled this kind
-        if (!userReminders[m.id]?.[kind]) continue; // and didn't subscribe per-match
+        if (!u[kind]) continue;
+        if (!userReminders[m.id]?.[kind]) continue;
         if (now >= when && now < when + WINDOW_MS) {
           pending.push({ uid: u.uid, email: u.email, matchId: m.id, kind });
         }
@@ -93,7 +82,6 @@ export async function GET(req: Request) {
     }
   }
 
-  /* 5. De-dupe against `email_log` */
   const sent: string[] = [];
   for (const row of pending) {
     const logId = `${row.uid}_${row.matchId}_${row.kind}`;
@@ -106,25 +94,20 @@ export async function GET(req: Request) {
     const away = TEAMS[m.away] || { name: m.away, flag: "" };
     const channels = (m.channels || []).map(c => CHANNELS[c]?.name).filter(Boolean) as string[];
     const when =
-      row.kind === "h60"      ? "המשחק מתחיל בעוד שעה"
-    : row.kind === "m15"      ? "המשחק מתחיל בעוד 15 דקות"
-    :                           "ההימורים נסגרים בקרוב";
+      row.kind === "h60" ? "המשחק מתחיל בעוד שעה"
+      : row.kind === "m15" ? "המשחק מתחיל בעוד 15 דקות"
+      : "ההימורים נסגרים בקרוב";
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://mondial-2026.vercel.app";
     const matchUrl = `${baseUrl}/?match=${m.id}`;
     const shareText = `⚽ מונדיאל 2026: ${home.name} נגד ${away.name} — ${formatIsraelDate(m.utc)} ${formatIsraelTime(m.utc)} ${matchUrl}`;
     const waUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
     const html = reminderEmailHtml({
-      homeName: home.name,
-      homeFlag: home.flag,
-      awayName: away.name,
-      awayFlag: away.flag,
+      homeName: home.name, homeFlag: home.flag,
+      awayName: away.name, awayFlag: away.flag,
       dateLabel: formatIsraelDate(m.utc),
       timeLabel: formatIsraelTime(m.utc),
-      channels,
-      whenLabel: when,
-      matchUrl,
-      whatsappUrl: waUrl,
+      channels, whenLabel: when, matchUrl, whatsappUrl: waUrl,
     });
 
     const result = await sendEmail({
@@ -134,4 +117,17 @@ export async function GET(req: Request) {
     });
 
     await logRef.set({
-      uid: row.u
+      uid: row.uid,
+      matchId: row.matchId,
+      kind: row.kind,
+      sentAt: now,
+      ok: result.ok,
+      error: result.error || null,
+      providerId: result.id || null,
+    });
+
+    if (result.ok) sent.push(logId);
+  }
+
+  return NextResponse.json({ scanned: pending.length, sent: sent.length, ids: sent });
+}
