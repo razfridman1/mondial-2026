@@ -1,0 +1,20 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "installCommand": "npm install",
+  "regions": ["fra1"],
+  "crons": [
+    { "path": "/api/reminders/cron",          "schedule": "*/5 * * * *" },
+    { "path": "/api/auto-predict",            "schedule": "*/5 * * * *" },
+    { "path": "/api/admin/simulation/tick",   "schedule": "* * * * *"   }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
+        { "key": "Permissions-Policy",        "value": "camera=(), microphone=(), geolocation=()" }
+      ]
+    }
+  ]
+}

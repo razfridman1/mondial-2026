@@ -1,0 +1,50 @@
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+
+# production
+build
+dist
+
+# env
+.env*.local
+.env
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# debug
+.vscode/
+.idea/
+*.swp
+
+# system
+.DS_Store
+Thumbs.db
+
+# capacitor / android
+android/
+ios/
+.gradle/
+local.properties
+*.keystore
+*.jks
+
+# firebase
+firebase-debug.log
+.firebase/
+serviceAccountKey.json
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# vercel
+.vercel

@@ -1,0 +1,16 @@
+{
+  "name": "מונדיאל 2026",
+  "short_name": "Mondial 2026",
+  "description": "לוח משחקים ושידורים בישראל למונדיאל 2026",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "lang": "he",
+  "dir": "rtl",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/logo.svg",    "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icons/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

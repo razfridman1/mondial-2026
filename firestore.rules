@@ -1,0 +1,118 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Per-user private docs (owner read/write only) ----------
+    match /user_favorites/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /user_reminders/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /email_prefs/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ---------- User profile (public read, owner write) ----------
+    match /profiles/{uid} {
+      allow read:  if true;                                            // leaderboard needs display name + avatar
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ---------- Predictions (owner only) ----------
+    match /predictions/{docId} {
+      allow read:  if request.auth != null && docId.matches(request.auth.uid + '_.*');
+      allow write: if request.auth != null && docId.matches(request.auth.uid + '_.*');
+    }
+
+    // ---------- Groups: read for any member, write for owner ----------
+    match /groups/{groupId} {
+      allow read:  if true;                                            // discoverable; admin SDK enforces deletion
+      allow write: if request.auth != null
+                   && resource.data.ownerUid == request.auth.uid;
+    }
+    match /group_memberships/{docId} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null
+                   && docId.matches(request.auth.uid + '_.*');
+    }
+
+    // ---------- Activity feed (read all, write authenticated via API) ----------
+    match /activity/{docId} {
+      allow read:  if true;
+      allow write: if request.auth != null;
+    }
+
+    // ---------- Match results (server-side admin only) ----------
+    match /match_results/{matchId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    // ---------- Achievements unlocks (server-side only) ----------
+    match /achievement_unlocks/{docId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    // ---------- Email log (server only) ----------
+    match /email_log/{docId} {
+      allow read, write: if false;
+    }
+
+    // ---------- Joker usage (owner read/write through API) ----------
+    match /joker_usage/{uid} {
+      allow read:  if request.auth != null && request.auth.uid == uid;
+      allow write: if false;   // only API route (admin SDK) writes
+    }
+
+    // ---------- Live lineups cache (server-only writes, public read) ----------
+    match /live_lineups/{matchId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    // ---------- Managed users (admin-only writes via API) ----------
+    // Owner can read own record; admins read all. Writes always via Admin SDK.
+    match /managed_users/{uid} {
+      allow read:  if request.auth != null
+                   && (request.auth.uid == uid
+                       || request.auth.token.email in [
+                            "raz.fridman1@gmail.com"
+                          ]);
+      allow write: if false;
+    }
+
+    // ---------- Username lookup (resolver) ----------
+    // Public read so the login page can resolve username → email (no password exposure).
+    match /username_lookup/{username} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    // ---------- Simulation config (admin-only writes via API, public read) ----------
+    match /sim_config/{docId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    /* All admin-only mutations go through Admin SDK API routes which bypass
+     * these rules. Reads above already allow admin (their token email is in
+     * the whitelist on relevant rules). */
+
+    // ---------- Roasts (public read for the side feed, server writes via API) ----------
+    match /roasts/{id} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    // ---------- Broadcast overrides (admin whitelist) ----------
+    match /broadcast_overrides/{matchId} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.token.email in [
+                        "raz.fridman1@gmail.com"
+                      ];
+    }
+  }
+}

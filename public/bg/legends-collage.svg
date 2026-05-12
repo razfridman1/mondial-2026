@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1000" width="1500" height="1000" preserveAspectRatio="xMidYMid slice">
+  <!--
+    30 BEST FOOTBALL LEGENDS OF THE LAST 20 YEARS — wallpaper collage
+    Each tile: stylized silhouette + jersey number + surname
+    Designed to be readable as identity, invisible as content (use at ~5-8% opacity).
+  -->
+  <defs>
+    <!-- 5 distinct stylized player poses, reused across tiles -->
+    <symbol id="p-stand" viewBox="0 0 80 120">
+      <circle cx="40" cy="18" r="10"/>
+      <path d="M32 28 Q32 44 36 60 L44 60 Q48 44 48 28 Z"/>
+      <path d="M32 30 L24 56 L30 56 L36 36 Z"/>
+      <path d="M48 30 L56 56 L50 56 L44 36 Z"/>
+      <path d="M36 60 L34 100 L40 100 L42 70 Z"/>
+      <path d="M44 60 L46 100 L40 100 L38 70 Z"/>
+    </symbol>
+    <symbol id="p-kick" viewBox="0 0 80 120">
+      <circle cx="40" cy="18" r="10"/>
+      <path d="M32 28 Q30 46 36 62 L46 60 Q50 44 48 28 Z"/>
+      <path d="M32 30 L20 50 L26 56 L36 38 Z"/>
+      <path d="M48 30 L62 36 L60 46 L46 38 Z"/>
+      <path d="M36 62 L32 100 L40 100 L42 72 Z"/>
+      <path d="M46 60 L66 78 L72 86 L66 92 L52 82 L44 70 Z"/>
+      <circle cx="70" cy="92" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+    </symbol>
+    <symbol id="p-run" viewBox="0 0 80 120">
+      <circle cx="40" cy="18" r="10"/>
+      <path d="M30 28 Q30 46 38 62 L46 60 Q50 44 48 28 Z"/>
+      <path d="M30 30 L18 56 L24 60 L36 38 Z"/>
+      <path d="M48 30 L62 24 L66 32 L52 40 Z"/>
+      <path d="M36 62 L26 92 L34 96 L40 70 Z"/>
+      <path d="M46 60 L58 88 L52 96 L42 72 Z"/>
+    </symbol>
+    <symbol id="p-celebrate" viewBox="0 0 80 120">
+      <circle cx="40" cy="22" r="10"/>
+      <path d="M32 32 Q32 48 36 64 L44 64 Q48 48 48 32 Z"/>
+      <path d="M32 34 L18 12 L24 8 L36 30 Z"/>
+      <path d="M48 34 L62 10 L56 6 L44 30 Z"/>
+      <path d="M36 64 L32 104 L40 104 L42 74 Z"/>
+      <path d="M44 64 L48 104 L40 104 L38 74 Z"/>
+    </symbol>
+    <symbol id="p-head" viewBox="0 0 80 120">
+      <circle cx="40" cy="22" r="10"/>
+      <path d="M32 32 Q32 50 38 66 L46 66 Q50 48 48 32 Z"/>
+      <path d="M32 34 L16 48 L20 56 L36 42 Z"/>
+      <path d="M48 34 L64 48 L60 56 L44 42 Z"/>
+      <path d="M36 66 L32 100 L40 100 L42 74 Z"/>
+      <path d="M46 66 L48 100 L40 100 L40 74 Z"/>
+      <circle cx="40" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="2"/>
+    </symbol>
+
+    <style>
+      .tile-bg   { fill: #ffffff; opacity: 0.02; }
+      .tile-line { fill: none; stroke: #ffffff; stroke-width: 1; opacity: 0.18; }
+      .silhouette { fill: #ffffff; }
+      .jersey    { fill: #ffd24a; font-family: 'Heebo','Rubik',sans-serif; font-weight: 900; font-size: 50px; }
+      .surname   { fill: #ffffff; font-family: 'Heebo','Rubik',sans-serif; font-weight: 800; font-size: 16px; letter-spacing: 2px; }
+      .era       { fill: #00d4ff; font-family: monospace; font-size: 10px; opacity: 0.7; }
+    </style>
+  </defs>
+
+  <!-- 6 columns × 5 rows = 30 tiles. Tile = 250 × 200 -->
+
+  <!-- Row 1: Eternal legends of modern era -->
+  <g transform="translate(0 0)">
+    <rect class="tile-bg"   width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-celebrate" x="20"  y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">10</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">MESSI</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇦🇷 2003–</text>
+  </g>
+  <g transform="translate(250 0)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-head" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">7</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">CRISTIANO</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇵🇹 2003–</text>
+  </g>
+  <g transform="translate(500 0)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-stand" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">10</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">ZIDANE</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇫🇷 1989–2006</text>
+  </g>
+  <g transform="translate(750 0)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-run" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">9</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">R9 RONALDO</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇧🇷 1993–2011</text>
+  </g>
+  <g transform="translate(1000 0)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-kick" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">10</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">RONALDINHO</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇧🇷 1999–2018</text>
+  </g>
+  <g transform="translate(1250 0)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-kick" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">10</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">NEYMAR</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇧🇷 2009–</text>
+  </g>
+
+  <!-- Row 2: Spanish + Italian icons -->
+  <g transform="translate(0 200)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-run" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">6</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">INIESTA</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇪🇸 2001–2023</text>
+  </g>
+  <g transform="translate(250 200)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-stand" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">8</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">XAVI</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇪🇸 1998–2019</text>
+  </g>
+  <g transform="translate(500 200)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-stand" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">21</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">PIRLO</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇮🇹 1995–2017</text>
+  </g>
+  <g transform="translate(750 200)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-stand" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">1</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">BUFFON</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇮🇹 1995–2023</text>
+  </g>
+  <g transform="translate(1000 200)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-stand" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">1</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">CASILLAS</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇪🇸 1999–2020</text>
+  </g>
+  <g transform="translate(1250 200)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-stand" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">4</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">RAMOS</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇪🇸 2004–</text>
+  </g>
+
+  <!-- Row 3: Premier League legends + Brazilian stars -->
+  <g transform="translate(0 400)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-run" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">14</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">HENRY</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇫🇷 1994–2014</text>
+  </g>
+  <g transform="translate(250 400)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-kick" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">22</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">KAKÁ</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇧🇷 2001–2017</text>
+  </g>
+  <g transform="translate(500 400)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-stand" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">11</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">DROGBA</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇨🇮 1998–2018</text>
+  </g>
+  <g transform="translate(750 400)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-celebrate" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">9</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">ETO'O</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇨🇲 1997–2019</text>
+  </g>
+  <g transform="translate(1000 400)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-kick" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">10</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">ROONEY</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🏴 2002–2021</text>
+  </g>
+  <g transform="translate(1250 400)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-kick" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">8</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">GERRARD</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🏴 1998–2016</text>
+  </g>
+
+  <!-- Row 4: Mid-2010s top tier -->
+  <g transform="translate(0 600)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-stand" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">8</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">LAMPARD</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🏴 1995–2017</text>
+  </g>
+  <g transform="translate(250 600)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-run" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">10</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">MODRIĆ</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇭🇷 2003–</text>
+  </g>
+  <g transform="translate(500 600)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-head" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">9</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">LEWANDOWSKI</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇵🇱 2008–</text>
+  </g>
+  <g transform="translate(750 600)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-kick" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">9</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">SUÁREZ</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇺🇾 2005–</text>
+  </g>
+  <g transform="translate(1000 600)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-celebrate" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">11</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">SALAH</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇪🇬 2010–</text>
+  </g>
+  <g transform="translate(1250 600)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-stand" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">10</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">AGÜERO</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇦🇷 2003–2023</text>
+  </g>
+
+  <!-- Row 5: Recent stars + current top -->
+  <g transform="translate(0 800)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-run" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">10</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">ROBBEN</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇳🇱 2000–2021</text>
+  </g>
+  <g transform="translate(250 800)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-run" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">7</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">RIBÉRY</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇫🇷 2000–2022</text>
+  </g>
+  <g transform="translate(500 800)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-stand" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">8</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">KROOS</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇩🇪 2007–2024</text>
+  </g>
+  <g transform="translate(750 800)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-kick" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">17</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">DE BRUYNE</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇧🇪 2008–</text>
+  </g>
+  <g transform="translate(1000 800)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-run" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">10</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">MBAPPÉ</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇫🇷 2015–</text>
+  </g>
+  <g transform="translate(1250 800)">
+    <rect class="tile-bg" width="250" height="200"/>
+    <rect class="tile-line" x="5" y="5" width="240" height="190" rx="6"/>
+    <use href="#p-celebrate" x="20" y="40" width="80" height="120" class="silhouette"/>
+    <text class="jersey" x="230" y="65" text-anchor="end">9</text>
+    <text class="surname" x="125" y="185" text-anchor="middle">HAALAND</text>
+    <text class="era" x="125" y="30" text-anchor="middle">🇳🇴 2019–</text>
+  </g>
+</svg>
