@@ -35,7 +35,17 @@ export async function GET(req: Request) {
 
   const { db } = getAdmin();
   const snap = await db.collection("managed_users").orderBy("createdAt", "desc").get();
-  const users = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+
+  /* Enrich each user with aiBlocked (from profiles) + group memberships */
+  const users: any[] = [];
+  for (const d of snap.docs) {
+    const base: any = { uid: d.id, ...d.data() };
+    const profSnap = await db.collection("profiles").doc(d.id).get();
+    base.aiBlocked = !!(profSnap.data() as any)?.aiBlocked;
+    const memSnap = await db.collection("group_memberships").where("uid", "==", d.id).get();
+    base.groupIds = memSnap.docs.map(m => (m.data() as any).groupId);
+    users.push(base);
+  }
   return NextResponse.json(users);
 }
 

@@ -17,6 +17,9 @@ import { AvatarDisplay } from "./AvatarPicker";
 const LOCK_MIN = 3;
 const STAGE_ORDER: StageId[] = ["GROUP", "R32", "R16", "QF", "SF", "THIRD", "FINAL"];
 
+const LS_STAGE = "mondial26.mypredictions.stage";
+const LS_GROUP = "mondial26.mypredictions.groupLetter";
+
 type MatchResult = { home: number; away: number; finishedAt: number };
 
 export default function MyPredictionsTab() {
@@ -32,9 +35,35 @@ export default function MyPredictionsTab() {
 
   const [stage, setStage] = useState<StageId>("GROUP");
   const [groupLetter, setGroupLetter] = useState<string | null>(null);
+  const [restored, setRestored] = useState(false);
   const [results, setResults] = useState<Record<string, MatchResult>>({});
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [now, setNow] = useState(Date.now());
+
+  /* Restore last position from localStorage on first client mount.
+   * Done in useEffect (not useState init) to avoid SSR/CSR hydration mismatch. */
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem(LS_STAGE);
+      if (s && STAGE_ORDER.includes(s as StageId)) setStage(s as StageId);
+      const g = localStorage.getItem(LS_GROUP);
+      if (g) setGroupLetter(g);
+    } catch {}
+    setRestored(true);
+  }, []);
+
+  /* Persist last position whenever stage/group changes (but only after restore). */
+  useEffect(() => {
+    if (!restored) return;
+    try { localStorage.setItem(LS_STAGE, stage); } catch {}
+  }, [stage, restored]);
+  useEffect(() => {
+    if (!restored) return;
+    try {
+      if (groupLetter) localStorage.setItem(LS_GROUP, groupLetter);
+      else localStorage.removeItem(LS_GROUP);
+    } catch {}
+  }, [groupLetter, restored]);
 
   useEffect(() => { refreshGroups(); }, [refreshGroups]);
   useEffect(() => {
@@ -139,14 +168,16 @@ export default function MyPredictionsTab() {
     return top.totalPoints - myRow.totalPoints;
   }, [leaderboard, myRow]);
 
-  /* Auto-select first group letter when stage changes to GROUP */
+  /* Auto-select first group letter when stage changes to GROUP.
+   * Waits for `restored` so it doesn't overwrite a localStorage-restored letter. */
   useEffect(() => {
+    if (!restored) return;
     if (stage !== "GROUP") { setGroupLetter(null); return; }
     if (!groupLetter) {
       const groups = [...new Set((byStage.GROUP || []).map(m => m.group).filter(Boolean))] as string[];
       setGroupLetter(groups[0] || null);
     }
-  }, [stage]);
+  }, [stage, restored]);
 
   const groupLetters = useMemo(() => {
     return [...new Set((byStage.GROUP || []).map(m => m.group).filter(Boolean))].sort() as string[];

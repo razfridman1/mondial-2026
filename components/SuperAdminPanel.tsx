@@ -102,6 +102,11 @@ export default function SuperAdminPanel() {
         <summary>🔍 כל המידע על משתמש (Deep View)</summary>
         <UserDeepView />
       </details>
+
+      <details className="adm-section">
+        <summary>💾 גיבוי מלא — ייצוא לקובץ JSON</summary>
+        <BackupAdmin />
+      </details>
     </section>
   );
 }
@@ -479,6 +484,86 @@ function UserDeepView() {
           marginTop: 10, padding: 12, background: "var(--bg-elev)", border: "1px solid var(--border)",
           borderRadius: 8, fontSize: 11, maxHeight: 480, overflow: "auto", direction: "ltr", textAlign: "left",
         }}>{JSON.stringify(data, null, 2)}</pre>
+      )}
+    </div>
+  );
+}
+
+/* ============================ 7. BACKUP ============================ */
+function BackupAdmin() {
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState<{ counts: Record<string, number>; exportedAt: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function download() {
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch("/api/admin/backup", { headers: await adminAuthHeaders() });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setError(d.error || "שגיאה בייצוא");
+        return;
+      }
+      const data = await r.json();
+
+      /* Trigger download */
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      a.href = url;
+      a.download = `mondial-2026-backup-${ts}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+      setInfo({ counts: data.counts || {}, exportedAt: data.exportedAt });
+    } catch (e: any) {
+      setError(e.message || "שגיאה");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="adm-body">
+      <p className="muted" style={{ marginBottom: 10, fontSize: 13, lineHeight: 1.6 }}>
+        ייצוא קובץ JSON שמכיל את <strong>כל הנתונים</strong> של האפליקציה:
+        משתמשים, פרופילים, ניחושים, תוצאות, קבוצות, חברויות, סימולציות, ופיד פעילות.
+        הקובץ נשמר במחשב שלך — אפשר להעלות לדרייב, GitHub, או כל מקום אחר לגיבוי.
+      </p>
+      <p className="muted" style={{ marginBottom: 14, fontSize: 12 }}>
+        💡 <strong>שים לב:</strong> הנתונים שלך כבר נשמרים אוטומטית ב‑Firebase Firestore.
+        deployment של קוד חדש לא נוגע בנתונים — הגיבוי הזה הוא רק שכבת ביטחון נוספת.
+      </p>
+
+      <div className="mc-actions">
+        <button className="btn btn-primary" onClick={download} disabled={busy}>
+          {busy ? "…מייצא" : "📥 הורד גיבוי מלא (JSON)"}
+        </button>
+      </div>
+
+      {error && <p className="pred-msg is-locked" style={{ marginTop: 10 }}>⚠ {error}</p>}
+
+      {info && (
+        <div style={{
+          marginTop: 14, padding: 12,
+          background: "rgba(34,197,94,0.08)", border: "1px solid #22c55e", borderRadius: 10,
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>✓ הגיבוי הורד בהצלחה</div>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+            ייצוא: {new Date(info.exportedAt).toLocaleString("he-IL")}
+          </div>
+          <details>
+            <summary style={{ cursor: "pointer", fontSize: 13 }}>📊 מספרי רשומות</summary>
+            <div style={{ marginTop: 8, fontFamily: "monospace", fontSize: 12 }}>
+              {Object.entries(info.counts).map(([coll, n]) => (
+                <div key={coll}>
+                  <strong>{coll}:</strong> {n}
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
       )}
     </div>
   );

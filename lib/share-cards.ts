@@ -232,9 +232,9 @@ async function openInstagramStory(blob: Blob): Promise<boolean> {
   return false;
 }
 
-/* Open a modal that shows the card + download/share */
+/* Open a modal that shows the card + share-to-story button */
 export function openShareCard(kind: CardKind, args: any) {
-  const { svg, width, height, filename } = buildSvg(kind, args);
+  const { svg, width, height } = buildSvg(kind, args);
 
   /* Create modal */
   const overlay = document.createElement("div");
@@ -248,12 +248,10 @@ export function openShareCard(kind: CardKind, args: any) {
       </header>
       <div class="share-card-preview">${svg}</div>
       <div class="mc-actions" style="margin-top:14px;">
-        <button class="btn btn-primary" data-act="story">📸 שתף בסטורי</button>
-        <button class="btn" data-act="download">⬇️ הורד תמונה</button>
+        <button class="btn btn-primary" data-act="story">📸 שתף בסטורי באינסטגרם</button>
       </div>
       <p class="muted" style="font-size:11px;margin-top:10px; line-height:1.5;">
-        📱 <strong>מובייל:</strong> "שתף בסטורי" יפתח את אפליקציית האינסטגרם — בחר Stories.<br/>
-        💻 <strong>מחשב:</strong> הורד את התמונה ושלח לעצמך בטלפון להעלאה כסטורי.
+        📱 לחיצה תפתח את אפליקציית האינסטגרם (במובייל). אם אתה במחשב, פתח את האתר בטלפון כדי לשתף בסטורי.
       </p>
     </div>`;
   document.body.appendChild(overlay);
@@ -262,35 +260,19 @@ export function openShareCard(kind: CardKind, args: any) {
     if (e.target === overlay || (e.target as HTMLElement).classList.contains("modal-close")) overlay.remove();
   });
 
-  overlay.querySelector("[data-act='download']")!.addEventListener("click", async () => {
-    try {
-      const blob = await svgToPngBlob(svg, width, height);
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1500);
-    } catch (e) {
-      alert("שגיאה בהורדה");
-    }
-  });
-
   overlay.querySelector("[data-act='story']")!.addEventListener("click", async () => {
     try {
       const blob = await svgToPngBlob(svg, width, height);
-      if (isMobile()) {
-        const ok = await openInstagramStory(blob);
-        if (ok) return;
-      }
-      // Desktop or no share API: just download
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1500);
       if (!isMobile()) {
-        alert("📥 התמונה ירדה. שלח אותה לטלפון שלך כדי להעלות כסטורי באינסטגרם.");
+        alert("📱 שיתוף לסטורי באינסטגרם זמין רק במובייל. פתח את האתר בטלפון שלך ונסה שוב.");
+        return;
       }
-    } catch (e) {}
+      const ok = await openInstagramStory(blob);
+      if (!ok) {
+        alert("לא הצלחנו לפתוח את אפליקציית האינסטגרם. ודא שהיא מותקנת במכשיר.");
+      }
+    } catch (e) {
+      alert("שגיאה בשיתוף — נסה שוב.");
+    }
   });
 }
