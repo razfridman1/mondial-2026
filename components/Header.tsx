@@ -12,7 +12,6 @@ const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean }[] = [
   { id: "schedule",      label: "📋 לוח משחקים" },
   { id: "mypredictions", label: "🔮 הניחושים שלי" },
   { id: "ranking",       label: "🏆 דירוג חברים" },
-  { id: "broadcasts",    label: "📺 שידורים בישראל" },
   { id: "teams",         label: "🌍 קבוצות ושחקנים" },
   { id: "bracket",       label: "🏆 שלב הנוקאאוט" },
   { id: "ai",            label: "🤖 AI" },
@@ -36,6 +35,11 @@ export default function Header() {
     return () => clearInterval(id);
   }, []);
 
+  /* Legacy guard: broadcasts tab was removed — auto-reset to schedule */
+  useEffect(() => {
+    if ((tab as string) === "broadcasts") setPref("tab", "schedule");
+  }, [tab, setPref]);
+
   return (
     <header className="header">
       <div className="header-top">
@@ -44,7 +48,7 @@ export default function Header() {
           <img src="/icons/logo.svg" alt="מונדיאל 2026" className="brand-logo-img" />
           <div>
             <div className="brand-title">מונדיאל 2026</div>
-            <div className="brand-sub">לוח משחקים · שידורים בישראל · קנדה · מקסיקו · ארה״ב</div>
+            <div className="brand-sub">לוח משחקים · ניחושים · דירוג חברים · קנדה · מקסיקו · ארה״ב</div>
           </div>
         </div>
         <div id="header-clock">

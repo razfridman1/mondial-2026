@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "מונדיאל 2026 — לוח משחקים ושידורים בישראל",
+  title: "מונדיאל 2026 — לוח משחקים וניחושים",
   description: "כל המשחקים, שעות בישראל, ערוצי שידור, AI insights ועוד.",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Mondial 2026" },
