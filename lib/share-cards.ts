@@ -1,13 +1,12 @@
 /* =====================================================================
- * Share Cards — beautiful SVG cards designed per platform.
- * - Instagram: 1080×1080 square
- * - X (Twitter): 1200×675 landscape
- * - Prediction summary: per-user prediction card
+ * Share Cards — beautiful SVG cards for Instagram Story sharing.
+ * - Instagram Story: 1080×1920 portrait (9:16)
+ * - Prediction summary: per-user prediction card (also 9:16)
  *
  * Renders as SVG, opens a modal that:
  *   1. Displays the SVG preview
  *   2. Lets the user download as PNG (via canvas)
- *   3. Shares via Web Share API (native sheet → WhatsApp/Instagram/X)
+ *   3. Shares via Web Share API (native sheet → Instagram Stories)
  * ===================================================================*/
 "use client";
 
@@ -15,7 +14,7 @@ import { TEAMS, CHANNELS, STAGES, VENUES } from "./data";
 import { formatIsraelDate, formatIsraelTime } from "./utils";
 import type { Match } from "./types";
 
-type CardKind = "match" | "match-twitter" | "prediction" | "leaderboard";
+type CardKind = "match" | "prediction" | "leaderboard";
 
 interface MatchCardArgs { match: Match; }
 interface PredictionCardArgs { match: Match; home: number; away: number; joker?: boolean; }
@@ -24,7 +23,6 @@ interface LeaderboardCardArgs { rank: number; name: string; points: number; }
 export function buildSvg(kind: CardKind, args: any): { svg: string; width: number; height: number; filename: string } {
   switch (kind) {
     case "match":          return buildMatchInstaCard(args as MatchCardArgs);
-    case "match-twitter":  return buildMatchTwitterCard(args as MatchCardArgs);
     case "prediction":     return buildPredictionCard(args as PredictionCardArgs);
     case "leaderboard":    return buildLeaderboardCard(args as LeaderboardCardArgs);
   }
@@ -98,51 +96,6 @@ function buildMatchInstaCard({ match }: MatchCardArgs) {
 </svg>`,
     width: W, height: H,
     filename: `mondial-${match.id}-insta.png`,
-  };
-}
-
-/* ------- 1200×675 Twitter/X landscape ------- */
-function buildMatchTwitterCard({ match }: MatchCardArgs) {
-  const W = 1200, H = 675;
-  const home = TEAMS[match.home] || { name: match.home, flag: "?" } as any;
-  const away = TEAMS[match.away] || { name: match.away, flag: "?" } as any;
-  const stage = STAGES[match.stage]?.name || "";
-  return {
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#0b1020"/>
-      <stop offset="100%" stop-color="#182343"/>
-    </linearGradient>
-    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ffd24a"/><stop offset="100%" stop-color="#f59e0b"/>
-    </linearGradient>
-  </defs>
-  <rect width="${W}" height="${H}" fill="url(#bg)"/>
-
-  <g transform="translate(60 80)" font-family="Heebo, Rubik, Arial">
-    <text font-size="32" font-weight="900" fill="url(#gold)">מונדיאל 2026 ⚽</text>
-    <text y="40" font-size="20" fill="#9aa3c7">${stage}${match.group ? ` · בית ${match.group}` : ""}</text>
-  </g>
-
-  <g text-anchor="middle" font-family="Heebo, Rubik, Arial" fill="#fff">
-    <text x="${W*0.25}" y="${H*0.55}" font-size="220">${home.flag}</text>
-    <text x="${W*0.25}" y="${H*0.78}" font-size="44" font-weight="800">${home.name}</text>
-
-    <text x="${W*0.5}" y="${H*0.45}" font-size="76" font-weight="900" fill="url(#gold)">VS</text>
-    <text x="${W*0.5}" y="${H*0.62}" font-size="72" font-weight="900" fill="#fff">${formatIsraelTime(match.utc)}</text>
-    <text x="${W*0.5}" y="${H*0.75}" font-size="22" fill="#9aa3c7">${formatIsraelDate(match.utc, { short: true })} · שעון ישראל</text>
-
-    <text x="${W*0.75}" y="${H*0.55}" font-size="220">${away.flag}</text>
-    <text x="${W*0.75}" y="${H*0.78}" font-size="44" font-weight="800">${away.name}</text>
-  </g>
-
-  <text x="${W/2}" y="${H - 30}" text-anchor="middle" font-family="Heebo" font-size="18" fill="#9aa3c7">
-    #מונדיאל2026 · #FIFAWorldCup
-  </text>
-</svg>`,
-    width: W, height: H,
-    filename: `mondial-${match.id}-x.png`,
   };
 }
 
@@ -240,6 +193,45 @@ async function svgToPngBlob(svg: string, w: number, h: number): Promise<Blob> {
   });
 }
 
+/* Detect mobile so we can try the Instagram Stories deep link */
+function isMobile(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+/* Try to open Instagram Stories directly with the image as background.
+ * Works on iOS / Android when the Instagram app is installed.
+ * Falls back to the native share sheet if the deep link doesn't fire. */
+async function openInstagramStory(blob: Blob): Promise<boolean> {
+  const file = new File([blob], "story.png", { type: "image/png" });
+
+  // 1. Best: Web Share API with files — Instagram appears as a target
+  if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
+    try {
+      await (navigator as any).share({ files: [file], title: "מונדיאל 2026" });
+      return true;
+    } catch {}
+  }
+
+  // 2. iOS: instagram-stories:// scheme (requires base64 image)
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    try {
+      const dataUrl = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.onerror = rej;
+        r.readAsDataURL(blob);
+      });
+      const base64 = dataUrl.split(",")[1];
+      const url = `instagram-stories://share?source_application=mondial2026&background_image=${encodeURIComponent(base64)}`;
+      window.location.href = url;
+      return true;
+    } catch {}
+  }
+
+  return false;
+}
+
 /* Open a modal that shows the card + download/share */
 export function openShareCard(kind: CardKind, args: any) {
   const { svg, width, height, filename } = buildSvg(kind, args);
@@ -251,17 +243,17 @@ export function openShareCard(kind: CardKind, args: any) {
     <div class="modal" role="dialog" style="max-width: 540px;">
       <button class="modal-close" aria-label="סגור">✕</button>
       <header class="modal-header">
-        <h2>📷 שתף באינסטה</h2>
-        <div class="muted">${kind === "match-twitter" ? "X / Twitter 1200×675" : "Instagram / WhatsApp 1080×1080"}</div>
+        <h2>📷 שתף בסטורי באינסטה</h2>
+        <div class="muted">תמונה 1080×1080 מותאמת לסטורי</div>
       </header>
       <div class="share-card-preview">${svg}</div>
       <div class="mc-actions" style="margin-top:14px;">
-        <button class="btn btn-primary" data-act="download">⬇️ הורד תמונה</button>
-        <button class="btn wa-btn" data-act="share">📲 שתף</button>
-        <button class="btn" data-act="copy-svg">📋 העתק SVG</button>
+        <button class="btn btn-primary" data-act="story">📸 שתף בסטורי</button>
+        <button class="btn" data-act="download">⬇️ הורד תמונה</button>
       </div>
-      <p class="muted" style="font-size:11px;margin-top:8px;">
-        טיפ: בנייד "שתף" יפתח את הסליל המקורי של המכשיר (WhatsApp / Instagram / X / Telegram).
+      <p class="muted" style="font-size:11px;margin-top:10px; line-height:1.5;">
+        📱 <strong>מובייל:</strong> "שתף בסטורי" יפתח את אפליקציית האינסטגרם — בחר Stories.<br/>
+        💻 <strong>מחשב:</strong> הורד את התמונה ושלח לעצמך בטלפון להעלאה כסטורי.
       </p>
     </div>`;
   document.body.appendChild(overlay);
@@ -283,30 +275,22 @@ export function openShareCard(kind: CardKind, args: any) {
     }
   });
 
-  overlay.querySelector("[data-act='share']")!.addEventListener("click", async () => {
+  overlay.querySelector("[data-act='story']")!.addEventListener("click", async () => {
     try {
       const blob = await svgToPngBlob(svg, width, height);
-      const file = new File([blob], filename, { type: "image/png" });
-      if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
-        await (navigator as any).share({ files: [file], title: "מונדיאל 2026" });
-      } else {
-        // Desktop fallback: download
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = filename;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+      if (isMobile()) {
+        const ok = await openInstagramStory(blob);
+        if (ok) return;
+      }
+      // Desktop or no share API: just download
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+      if (!isMobile()) {
+        alert("📥 התמונה ירדה. שלח אותה לטלפון שלך כדי להעלות כסטורי באינסטגרם.");
       }
     } catch (e) {}
-  });
-
-  overlay.querySelector("[data-act='copy-svg']")!.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(svg);
-      const btn = overlay.querySelector("[data-act='copy-svg']") as HTMLElement;
-      const orig = btn.textContent;
-      btn.textContent = "✓ הועתק";
-      setTimeout(() => { btn.textContent = orig; }, 1500);
-    } catch {}
   });
 }

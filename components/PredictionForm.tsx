@@ -103,7 +103,7 @@ export default function PredictionForm({ match }: { match: Match }) {
           const a = parseInt(away, 10) || 0;
           openShareCard("prediction", { match, home: h, away: a, joker: false });
         }}>
-          📷 שתף באינסטה
+          📷 שתף בסטורי באינסטה
         </button>
       </div>
 
