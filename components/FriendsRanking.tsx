@@ -45,6 +45,25 @@ export default function FriendsRanking() {
   const [openMatch, setOpenMatch] = useState<string | null>(null);
   const [scope, setScope] = useState<"upcoming" | "finished" | "all">("upcoming");
 
+  /* Super-admin sees EVERY group's leaderboard, not just their own memberships */
+  const [adminAllGroups, setAdminAllGroups] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    if (!user?.isAdmin) { setAdminAllGroups([]); return; }
+    (async () => {
+      try {
+        const token = await getFirebase().auth!.currentUser!.getIdToken();
+        const r = await fetch("/api/admin/groups", { headers: { authorization: `Bearer ${token}` } });
+        if (r.ok) {
+          const arr = await r.json();
+          setAdminAllGroups(arr.map((g: any) => ({ id: g.id, name: g.name })));
+        }
+      } catch {}
+    })();
+  }, [user?.isAdmin]);
+
+  /* Group list to render leaderboards for. Admin sees all; regular user sees their own. */
+  const leaderboardGroups = user?.isAdmin && adminAllGroups.length > 0 ? adminAllGroups : groups;
+
   useEffect(() => { refreshGroups(); }, [refreshGroups]);
 
   const currentGroup = useMemo(
@@ -140,29 +159,39 @@ export default function FriendsRanking() {
         </div>
       )}
 
-      {/* Leaderboards — one per group the user is a member of, plus global */}
+      {/* Leaderboards — one card per group, side-by-side.
+       *   Regular user: only groups they're a member of.
+       *   Super admin:  ALL groups in the system. */}
       <h3 className="sec-title" style={{ marginTop: 18 }}>
-        📊 לוחות התוצאות {groups.length > 1 ? `שלך (${groups.length} קבוצות)` : ""}
+        📊 לוחות התוצאות
+        {user.isAdmin && adminAllGroups.length > 0
+          ? <span className="chip chip-strong" style={{ marginInlineStart: 8, fontSize: 11 }}>🛡️ Super Admin · רואה את כל הקבוצות ({adminAllGroups.length})</span>
+          : leaderboardGroups.length > 1
+            ? <span className="muted" style={{ marginInlineStart: 8, fontSize: 13 }}>שלך ({leaderboardGroups.length} קבוצות)</span>
+            : null}
       </h3>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {groups.map(g => (
-          <GroupLeaderboardCard
-            key={g.id}
-            groupId={g.id}
-            groupName={g.name}
-            myUid={user.uid}
-            predictionRows={g.id === currentGroupId ? rows : []}
-          />
-        ))}
-        <GroupLeaderboardCard
-          key="global"
-          groupId={null}
-          groupName="🌍 דירוג גלובלי (כל המשתמשים)"
-          myUid={user.uid}
-          predictionRows={!currentGroupId ? rows : []}
-          collapsed={groups.length > 0}
-        />
-      </div>
+      {leaderboardGroups.length === 0 ? (
+        <div className="empty-state">
+          עוד לא הצטרפת לקבוצה. צור קבוצה משלך או הצטרף לקבוצה קיימת עם קוד הזמנה למעלה.
+        </div>
+      ) : (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(auto-fit, minmax(${leaderboardGroups.length === 1 ? 320 : 300}px, 1fr))`,
+          gap: 14,
+          alignItems: "start",
+        }}>
+          {leaderboardGroups.map(g => (
+            <GroupLeaderboardCard
+              key={g.id}
+              groupId={g.id}
+              groupName={g.name}
+              myUid={user.uid}
+              predictionRows={g.id === currentGroupId ? rows : []}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Predictions per match */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18 }}>
