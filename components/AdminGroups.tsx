@@ -369,11 +369,6 @@ function AllLeaderboardsModal({
             if (r.ok) out[g.id] = await r.json();
           } catch {}
         }));
-        /* Also load global */
-        try {
-          const r = await fetch(`/api/leaderboard`);
-          if (r.ok) out["__global__"] = await r.json();
-        } catch {}
         setBoards(out);
       } finally { setBusy(false); }
     })();
@@ -381,26 +376,24 @@ function AllLeaderboardsModal({
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" style={{ maxWidth: 760 }}>
+      <div className="modal" role="dialog" style={{ maxWidth: "95vw", width: 1200 }}>
         <button className="modal-close" onClick={onClose}>✕</button>
         <header className="modal-header">
           <h2>📊 כל לוחות התוצאות</h2>
-          <div className="muted">{groups.length} קבוצות + לוח גלובלי</div>
+          <div className="muted">{groups.length} קבוצות (כל לוח מוצג בנפרד — אין שילוב בין קבוצות)</div>
         </header>
 
         {busy && Object.keys(boards).length === 0 && (
           <div className="muted" style={{ marginTop: 14 }}>…טוען</div>
         )}
 
-        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* Global */}
-          {boards["__global__"] && boards["__global__"].length > 0 && (
-            <LbCard
-              title="🌍 דירוג גלובלי (כל המשתמשים)"
-              rows={boards["__global__"]}
-              groupName={null}
-            />
-          )}
+        <div style={{
+          marginTop: 14,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: 14,
+          alignItems: "start",
+        }}>
           {groups.map(g => {
             const rows = boards[g.id] || [];
             return (

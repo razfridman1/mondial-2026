@@ -14,7 +14,6 @@ const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean }[] = [
   { id: "ranking",       label: "🏆 דירוג חברים" },
   { id: "teams",         label: "🌍 קבוצות ושחקנים" },
   { id: "bracket",       label: "🏆 שלב הנוקאאוט" },
-  { id: "ai",            label: "🤖 AI" },
   { id: "profile",       label: "👤 פרופיל" },
   { id: "admin",         label: "👥 ניהול משתמשים", adminOnly: true },
   { id: "simulation",    label: "🧪 ניהול סימולציה", adminOnly: true },
@@ -35,9 +34,11 @@ export default function Header() {
     return () => clearInterval(id);
   }, []);
 
-  /* Legacy guard: broadcasts tab was removed — auto-reset to schedule */
+  /* Legacy guard: removed tabs auto-reset to schedule */
   useEffect(() => {
-    if ((tab as string) === "broadcasts") setPref("tab", "schedule");
+    if ((tab as string) === "broadcasts" || (tab as string) === "ai") {
+      setPref("tab", "schedule");
+    }
   }, [tab, setPref]);
 
   return (
