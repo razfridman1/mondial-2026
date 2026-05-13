@@ -112,13 +112,7 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
               const { openShareCard } = await import("@/lib/share-cards");
               openShareCard("match", { match: m });
             }}>
-              📷 שתף באינסטה
-            </button>
-            <button className="btn" onClick={async () => {
-              const { openShareCard } = await import("@/lib/share-cards");
-              openShareCard("match-twitter", { match: m });
-            }}>
-              𝕏 כרטיס ל-X
+              📷 שתף בסטורי באינסטה
             </button>
           </div>
         </section>
@@ -126,9 +120,9 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
           <h3>📺 שידור בישראל</h3>
           <div className="bc-chips">
             {channels.length ? channels.map(c => (
-              <a key={c.id} className="channel-chip channel-big" style={{ ["--ch" as any]: c.color }} href={c.url} target="_blank" rel="noopener">
+              <span key={c.id} className="channel-chip channel-big is-static" style={{ ["--ch" as any]: c.color }}>
                 <span className="channel-logo">{c.logo}</span><span>{c.name}</span><span className="muted">{c.type}</span>
-              </a>
+              </span>
             )) : <span className="muted">טרם נקבע</span>}
           </div>
           {m.studioShow && <p>🎬 {m.studioShow}</p>}

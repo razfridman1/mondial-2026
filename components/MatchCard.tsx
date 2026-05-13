@@ -97,9 +97,9 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
         <div className="bc-label">שידור בישראל:</div>
         <div className="bc-chips">
           {channels.length ? channels.map(c => (
-            <a key={c.id} className="channel-chip" style={{ ["--ch" as any]: c.color }} href={c.url} target="_blank" rel="noopener">
+            <span key={c.id} className="channel-chip is-static" style={{ ["--ch" as any]: c.color }}>
               <span className="channel-logo">{c.logo}</span><span>{c.name}</span>
-            </a>
+            </span>
           )) : <span className="muted">טרם נקבע</span>}
         </div>
         {match.studioShow && (

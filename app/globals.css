@@ -622,6 +622,8 @@ button { font-family: inherit; cursor: pointer; }
   transition: transform .15s, background .15s;
 }
 .channel-chip:hover { background: var(--ch, var(--border)); color: #fff; transform: translateY(-1px); }
+.channel-chip.is-static { cursor: default; }
+.channel-chip.is-static:hover { background: rgba(255,255,255,0.04); color: var(--text); transform: none; }
 .channel-big { padding: 8px 14px; font-size: 14px; }
 .channel-logo { font-size: 14px; }
 .bc-studio { font-size: 12px; color: var(--text-muted); }
