@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AVATARS, getAvatar, defaultAvatarId } from "@/lib/avatars";
 import { useStore } from "@/lib/store";
 
@@ -8,13 +9,26 @@ export default function AvatarPicker({ onClose }: { onClose: () => void }) {
   const profile = useStore(s => s.profile);
   const setProfileAvatar = useStore(s => s.setProfileAvatar);
   const [selected, setSelected] = useState<string>(profile?.avatarId || defaultAvatarId());
+  const [mounted, setMounted] = useState(false);
+
+  /* Portal target only available client-side. */
+  useEffect(() => { setMounted(true); }, []);
+
+  /* Lock body scroll while modal is open */
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
 
   async function save() {
     await setProfileAvatar(selected);
     onClose();
   }
 
-  return (
+  if (!mounted) return null;
+
+  const content = (
     <div className="modal-overlay avatar-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal avatar-modal" role="dialog">
         <button className="modal-close" onClick={onClose} aria-label="סגור">✕</button>
@@ -52,6 +66,8 @@ export default function AvatarPicker({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }
 
 export function AvatarDisplay({ avatarId, size = 40 }: { avatarId: string; size?: number }) {
