@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdmin, verifyIdToken } from "@/lib/firebase-admin";
+import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { MATCHES } from "@/lib/data";
 import { effectiveUtc, type SimConfig } from "@/lib/sim";
 import { applyOverride } from "@/lib/utils";
@@ -70,9 +70,11 @@ export async function GET(req: Request) {
     return { ...withOv, effUtc: effectiveUtc(withOv.utc, sim) };
   });
 
-  /* 5. Build rows for matches that have at least 1 prediction */
+  /* 5. Build rows for matches that have at least 1 prediction.
+   *    Super-admins see EVERY prediction regardless of timing (no privacy redaction). */
   const now = Date.now();
   const callerUid = decoded.uid;
+  const callerIsAdmin = isAdminEmail(decoded.email);
 
   const rows = matchEff
     .filter(mt => allPreds.some(p => p.matchId === mt.id))
@@ -82,7 +84,7 @@ export async function GET(req: Request) {
         .filter(p => p.matchId === mt.id)
         .map(p => {
           const isSelf = p.uid === callerUid;
-          const reveal = visible || isSelf;
+          const reveal = visible || isSelf || callerIsAdmin;
           return {
             uid: p.uid,
             displayName: profByUid[p.uid]?.displayName || "משתמש",

@@ -290,7 +290,10 @@ function MatchBlock({ row, onOpen }: { row: MatchRow; onOpen: () => void }) {
   const startMs = new Date(row.utc).getTime();
   const visibleAtMs = startMs - 2 * 60 * 1000;
   const msToVisibility = visibleAtMs - now;
-  const visibleNow = row.visible || msToVisibility <= 0;
+  /* Admins see all predictions unredacted (server marks `hidden: false` on them),
+   * so if nothing is hidden treat the row as visible regardless of timing. */
+  const allRevealed = row.predictions.every(p => !p.hidden);
+  const visibleNow = row.visible || msToVisibility <= 0 || allRevealed;
   const fmtCountdown = () => {
     const total = Math.max(0, Math.floor(msToVisibility / 1000));
     const h = Math.floor(total / 3600);
