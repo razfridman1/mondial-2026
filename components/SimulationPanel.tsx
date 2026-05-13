@@ -6,7 +6,12 @@ import { MATCHES, STAGES } from "@/lib/data";
 import { SIM_PRESETS } from "@/lib/sim";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 
-interface GroupRow { id: string; name: string; memberCount?: number; }
+interface GroupRow {
+  id: string;
+  name: string;
+  memberCount?: number;
+  members?: Array<{ uid: string; role?: string }>;
+}
 
 const STAGE_OPTIONS: Array<{ id: string; label: string }> = [
   { id: "ALL",      label: "כל השלבים" },
@@ -39,20 +44,19 @@ export default function SimulationPanel() {
     return { "content-type": "application/json", authorization: `Bearer ${token}` };
   }
 
-  /* Load groups list once when component mounts (admin-only) */
-  useEffect(() => {
+  /* Load groups list (admin-only). Re-run via reloadGroups() after any action. */
+  async function reloadGroups() {
     if (!user?.isAdmin) return;
-    (async () => {
-      try {
-        const r = await fetch("/api/admin/groups", { headers: await authHeaders() });
-        if (r.ok) {
-          const data = await r.json();
-          setGroups(data);
-          if (data[0]) setFillGroupId(data[0].id);
-        }
-      } catch {}
-    })();
-  }, [user?.isAdmin]);
+    try {
+      const r = await fetch("/api/admin/groups", { headers: await authHeaders() });
+      if (r.ok) {
+        const data = await r.json();
+        setGroups(data);
+        if (!fillGroupId && data[0]) setFillGroupId(data[0].id);
+      }
+    } catch {}
+  }
+  useEffect(() => { reloadGroups(); }, [user?.isAdmin]);
 
   async function randomFill() {
     if (!fillGroupId) { alert("בחר קבוצה."); return; }
@@ -514,17 +518,45 @@ export default function SimulationPanel() {
           ⚡ אין צורך בסימולציה זמן‑אמת לבדיקות האלה — הכל מיידי.
         </p>
 
-        <div className="sim-row">
+        <div className="sim-row" style={{ alignItems: "center" }}>
           <label>👥 קבוצה:</label>
-          <select value={fillGroupId} onChange={e => setFillGroupId(e.target.value)} disabled={busy}>
+          <select value={fillGroupId} onChange={e => setFillGroupId(e.target.value)} disabled={busy} style={{ flex: 1 }}>
             <option value="">— בחר קבוצה —</option>
-            {groups.map(g => (
-              <option key={g.id} value={g.id}>
-                {g.name} {g.memberCount ? `(${g.memberCount} חברים)` : ""}
-              </option>
-            ))}
+            {groups.map(g => {
+              const actualCount = g.members?.length ?? g.memberCount ?? 0;
+              return (
+                <option key={g.id} value={g.id}>
+                  {g.name} ({actualCount} חברים)
+                </option>
+              );
+            })}
           </select>
+          <button
+            type="button"
+            className="btn btn-small"
+            onClick={reloadGroups}
+            disabled={busy}
+            title="טען מחדש את רשימת הקבוצות (אחרי שינויים בניהול משתמשים)"
+          >
+            ↻
+          </button>
         </div>
+        {fillGroupId && (() => {
+          const g = groups.find(x => x.id === fillGroupId);
+          const memberCount = g?.members?.length ?? g?.memberCount ?? 0;
+          if (memberCount === 0) {
+            return (
+              <p style={{
+                fontSize: 12, color: "var(--orange)",
+                background: "rgba(245,158,11,0.10)",
+                padding: "6px 10px", borderRadius: 6, margin: "4px 0",
+              }}>
+                ⚠ לקבוצה הזו אין חברים. מילוי ניחושים לא יעשה כלום.
+              </p>
+            );
+          }
+          return null;
+        })()}
 
         <div className="sim-row">
           <label>🏁 שלב:</label>
