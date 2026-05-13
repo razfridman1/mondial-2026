@@ -348,6 +348,7 @@ function MiniGroupLeaderboard({
 }: { groupId: string; groupName: string; myUid: string }) {
   const [rows, setRows] = useState<LeaderRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [peek, setPeek] = useState<LeaderRow | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -378,7 +379,16 @@ function MiniGroupLeaderboard({
       ) : (
         <div className="mypred-mini-rows">
           {rows.slice(0, 5).map((r, i) => (
-            <div key={r.uid} className={`mypred-mini-row ${r.uid === myUid ? "is-me" : ""}`}>
+            <div
+              key={r.uid}
+              className={`mypred-mini-row ${r.uid === myUid ? "is-me" : ""}`}
+              onClick={() => setPeek(r)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => { if (e.key === "Enter") setPeek(r); }}
+              style={{ cursor: "pointer" }}
+              title="לחץ לפרטים מלאים"
+            >
               <span className={`mypred-mini-rank rank-${i + 1}`}>
                 {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
               </span>
@@ -389,6 +399,87 @@ function MiniGroupLeaderboard({
           ))}
         </div>
       )}
+      {peek && <ProfilePeekModal row={peek} isMe={peek.uid === myUid} onClose={() => setPeek(null)} />}
+    </div>
+  );
+}
+
+/* ===================================================================
+ * ProfilePeekModal — quick user details (name, avatar, joined, stats)
+ * triggered from the mini leaderboards.
+ * =================================================================== */
+function ProfilePeekModal({
+  row, isMe, onClose,
+}: { row: LeaderRow; isMe: boolean; onClose: () => void }) {
+  const [profile, setProfile] = useState<any>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { getUserDoc } = await import("@/lib/firebase");
+        const p = await getUserDoc<any>(`profiles/${row.uid}`);
+        if (p) setProfile(p);
+      } catch {}
+    })();
+  }, [row.uid]);
+
+  const { AVATARS } = require("@/lib/avatars");
+  const avatarInfo = AVATARS.find((a: any) => a.id === (profile?.avatarId || row.avatarId));
+  const accuracyPct = row.predictionsCount > 0
+    ? Math.round((row.resultCount / row.predictionsCount) * 100)
+    : 0;
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog" style={{ maxWidth: 480 }}>
+        <button className="modal-close" onClick={onClose}>✕</button>
+        <header className="modal-header" style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          <AvatarDisplay avatarId={row.avatarId} size={72} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ margin: 0 }}>
+              {row.displayName}
+              {isMe && <span className="chip chip-strong" style={{ marginInlineStart: 6, fontSize: 10 }}>אתה</span>}
+              {profile?.managed && <span className="chip" style={{ marginInlineStart: 6, fontSize: 10 }}>חשבון פנימי</span>}
+            </h2>
+            <div className="muted" style={{ marginTop: 4 }}>
+              מקום <strong style={{ color: "var(--accent)" }}>#{row.rank}</strong> · {row.totalPoints} נקודות
+            </div>
+            {avatarInfo && (
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                {avatarInfo.flag} <strong>{avatarInfo.name}</strong> · {avatarInfo.era}
+                {avatarInfo.signature && <> · <em>{avatarInfo.signature}</em></>}
+              </div>
+            )}
+            {profile?.joinedAt && (
+              <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+                📅 חבר מאז {new Date(profile.joinedAt).toLocaleDateString("he-IL")}
+              </div>
+            )}
+            {profile?.bio && (
+              <div style={{
+                marginTop: 6, padding: "6px 10px",
+                background: "var(--bg-elev)", borderRadius: 8,
+                fontSize: 12, fontStyle: "italic",
+              }}>"{profile.bio}"</div>
+            )}
+          </div>
+        </header>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
+          gap: 8, marginTop: 16,
+        }}>
+          <StatTile icon="🏆" value={row.totalPoints} label="נקודות" big />
+          <StatTile icon="📊" value={`${accuracyPct}%`} label="דיוק" />
+          <StatTile icon="🎯" value={row.exactCount} label="מדויקים" />
+          <StatTile icon="🔥" value={row.streak} label="סטריק" />
+          <StatTile icon="✅" value={`${row.resultCount}/${row.predictionsCount}`} label="תוצאות" />
+        </div>
+
+        <div className="mc-actions" style={{ marginTop: 16 }}>
+          <button className="btn btn-primary" onClick={onClose}>סגור</button>
+        </div>
+      </div>
     </div>
   );
 }

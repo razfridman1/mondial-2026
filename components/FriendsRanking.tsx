@@ -5,6 +5,8 @@ import { getFirebase } from "@/lib/firebase";
 import { TEAMS } from "@/lib/data";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { shareToWhatsApp, leaderboardShareText } from "@/lib/share";
+import { getUserDoc } from "@/lib/firebase";
+import { AVATARS } from "@/lib/avatars";
 import { AvatarDisplay } from "./AvatarPicker";
 import MatchModal from "./MatchModal";
 import type { LeaderRow, ActivityEvent } from "@/lib/types";
@@ -448,25 +450,65 @@ function UserStatsModal({
     return out.sort((a, b) => new Date(b.utc).getTime() - new Date(a.utc).getTime());
   }, [predictionRows, row.uid]);
 
+  /* Fetch the public profile doc for extra details (bio, joinedAt, etc.) */
+  const [profile, setProfile] = useState<{
+    displayName?: string;
+    avatarId?: string;
+    bio?: string;
+    joinedAt?: number;
+    managed?: boolean;
+  } | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const p = await getUserDoc<any>(`profiles/${row.uid}`);
+        if (p) setProfile(p);
+      } catch {}
+    })();
+  }, [row.uid]);
+
+  const avatarInfo = AVATARS.find(a => a.id === (profile?.avatarId || row.avatarId));
+
   const accuracyPct = row.predictionsCount > 0
     ? Math.round((row.resultCount / row.predictionsCount) * 100)
     : 0;
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" style={{ maxWidth: 600 }}>
+      <div className="modal" role="dialog" style={{ maxWidth: 620 }}>
         <button className="modal-close" onClick={onClose} aria-label="סגור">✕</button>
 
         <header className="modal-header" style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <AvatarDisplay avatarId={row.avatarId} size={64} />
-          <div>
+          <AvatarDisplay avatarId={row.avatarId} size={80} />
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{ margin: 0 }}>
               {row.displayName}
               {isMe && <span className="chip chip-strong" style={{ marginInlineStart: 8, fontSize: 11 }}>אתה</span>}
+              {profile?.managed && <span className="chip" style={{ marginInlineStart: 6, fontSize: 10 }}>חשבון פנימי</span>}
             </h2>
-            <div className="muted">
+            <div className="muted" style={{ marginTop: 4 }}>
               מקום <strong style={{ color: "var(--accent)" }}>#{row.rank}</strong> · {row.totalPoints} נקודות
             </div>
+            {avatarInfo && (
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                {avatarInfo.flag} <strong>{avatarInfo.name}</strong> · {avatarInfo.era}
+                {avatarInfo.signature && <> · <em>{avatarInfo.signature}</em></>}
+              </div>
+            )}
+            {profile?.joinedAt && (
+              <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+                📅 חבר מאז {new Date(profile.joinedAt).toLocaleDateString("he-IL")}
+              </div>
+            )}
+            {profile?.bio && (
+              <div style={{
+                marginTop: 6, padding: "6px 10px",
+                background: "var(--bg-elev)", borderRadius: 8,
+                fontSize: 12, fontStyle: "italic",
+              }}>
+                "{profile.bio}"
+              </div>
+            )}
           </div>
         </header>
 
