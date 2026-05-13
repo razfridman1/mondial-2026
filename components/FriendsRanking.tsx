@@ -145,7 +145,7 @@ export default function FriendsRanking() {
       {loading && !leaderboard.length ? (
         <div className="muted">…טוען</div>
       ) : (
-        <Leaderboard rows={leaderboard} myUid={user.uid} />
+        <Leaderboard rows={leaderboard} myUid={user.uid} predictionRows={rows} />
       )}
 
       {/* Predictions per match */}
@@ -256,26 +256,240 @@ function JoinGroupBtn({ onJoined }: { onJoined: () => void }) {
   return <button className="btn" onClick={join} disabled={busy}>🔑 הצטרף עם קוד</button>;
 }
 
-function Leaderboard({ rows, myUid }: { rows: LeaderRow[]; myUid: string }) {
+function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid: string; predictionRows: MatchRow[] }) {
+  const [openUser, setOpenUser] = useState<LeaderRow | null>(null);
   if (!rows.length) return <div className="empty-state">אין עדיין נתונים — כשיתחילו המשחקים יופיע leaderboard חי.</div>;
   return (
-    <div className="leaderboard">
-      {rows.map(r => (
-        <div key={r.uid} className={`lb-row ${r.rank === 1 ? "is-first" : r.rank === 2 ? "is-second" : r.rank === 3 ? "is-third" : ""} ${r.uid === myUid ? "is-me" : ""}`}>
-          <div className="lb-rank">#{r.rank}</div>
-          <div className="lb-avatar"><AvatarDisplay avatarId={r.avatarId} size={36} /></div>
-          <div className="lb-name">
-            <div>
-              {r.displayName}
-              {r.uid === myUid && <span className="chip" style={{ marginInlineStart: 6, fontSize: 9 }}>אתה</span>}
+    <>
+      <div className="leaderboard">
+        {rows.map(r => (
+          <div
+            key={r.uid}
+            role="button"
+            tabIndex={0}
+            onClick={() => setOpenUser(r)}
+            onKeyDown={e => { if (e.key === "Enter") setOpenUser(r); }}
+            className={`lb-row lb-row-clickable ${r.rank === 1 ? "is-first" : r.rank === 2 ? "is-second" : r.rank === 3 ? "is-third" : ""} ${r.uid === myUid ? "is-me" : ""}`}
+            title="לחץ לפרטים מלאים"
+          >
+            <div className="lb-rank">#{r.rank}</div>
+            <div className="lb-avatar"><AvatarDisplay avatarId={r.avatarId} size={36} /></div>
+            <div className="lb-name">
+              <div>
+                {r.displayName}
+                {r.uid === myUid && <span className="chip" style={{ marginInlineStart: 6, fontSize: 9 }}>אתה</span>}
+              </div>
+              <div className="muted lb-stats">
+                <span title="ניחושים מדויקים — תוצאה זהה לחלוטין למשחק האמיתי (7 נק׳ למשחק)">🎯 {r.exactCount}</span>
+                {" · "}
+                <span title="תוצאות נכונות (מי ניצח / תיקו) מתוך כלל הניחושים — 3 נק׳ למשחק, +1 אם גם הפרש שערים נכון">✅ {r.resultCount}/{r.predictionsCount}</span>
+                {" · "}
+                <span title="סטריק — רצף ארוך ביותר של ניחושים נכונים. כל ניחוש נכון ברצף = נקודת בונוס נוספת">🔥 {r.streak}</span>
+              </div>
             </div>
-            <div className="muted lb-stats">
-              🎯 {r.exactCount} · ✅ {r.resultCount}/{r.predictionsCount} · 🔥 {r.streak}
+            <div className="lb-points">{r.totalPoints}<span className="muted" style={{ fontSize: 11 }}> נק׳</span></div>
+          </div>
+        ))}
+      </div>
+      {openUser && (
+        <UserStatsModal
+          row={openUser}
+          isMe={openUser.uid === myUid}
+          predictionRows={predictionRows}
+          onClose={() => setOpenUser(null)}
+        />
+      )}
+    </>
+  );
+}
+
+/* ===================================================================
+ * UserStatsModal — detailed view of a single user's leaderboard stats
+ * =================================================================== */
+function UserStatsModal({
+  row, isMe, predictionRows, onClose,
+}: {
+  row: LeaderRow;
+  isMe: boolean;
+  predictionRows: MatchRow[];
+  onClose: () => void;
+}) {
+  /* Pull every prediction this user made from the group-predictions snapshot */
+  const myPreds = useMemo(() => {
+    const out: Array<{
+      matchId: string; home: string; away: string; utc: string;
+      pred: PredictionCell | null;
+    }> = [];
+    for (const mr of predictionRows) {
+      const p = mr.predictions.find(x => x.uid === row.uid);
+      if (p) out.push({ matchId: mr.matchId, home: mr.home, away: mr.away, utc: mr.utc, pred: p });
+    }
+    return out.sort((a, b) => new Date(b.utc).getTime() - new Date(a.utc).getTime());
+  }, [predictionRows, row.uid]);
+
+  const accuracyPct = row.predictionsCount > 0
+    ? Math.round((row.resultCount / row.predictionsCount) * 100)
+    : 0;
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog" style={{ maxWidth: 600 }}>
+        <button className="modal-close" onClick={onClose} aria-label="סגור">✕</button>
+
+        <header className="modal-header" style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <AvatarDisplay avatarId={row.avatarId} size={64} />
+          <div>
+            <h2 style={{ margin: 0 }}>
+              {row.displayName}
+              {isMe && <span className="chip chip-strong" style={{ marginInlineStart: 8, fontSize: 11 }}>אתה</span>}
+            </h2>
+            <div className="muted">
+              מקום <strong style={{ color: "var(--accent)" }}>#{row.rank}</strong> · {row.totalPoints} נקודות
             </div>
           </div>
-          <div className="lb-points">{r.totalPoints}<span className="muted" style={{ fontSize: 11 }}> נק׳</span></div>
+        </header>
+
+        {/* Stat tiles */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: 10,
+          marginTop: 16,
+        }}>
+          <StatTile
+            icon="🏆"
+            value={row.totalPoints}
+            label="סך נקודות"
+            tooltip="סך כל הנקודות שצברת מניחושים, כולל בונוסי סטריק."
+            big
+          />
+          <StatTile
+            icon="📊"
+            value={`${accuracyPct}%`}
+            label={`דיוק (${row.resultCount}/${row.predictionsCount})`}
+            tooltip="אחוז הניחושים שבהם ניחשת נכון מי מנצח (או תיקו) מתוך כלל הניחושים שכבר הסתיימו."
+          />
+          <StatTile
+            icon="🎯"
+            value={row.exactCount}
+            label="מדויקים"
+            tooltip="ניחושים שבהם פגעת בתוצאה המדויקת של המשחק — אותם שערים בדיוק לכל קבוצה. שווה 7 נקודות למשחק (כפול ממשחק עם תוצאה נכונה בלבד)."
+          />
+          <StatTile
+            icon="🔥"
+            value={row.streak}
+            label="סטריק"
+            tooltip="הרצף הארוך ביותר של ניחושים נכונים ברצף. כל ניחוש נכון בתוך רצף שווה נקודת בונוס נוספת. הרצף נשבר כשמפספסים."
+          />
+          <StatTile
+            icon="✅"
+            value={row.resultCount}
+            label="תוצאות נכונות"
+            tooltip="ניחושים שבהם ניחשת נכון מי ניצח (או תיקו), גם אם לא פגעת בתוצאה המדויקת. שווה 3 נקודות (או 4 אם גם הפרש השערים מדויק)."
+          />
+          <StatTile
+            icon="📝"
+            value={row.predictionsCount}
+            label="סך הניחושים"
+            tooltip="כל הניחושים ששמרת עד עתה (כולל אלו שעוד לא הסתיימו)."
+          />
         </div>
-      ))}
+
+        {/* Explanation of scoring */}
+        <details style={{
+          marginTop: 16, padding: 10,
+          background: "var(--bg-elev)",
+          border: "1px solid var(--border-soft)",
+          borderRadius: 10,
+          fontSize: 12, lineHeight: 1.7,
+        }}>
+          <summary style={{ cursor: "pointer", fontWeight: 700 }}>💡 איך נצברות נקודות?</summary>
+          <div style={{ marginTop: 8 }}>
+            • 🎯 <strong>תוצאה מדויקת</strong> (3:1 — 3:1): <strong>7 נק׳</strong><br/>
+            • ✅ <strong>תוצאה נכונה + הפרש שערים</strong> (3:1 — 2:0): <strong>4 נק׳</strong><br/>
+            • ✅ <strong>תוצאה נכונה</strong> (3:1 — 4:2): <strong>3 נק׳</strong><br/>
+            • ❌ <strong>תוצאה לא נכונה</strong> (3:1 — 1:2): <strong>0 נק׳</strong> (וסטריק נשבר)<br/>
+            • 🔥 <strong>בונוס סטריק</strong>: כל ניחוש נכון ברצף = +1 נק׳ נוספת
+          </div>
+        </details>
+
+        {/* Recent predictions */}
+        {myPreds.length > 0 && (
+          <>
+            <h3 className="sec-title" style={{ marginTop: 18, fontSize: 14 }}>
+              🔮 ניחושים אחרונים ({myPreds.length})
+            </h3>
+            <div style={{ maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+              {myPreds.slice(0, 20).map(p => {
+                const home = TEAMS[p.home] || { name: p.home, flag: "❓" };
+                const away = TEAMS[p.away] || { name: p.away, flag: "❓" };
+                return (
+                  <div key={p.matchId} style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto 1fr",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 10px",
+                    background: "var(--bg-elev)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}>
+                    <span style={{ textAlign: "start" }}>
+                      {home.flag} {home.name}
+                    </span>
+                    <span style={{ fontWeight: 800, color: p.pred?.hidden ? "var(--text-muted)" : "var(--accent)" }}>
+                      {p.pred?.hidden
+                        ? "🔒"
+                        : `${p.pred?.homeScore} : ${p.pred?.awayScore}`}
+                    </span>
+                    <span style={{ textAlign: "end" }}>
+                      {away.name} {away.flag}
+                    </span>
+                  </div>
+                );
+              })}
+              {myPreds.length > 20 && (
+                <div className="muted" style={{ fontSize: 11, textAlign: "center", padding: 6 }}>
+                  + עוד {myPreds.length - 20} ניחושים…
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        <div className="mc-actions" style={{ marginTop: 16 }}>
+          <button className="btn btn-primary" onClick={onClose}>סגור</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatTile({
+  icon, value, label, tooltip, big = false,
+}: { icon: string; value: any; label: string; tooltip: string; big?: boolean }) {
+  return (
+    <div
+      title={tooltip}
+      style={{
+        background: big ? "linear-gradient(135deg, var(--primary), var(--primary-2))" : "var(--bg-elev)",
+        color: big ? "#fff" : "var(--text)",
+        border: `1px solid ${big ? "var(--primary)" : "var(--border)"}`,
+        borderRadius: 12,
+        padding: "10px 12px",
+        textAlign: "center",
+        cursor: "help",
+        position: "relative",
+      }}
+    >
+      <div style={{ fontSize: 12, opacity: big ? 0.9 : 0.7 }}>{icon} {label}</div>
+      <div style={{ fontSize: big ? 28 : 22, fontWeight: 900, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
+        {value}
+      </div>
+      <div style={{
+        position: "absolute", top: 4, insetInlineEnd: 6,
+        fontSize: 10, color: big ? "rgba(255,255,255,0.6)" : "var(--text-muted)",
+      }} aria-hidden>ⓘ</div>
     </div>
   );
 }

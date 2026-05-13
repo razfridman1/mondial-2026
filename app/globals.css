@@ -1436,6 +1436,19 @@ button { font-family: inherit; cursor: pointer; }
 .lb-row.is-first  { border-color: var(--accent);        background: linear-gradient(90deg, rgba(255,210,74,0.10), var(--bg-card)); }
 .lb-row.is-second { border-color: #c0c0c0; }
 .lb-row.is-third  { border-color: #cd7f32; }
+.lb-row-clickable {
+  cursor: pointer;
+  transition: transform .12s, border-color .12s, box-shadow .12s;
+}
+.lb-row-clickable:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(0,212,255,0.10);
+}
+.lb-row-clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .lb-rank { font-size: 18px; font-weight: 900; color: var(--accent); text-align: center; }
 .lb-name { font-weight: 700; }
 .lb-stats { font-size: 11px; margin-top: 2px; }
