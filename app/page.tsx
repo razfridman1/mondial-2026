@@ -8,7 +8,6 @@ import Bracket from "@/components/Bracket";
 import AIInsights from "@/components/AIInsights";
 import AdminPanel from "@/components/AdminPanel";
 import ChatAssistant from "@/components/ChatAssistant";
-import EmailReminderPrefs from "@/components/EmailReminderPrefs";
 import TeamsTab from "@/components/TeamsTab";
 import ProfileTab from "@/components/ProfileTab";
 import FriendsRanking from "@/components/FriendsRanking";
@@ -25,7 +24,6 @@ function HomeInner() {
       <Header />
       <SimulationBanner />
       <main className="container">
-        <EmailReminderPrefs />
         {tab === "schedule"   && <Schedule />}
         {tab === "ranking"    && <FriendsRanking />}
         {tab === "broadcasts" && <Broadcasts />}

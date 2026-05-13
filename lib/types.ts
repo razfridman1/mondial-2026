@@ -58,11 +58,6 @@ export interface Match {
 }
 
 /* Firestore documents */
-export interface UserRemindersDoc {
-  uid: string;
-  reminders: Record<string, { h60?: boolean; m15?: boolean; betsClose?: boolean }>;
-  updatedAt: number;
-}
 export interface BroadcastOverrideDoc {
   matchId: string;
   utc?: string;
@@ -92,17 +87,6 @@ export interface Prediction {
   updatedAt: number;
   joker?: boolean;        // ×2 score multiplier for this match
   auto?: boolean;         // generated automatically at kickoff
-}
-
-/* Per-user email preferences */
-export interface EmailPrefsDoc {
-  uid: string;
-  email: string;
-  enabled: boolean;          // master toggle
-  h60: boolean;              // שעה לפני
-  m15: boolean;              // 15 דק׳ לפני
-  betsClose: boolean;        // סגירת הימורים
-  updatedAt: number;
 }
 
 /* Chat message for AI assistant */

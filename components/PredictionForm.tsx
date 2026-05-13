@@ -70,9 +70,6 @@ export default function PredictionForm({ match }: { match: Match }) {
       await setPrediction(match.id, h, a, joker);
       setSavedAt(Date.now());
       setTimeout(() => setSavedAt(null), 3000);
-      // Play a soft success sound
-      const { playSound } = await import("@/lib/sound");
-      playSound("save");
     } catch (e: any) {
       setError(e.message || "שגיאה בשמירה");
     }

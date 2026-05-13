@@ -14,8 +14,6 @@ import Pitch from "./Pitch";
 export default function MatchModal({ matchId, onClose }: { matchId: string; onClose: () => void }) {
   const overrides = useStore(s => s.overrides);
   const simConfig = useStore(s => s.simConfig);
-  const setReminder = useStore(s => s.setReminder);
-  const reminders = useStore(s => s.reminders);
   const [lineups, setLineups] = useState<{ home: TeamLineup; away: TeamLineup } | null>(null);
   const [lineupSource, setLineupSource] = useState<"default" | "live" | "placeholder">("default");
 
@@ -47,7 +45,6 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
   const venue = VENUES[m.venue] || { name: m.venue, city: "", country: "", flag: "", capacity: 0 };
   const stage = STAGES[m.stage];
   const channels = (m.channels || []).map(c => CHANNELS[c]).filter(Boolean);
-  const r = reminders[m.id] || {};
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -132,12 +129,6 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
           </div>
           {m.studioShow && <p>🎬 {m.studioShow}</p>}
           <p className="muted">קדם-משחק מתחיל {m.preGameMinutes} דק׳ לפני שריקת הפתיחה.</p>
-        </section>
-        <section className="modal-section">
-          <h3>⏰ תזכורת</h3>
-          <div className="mc-actions">
-            <button className={`btn ${r.m15 ? "btn-on" : ""}`} onClick={() => setReminder(m.id, "m15", !r.m15)}>⏰ 15 דקות לפני המשחק</button>
-          </div>
         </section>
       </div>
     </div>

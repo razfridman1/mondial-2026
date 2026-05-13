@@ -87,8 +87,6 @@ export async function DELETE(req: Request) {
   /* Cascade delete every doc related to the user */
   await db.collection("profiles").doc(uid).delete().catch(() => {});
   await db.collection("user_favorites").doc(uid).delete().catch(() => {});
-  await db.collection("user_reminders").doc(uid).delete().catch(() => {});
-  await db.collection("email_prefs").doc(uid).delete().catch(() => {});
   await db.collection("joker_usage").doc(uid).delete().catch(() => {});
   await db.collection("managed_users").doc(uid).delete().catch(() => {});
 

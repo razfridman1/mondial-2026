@@ -2,11 +2,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { formatIsraelDate, formatIsraelTime, israelOffsetHours } from "@/lib/utils";
+import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { AvatarDisplay } from "./AvatarPicker";
 import AvatarPicker from "./AvatarPicker";
-import SoundToggle from "./SoundToggle";
-import ThemeToggle from "./ThemeToggle";
 
 type Tab = "schedule" | "ranking" | "broadcasts" | "teams" | "bracket" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 
@@ -37,8 +35,6 @@ export default function Header() {
     return () => clearInterval(id);
   }, []);
 
-  const off = israelOffsetHours(now);
-
   return (
     <header className="header">
       <div className="header-top">
@@ -53,9 +49,6 @@ export default function Header() {
         <div id="header-clock">
           <span>🕒 {formatIsraelTime(now)}</span>
           <span className="muted">{formatIsraelDate(now, { short: true })}</span>
-          <span className="chip chip-soft">שעון ישראל UTC+{off}{off === 3 ? " (DST)" : ""}</span>
-          <ThemeToggle />
-          <SoundToggle />
           {user ? (
             <>
               <button

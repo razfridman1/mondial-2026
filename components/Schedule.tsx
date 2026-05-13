@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MATCHES, TEAMS, CHANNELS, STAGES } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import {
@@ -36,21 +36,25 @@ export default function Schedule() {
   const simConfig = useStore(s => s.simConfig);
   const [openId, setOpenId] = useState<string | null>(null);
 
+  /* Legacy guard: calendar view was removed — reset any leftover value */
+  useEffect(() => {
+    if ((prefs.view as string) === "calendar") setPref("view", "card");
+  }, [prefs.view, setPref]);
+
   const list = useMemo(() => filtered(prefs, overrides, simConfig), [prefs, overrides, simConfig]);
 
   return (
     <>
       <Filters />
       <div className="view-switch">
-        {(["card","calendar","timeline"] as const).map(v => (
+        {(["card","timeline"] as const).map(v => (
           <button key={v} className={`seg ${prefs.view === v ? "on" : ""}`} onClick={() => setPref("view", v)}>
-            {v === "card" ? "⚽ משחקים" : v === "calendar" ? "📅 לוח שנה" : "📜 ציר זמן"}
+            {v === "card" ? "⚽ משחקים" : "📜 ציר זמן"}
           </button>
         ))}
       </div>
       <div id="schedule-body">
         {prefs.view === "card"     && <CardView list={list}     onOpen={setOpenId} />}
-        {prefs.view === "calendar" && <CalendarView list={list} onOpen={setOpenId} />}
         {prefs.view === "timeline" && <TimelineView list={list} onOpen={setOpenId} />}
       </div>
       {openId && <MatchModal matchId={openId} onClose={() => setOpenId(null)} />}
@@ -80,76 +84,6 @@ function CardView({ list, onOpen }: { list: Match[]; onOpen: (id: string) => voi
           </div>
         </section>
       ))}
-    </>
-  );
-}
-
-function CalendarView({ list, onOpen }: { list: Match[]; onOpen: (id: string) => void }) {
-  const byDay = new Map<string, Match[]>();
-  list.forEach(m => {
-    const k = israelDateKey(m.utc);
-    if (!byDay.has(k)) byDay.set(k, []);
-    byDay.get(k)!.push(m);
-  });
-  const months = [
-    { y: 2026, m: 6, name: "יוני 2026" },
-    { y: 2026, m: 7, name: "יולי 2026" },
-  ];
-  const [selectedDay, setSelectedDay] = useStateLocal();
-  return (
-    <>
-      <div className="cal-wrap">
-        {months.map(({ y, m, name }) => {
-          const first = new Date(`${y}-${String(m).padStart(2,"0")}-01T12:00:00`);
-          const startDow = first.getDay();
-          const last = new Date(y, m, 0).getDate();
-          const cells: React.ReactNode[] = [];
-          for (let i = 0; i < startDow; i++) cells.push(<div key={`e${i}`} className="cal-cell cal-empty" />);
-          for (let d = 1; d <= last; d++) {
-            const key = `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-            const dayMatches = byDay.get(key) || [];
-            const liveDay = dayMatches.some(x => matchLiveStatus(x) === "live");
-            cells.push(
-              <button key={key} className={`cal-cell ${dayMatches.length ? "has-matches" : ""} ${liveDay ? "is-live" : ""}`}
-                      onClick={() => setSelectedDay(key)}>
-                <div className="cal-num">{d}</div>
-                {dayMatches.length > 0 && <div className="cal-count">{dayMatches.length} 🏟️</div>}
-                {dayMatches.slice(0, 2).map(m => (
-                  <div key={m.id} className="cal-mini">
-                    {(TEAMS[m.home]?.flag || "❓")}-{(TEAMS[m.away]?.flag || "❓")}
-                  </div>
-                ))}
-                {dayMatches.length > 2 && <div className="cal-mini muted">+{dayMatches.length - 2}</div>}
-              </button>
-            );
-          }
-          return (
-            <div key={name} className="cal-month">
-              <h3 className="cal-title">{name}</h3>
-              <div className="cal-grid">
-                <div className="cal-dow">א׳</div><div className="cal-dow">ב׳</div><div className="cal-dow">ג׳</div>
-                <div className="cal-dow">ד׳</div><div className="cal-dow">ה׳</div><div className="cal-dow">ו׳</div>
-                <div className="cal-dow">ש׳</div>
-                {cells}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="cal-day-panel">
-        {selectedDay && (() => {
-          const matches = byDay.get(selectedDay) || [];
-          if (!matches.length) return <div className="empty-state">אין משחקים בתאריך זה.</div>;
-          return (
-            <>
-              <h3 className="day-heading">{formatIsraelDate(matches[0].utc)}</h3>
-              <div className="card-grid">
-                {matches.map(m => <MatchCard key={m.id} match={m} onOpen={onOpen} />)}
-              </div>
-            </>
-          );
-        })()}
-      </div>
     </>
   );
 }
@@ -187,8 +121,3 @@ function TimelineView({ list, onOpen }: { list: Match[]; onOpen: (id: string) =>
   );
 }
 
-/* tiny local state helper */
-import { useState as _useState } from "react";
-function useStateLocal() {
-  return _useState<string | null>(null);
-}

@@ -1,7 +1,5 @@
 /* =====================================================================
  * Client-side state store (Zustand) + persistent prefs.
- * Backs reminders to Firestore when authenticated,
- * falls back to localStorage when anonymous.
  * ===================================================================*/
 "use client";
 
@@ -11,13 +9,13 @@ import type { User } from "firebase/auth";
 import { getFirebase, getUserDoc, setUserDoc, subscribeOverrides, subscribeSimConfig, watchAuth, signOut as fbSignOut } from "./firebase";
 import type { SimConfig } from "./sim";
 import type {
-  BroadcastOverrideDoc, AppUser, Prediction, EmailPrefsDoc,
+  BroadcastOverrideDoc, AppUser, Prediction,
   UserProfile, Group, ActivityEvent, AchievementUnlock,
 } from "./types";
 import { defaultAvatarId } from "./avatars";
 
 interface Prefs {
-  view: "card" | "calendar" | "timeline";
+  view: "card" | "timeline";
   selectedDay: string | null;
   selectedGroup: string | null;
   selectedStage: string | null;
@@ -31,9 +29,7 @@ interface MondialState {
   user: AppUser | null;
   loadingAuth: boolean;
   profile: UserProfile | null;
-  reminders: Record<string, { h60?: boolean; m15?: boolean; betsClose?: boolean }>;
   predictions: Record<string, Prediction>;  // by matchId
-  emailPrefs: EmailPrefsDoc | null;
   overrides: Record<string, BroadcastOverrideDoc>;
   groups: Group[];           // groups the user belongs to
   currentGroupId: string | null;
@@ -43,9 +39,7 @@ interface MondialState {
   prefs: Prefs;
   setUser: (u: AppUser | null) => void;
   setLoadingAuth: (b: boolean) => void;
-  setReminder: (matchId: string, key: "h60"|"m15"|"betsClose", val: boolean) => Promise<void>;
   setPrediction: (matchId: string, home: number, away: number, joker?: boolean) => Promise<void>;
-  updateEmailPrefs: (patch: Partial<EmailPrefsDoc>) => Promise<void>;
   setProfileAvatar: (avatarId: string) => Promise<void>;
   setCurrentGroup: (gid: string | null) => void;
   refreshGroups: () => Promise<void>;
@@ -62,9 +56,7 @@ export const useStore = create<MondialState>()(
       user: null,
       loadingAuth: true,
       profile: null,
-      reminders: {},
       predictions: {},
-      emailPrefs: null,
       overrides: {},
       groups: [],
       currentGroupId: null,
@@ -83,13 +75,6 @@ export const useStore = create<MondialState>()(
       },
       setUser: (u) => set({ user: u }),
       setLoadingAuth: (b) => set({ loadingAuth: b }),
-      setReminder: async (matchId, key, val) => {
-        const r = { ...get().reminders };
-        r[matchId] = { ...(r[matchId] || {}), [key]: val };
-        set({ reminders: r });
-        const u = get().user;
-        if (u) await setUserDoc(`user_reminders/${u.uid}`, { reminders: r });
-      },
       setPrediction: async (matchId, home, away, joker?: boolean) => {
         const u = get().user;
         if (!u) {
@@ -146,27 +131,8 @@ export const useStore = create<MondialState>()(
           }
         } catch {}
       },
-      updateEmailPrefs: async (patch) => {
-        const u = get().user;
-        if (!u || !u.email) return;
-        const next: EmailPrefsDoc = {
-          uid: u.uid,
-          email: u.email,
-          enabled: false,
-          h60: false,
-          m15: false,
-          betsClose: false,
-          ...(get().emailPrefs || {}),
-          ...patch,
-          updatedAt: Date.now(),
-        };
-        set({ emailPrefs: next });
-        await setUserDoc(`email_prefs/${u.uid}`, next);
-      },
       setPref: (key, val) => set(state => ({ prefs: { ...state.prefs, [key]: val } })),
       hydrateFromFirestore: async (uid) => {
-        const remDoc   = await getUserDoc<{ reminders: any }>(`user_reminders/${uid}`);
-        const prefsDoc = await getUserDoc<EmailPrefsDoc>(`email_prefs/${uid}`);
         const profDoc  = await getUserDoc<UserProfile>(`profiles/${uid}`);
         let predictions: Record<string, Prediction> = {};
         try {
@@ -183,8 +149,6 @@ export const useStore = create<MondialState>()(
           joinedAt: Date.now(),
         };
         set({
-          reminders: remDoc?.reminders || {},
-          emailPrefs: prefsDoc || null,
           predictions,
           profile,
         });
@@ -192,7 +156,7 @@ export const useStore = create<MondialState>()(
       },
       signOut: async () => {
         await fbSignOut();
-        set({ user: null, reminders: {} });
+        set({ user: null });
       },
       setOverrides: (o) => set({ overrides: o }),
       setSimConfig: (c) => set({ simConfig: c }),
@@ -200,7 +164,6 @@ export const useStore = create<MondialState>()(
     {
       name: "mondial26-store",
       partialize: (state) => ({
-        reminders: state.reminders,
         prefs: state.prefs,
       }),
     }

@@ -112,7 +112,7 @@ export default function SimulationPanel() {
       <div className="sim-help">
         <p className="muted">
           הסימולציה מזיזה את כל לוח המשחקים זמנית — אתה וחברים יכולים לבדוק את כל הזרימה:
-          ניחושים, נעילות, leaderboard, פיד פעילות, ותזכורות — בלי לחכות ליוני 2026.
+          ניחושים, נעילות, leaderboard, פיד פעילות — בלי לחכות ליוני 2026.
         </p>
         <p className="muted">
           תוצאות מתחוללות אוטומטית עם סוף כל משחק. ניתן להריץ <strong>כמה סבבי סימולציה ברצף</strong>:

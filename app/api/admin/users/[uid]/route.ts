@@ -73,8 +73,6 @@ export async function DELETE(req: Request, ctx: { params: { uid: string } }) {
   if (data.username) await db.collection("username_lookup").doc(data.username).delete();
   await db.collection("profiles").doc(uid).delete().catch(() => {});
   await db.collection("user_favorites").doc(uid).delete().catch(() => {});
-  await db.collection("user_reminders").doc(uid).delete().catch(() => {});
-  await db.collection("email_prefs").doc(uid).delete().catch(() => {});
   await db.collection("joker_usage").doc(uid).delete().catch(() => {});
 
   /* Cascade predictions */

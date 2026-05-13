@@ -10,9 +10,6 @@ import type { Match } from "@/lib/types";
 import Countdown from "./Countdown";
 
 export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id: string) => void }) {
-  const reminders = useStore(s => s.reminders);
-  const setReminder = useStore(s => s.setReminder);
-
   const home = TEAMS[match.home] || { code: match.home, name: match.home, flag: "❓" };
   const away = TEAMS[match.away] || { code: match.away, name: match.away, flag: "❓" };
   const venue = VENUES[match.venue] || { name: match.venue, city: "", country: "", flag: "" };
@@ -20,7 +17,6 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
   const channels = (match.channels || []).map(c => CHANNELS[c]).filter(Boolean);
   const status = matchLiveStatus(match);
   const rel = relativeLabel(match.utc);
-  const r = reminders[match.id] || {};
 
   const minutesToKick = useMemo(
     () => Math.round((new Date(match.utc).getTime() - Date.now()) / 60000),
@@ -108,8 +104,6 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
       </div>
 
       <div className="mc-actions mc-actions-row">
-        <button className={`btn ${r.m15 ? "btn-on" : ""}`}
-                onClick={(e) => { stop(e); setReminder(match.id, "m15", !r.m15); }}>⏰ 15 דק׳</button>
         {(status === "live" || status === "pregame" || status === "finished") && (
           <a className="btn btn-watch" href={channels[0]?.url || "#"} target="_blank" rel="noopener" onClick={stop}>
             {status === "live"    ? "▶ צפה"

@@ -2,14 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---------- Per-user private docs (owner read/write only) ----------
-    match /user_reminders/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
-    match /email_prefs/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
-
     // ---------- User profile (public read, owner write) ----------
     match /profiles/{uid} {
       allow read:  if true;                                            // leaderboard needs display name + avatar
@@ -50,11 +42,6 @@ service cloud.firestore {
     match /achievement_unlocks/{docId} {
       allow read:  if true;
       allow write: if false;
-    }
-
-    // ---------- Email log (server only) ----------
-    match /email_log/{docId} {
-      allow read, write: if false;
     }
 
     // ---------- Joker usage (owner read/write through API) ----------
