@@ -39,3 +39,17 @@ export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   return adminEmails().includes(email.toLowerCase());
 }
+
+/* AI-access gate. Returns true if this user is BLOCKED from AI features.
+ * Super-admins bypass the block automatically. */
+export async function isAiBlocked(uid: string, email?: string | null): Promise<boolean> {
+  if (isAdminEmail(email)) return false;
+  try {
+    const { db } = getAdmin();
+    const snap = await db.collection("profiles").doc(uid).get();
+    const data = snap.data() as any;
+    return !!data?.aiBlocked;
+  } catch {
+    return false;
+  }
+}

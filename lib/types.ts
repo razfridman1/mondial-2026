@@ -122,6 +122,7 @@ export interface UserProfile {
   onboardedAt?: number;   // when the user finished the tutorial
   managed?: boolean;      // true if created by admin via username/password flow
   theme?: "dark" | "light"; // synced across devices
+  aiBlocked?: boolean;    // super-admin can block a user from using AI features
 }
 
 /* Multi-tenant private group */

@@ -8,6 +8,8 @@ interface Member { uid: string; displayName: string; avatarId: string; }
 
 export default function RoastEngine() {
   const user = useStore(s => s.user);
+  const profile = useStore(s => s.profile);
+  const aiBlocked = !!profile?.aiBlocked;
   const currentGroupId = useStore(s => s.currentGroupId);
   const [members, setMembers] = useState<Member[]>([]);
   const [target, setTarget] = useState<string>("self");   // "self" | uid | "all"
@@ -33,6 +35,7 @@ export default function RoastEngine() {
 
   async function roast() {
     if (!user) return;
+    if (aiBlocked) { setError("השימוש בכלי ה-AI נחסם עבור המשתמש שלך על-ידי מנהל המערכת."); return; }
     setBusy(true); setError(null); setMarkdown("");
     try {
       const token = await getFirebase().auth!.currentUser!.getIdToken();
@@ -47,7 +50,7 @@ export default function RoastEngine() {
         body: JSON.stringify(body),
       });
       const data = await r.json();
-      if (!r.ok) { setError(data.error || "שגיאה"); return; }
+      if (!r.ok) { setError(data.message || data.error || "שגיאה"); return; }
       setMarkdown(data.markdown || "");
     } finally { setBusy(false); }
   }
@@ -77,8 +80,14 @@ export default function RoastEngine() {
         </p>
       )}
 
+      {aiBlocked && (
+        <p className="pred-msg is-locked" style={{ marginTop: 8 }}>
+          🚫 השימוש בכלי ה-AI נחסם עבור המשתמש שלך על-ידי מנהל המערכת.
+        </p>
+      )}
+
       <div className="mc-actions" style={{ marginTop: 10 }}>
-        <button className="btn btn-primary" onClick={roast} disabled={busy || !user}>
+        <button className="btn btn-primary" onClick={roast} disabled={busy || !user || aiBlocked}>
           {busy ? "…כותב" : "🔥 צור עקיצה"}
         </button>
         {!user && <span className="muted">צריך להתחבר</span>}

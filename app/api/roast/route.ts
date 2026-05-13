@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdmin, verifyIdToken } from "@/lib/firebase-admin";
+import { getAdmin, verifyIdToken, isAiBlocked } from "@/lib/firebase-admin";
 import { MATCHES, TEAMS } from "@/lib/data";
 import { scorePrediction } from "@/lib/scoring";
 
@@ -78,6 +78,10 @@ export async function POST(req: Request) {
   let decoded;
   try { decoded = await verifyIdToken(m[1]); }
   catch (e: any) { return NextResponse.json({ error: e.message }, { status: 401 }); }
+
+  if (await isAiBlocked(decoded.uid, decoded.email)) {
+    return NextResponse.json({ error: "ai_blocked", message: "השימוש בכלי ה-AI נחסם עבור המשתמש שלך על-ידי מנהל המערכת." }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const mode: "self" | "friend" | "all" = body.mode || "self";

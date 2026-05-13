@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdmin, verifyIdToken } from "@/lib/firebase-admin";
+import { getAdmin, verifyIdToken, isAiBlocked } from "@/lib/firebase-admin";
 import { MATCHES, TEAMS } from "@/lib/data";
 import { applyOverride } from "@/lib/utils";
 
@@ -29,8 +29,13 @@ export async function POST(req: Request) {
   const auth = req.headers.get("authorization") || "";
   const m = auth.match(/^Bearer (.+)$/);
   if (!m) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  try { await verifyIdToken(m[1]); }
+  let decoded;
+  try { decoded = await verifyIdToken(m[1]); }
   catch (e: any) { return NextResponse.json({ error: e.message }, { status: 401 }); }
+
+  if (await isAiBlocked(decoded.uid, decoded.email)) {
+    return NextResponse.json({ error: "ai_blocked", message: "השימוש בכלי ה-AI נחסם עבור המשתמש שלך על-ידי מנהל המערכת." }, { status: 403 });
+  }
 
   const { groupId, matchId } = await req.json();
   const { db } = getAdmin();

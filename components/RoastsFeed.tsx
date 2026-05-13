@@ -80,7 +80,7 @@ export default function RoastsFeed() {
 
           {items.length === 0 ? (
             <div className="empty-state" style={{ margin: 12, padding: 18 }}>
-              עוד אין עקיצות. לחץ "🔥 צור עקיצה" בלשונית "תובנות AI".
+              עוד אין עקיצות. לחץ "🔥 צור עקיצה" בלשונית "🤖 AI".
             </div>
           ) : (
             <div className="roasts-list">

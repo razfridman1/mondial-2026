@@ -25,6 +25,7 @@ interface ProfileRow {
   provider?: string;
   createdAt?: string;
   lastLoginAt?: string;
+  aiBlocked?: boolean;
 }
 interface PredictionRow {
   id: string; uid: string; matchId: string;
@@ -224,6 +225,9 @@ function UsersAdmin() {
 
   return (
     <div className="adm-body">
+      <p className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+        💡 כפתור <strong>🤖</strong> חוסם/מאפשר למשתמש לבצע פעולות AI (ניתוח חכם, עקיצה, צ׳אט).
+      </p>
       <div className="adm-table-wrap" style={{ maxHeight: 480, overflowY: "auto" }}>
         <table className="admin-table">
           <thead><tr><th>אווטר</th><th>שם / Email</th><th>פרובידר</th><th>נכנס לאחרונה</th><th>פעולות</th></tr></thead>
@@ -257,7 +261,11 @@ function UserRowEditor({ profile, onPatch, onDelete }: any) {
           : <strong>{profile.displayName || "—"}</strong>}
         <br /><small className="muted">{profile.email || profile.uid}</small>
       </td>
-      <td className="muted" style={{ fontSize: 11 }}>{profile.provider || "—"}{profile.disabled && <span className="badge badge-finished">מושבת</span>}</td>
+      <td className="muted" style={{ fontSize: 11 }}>
+        {profile.provider || "—"}
+        {profile.disabled && <><br /><span className="badge badge-finished">מושבת</span></>}
+        {profile.aiBlocked && <><br /><span className="badge badge-finished" style={{ background: "rgba(239,68,68,0.18)" }}>AI חסום</span></>}
+      </td>
       <td className="muted" style={{ fontSize: 11 }}>{profile.lastLoginAt ? new Date(profile.lastLoginAt).toLocaleDateString("he-IL") : "—"}</td>
       <td className="adm-actions" style={{ whiteSpace: "nowrap" }}>
         {!editing
@@ -270,6 +278,14 @@ function UserRowEditor({ profile, onPatch, onDelete }: any) {
           const pw = prompt("סיסמה חדשה (6+ תווים):");
           if (pw && pw.length >= 6) onPatch(profile.uid, { password: pw });
         }}>🔑</button>
+        <button
+          className="btn btn-small"
+          title={profile.aiBlocked ? "AI חסום — לחץ כדי לאפשר" : "AI פעיל — לחץ כדי לחסום"}
+          onClick={() => onPatch(profile.uid, { aiBlocked: !profile.aiBlocked })}
+          style={{ background: profile.aiBlocked ? "rgba(239,68,68,0.15)" : "transparent" }}
+        >
+          {profile.aiBlocked ? "🤖🚫" : "🤖"}
+        </button>
         <button className="btn btn-small" onClick={() => onPatch(profile.uid, { disabled: !profile.disabled })}>
           {profile.disabled ? "✓" : "🚫"}
         </button>

@@ -52,6 +52,7 @@ export async function PATCH(req: Request) {
   if (typeof body.avatarId    === "string") patch.avatarId    = body.avatarId;
   if (typeof body.bio         === "string") patch.bio         = body.bio.slice(0, 240);
   if (body.theme === "dark" || body.theme === "light") patch.theme = body.theme;
+  if (typeof body.aiBlocked   === "boolean") patch.aiBlocked   = body.aiBlocked;
 
   await db.collection("profiles").doc(body.uid).set(patch, { merge: true });
 

@@ -5,6 +5,8 @@ import { getFirebase } from "@/lib/firebase";
 
 export default function SmartInsights() {
   const user = useStore(s => s.user);
+  const profile = useStore(s => s.profile);
+  const aiBlocked = !!profile?.aiBlocked;
   const currentGroupId = useStore(s => s.currentGroupId);
   const [markdown, setMarkdown] = useState("");
   const [busy, setBusy] = useState(false);
@@ -12,6 +14,7 @@ export default function SmartInsights() {
 
   async function generate() {
     if (!user) { setError("צריך להתחבר"); return; }
+    if (aiBlocked) { setError("השימוש בכלי ה-AI נחסם עבור המשתמש שלך על-ידי מנהל המערכת."); return; }
     setBusy(true); setError(null);
     try {
       const token = await getFirebase().auth!.currentUser!.getIdToken();
@@ -21,7 +24,7 @@ export default function SmartInsights() {
         body: JSON.stringify({ groupId: currentGroupId || undefined }),
       });
       const data = await r.json();
-      if (!r.ok) { setError(data.error || "שגיאה"); return; }
+      if (!r.ok) { setError(data.message || data.error || "שגיאה"); return; }
       setMarkdown(data.markdown || "");
     } catch (e: any) {
       setError(e.message);
@@ -34,8 +37,13 @@ export default function SmartInsights() {
     <section className="ai-section">
       <h3>🧠 ניתוח ניחושים</h3>
       <p className="muted">בחר קבוצת חברים בלשונית "דירוג חברים" כדי לקבל ניתוח על הקבוצה. אחרת תנתח את כל המשתמשים.</p>
+      {aiBlocked && (
+        <p className="pred-msg is-locked" style={{ marginTop: 8 }}>
+          🚫 השימוש בכלי ה-AI נחסם עבור המשתמש שלך על-ידי מנהל המערכת.
+        </p>
+      )}
       <div className="mc-actions">
-        <button className="btn btn-primary" onClick={generate} disabled={busy}>
+        <button className="btn btn-primary" onClick={generate} disabled={busy || aiBlocked}>
           {busy ? "…מנתח" : "✨ צור ניתוח חכם"}
         </button>
       </div>

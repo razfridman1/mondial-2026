@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { verifyIdToken, isAiBlocked } from "@/lib/firebase-admin";
 
 /* =====================================================================
  * AI Chat — proxies messages to Anthropic Claude Haiku
@@ -19,6 +20,18 @@ const SYSTEM_PROMPT = `אתה עוזר חכם של אפליקציית "מונד�
 
 export async function POST(req: Request) {
   try {
+    /* Require auth so admin can block per-user access to AI chat */
+    const authHdr = req.headers.get("authorization") || "";
+    const tokenMatch = authHdr.match(/^Bearer (.+)$/);
+    if (!tokenMatch) return NextResponse.json({ error: "unauthorized", message: "צריך להתחבר כדי להשתמש בצ׳אט." }, { status: 401 });
+    let decoded;
+    try { decoded = await verifyIdToken(tokenMatch[1]); }
+    catch (e: any) { return NextResponse.json({ error: "unauthorized", message: e.message }, { status: 401 }); }
+
+    if (await isAiBlocked(decoded.uid, decoded.email)) {
+      return NextResponse.json({ error: "ai_blocked", message: "השימוש בכלי ה-AI נחסם עבור המשתמש שלך על-ידי מנהל המערכת." }, { status: 403 });
+    }
+
     const { messages } = await req.json();
     if (!Array.isArray(messages) || !messages.length) {
       return NextResponse.json({ error: "missing messages" }, { status: 400 });
