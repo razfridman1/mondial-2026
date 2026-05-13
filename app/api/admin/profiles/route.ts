@@ -39,20 +39,30 @@ export async function GET(req: Request) {
     const managedByUid: Record<string, any> = {};
     managedSnap.forEach(d => { managedByUid[d.id] = d.data(); });
 
-    /* Fetch ALL auth metadata in parallel — way faster than sequential per-uid */
+    /* Fetch ALL auth metadata in a single batched call (auth.getUsers supports up to 100 uids per call).
+     * Avoids the per-user RESOURCE_EXHAUSTED throttling we'd hit with parallel auth.getUser calls. */
     const authMetaByUid: Record<string, any> = {};
-    await Promise.all(profSnap.docs.map(async d => {
+    const allUids = [
+      ...profSnap.docs.map(d => d.id),
+      ...Object.keys(managedByUid),
+    ];
+    const uniqUids = [...new Set(allUids)];
+    /* Chunk into groups of 100 */
+    for (let i = 0; i < uniqUids.length; i += 100) {
+      const chunk = uniqUids.slice(i, i + 100).map(uid => ({ uid }));
       try {
-        const rec = await auth.getUser(d.id);
-        authMetaByUid[d.id] = {
-          email: rec.email,
-          disabled: rec.disabled,
-          createdAt: rec.metadata.creationTime,
-          lastLoginAt: rec.metadata.lastSignInTime,
-          provider: rec.providerData[0]?.providerId,
-        };
-      } catch { /* auth user might be deleted but profile still exists — that's OK */ }
-    }));
+        const res = await auth.getUsers(chunk);
+        for (const u of res.users) {
+          authMetaByUid[u.uid] = {
+            email: u.email,
+            disabled: u.disabled,
+            createdAt: u.metadata.creationTime,
+            lastLoginAt: u.metadata.lastSignInTime,
+            provider: u.providerData[0]?.providerId,
+          };
+        }
+      } catch { /* if a batch fails, fall through with empty auth meta — Firestore data still shown */ }
+    }
 
     const profiles: any[] = [];
     for (const d of profSnap.docs) {

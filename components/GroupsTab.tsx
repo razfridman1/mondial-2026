@@ -34,7 +34,8 @@ export default function GroupsTab() {
 
   useEffect(() => { loadGroupData(currentGroupId); }, [currentGroupId]);
   useEffect(() => {
-    const id = setInterval(() => loadGroupData(currentGroupId), 20000);
+    /* Reduced from 20s → 90s to lower Firestore read pressure. */
+    const id = setInterval(() => loadGroupData(currentGroupId), 90000);
     return () => clearInterval(id);
   }, [currentGroupId]);
 

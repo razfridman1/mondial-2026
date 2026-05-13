@@ -75,7 +75,9 @@ export default function FriendsRanking() {
 
   useEffect(() => { load(); }, [user?.uid, currentGroupId]);
   useEffect(() => {
-    const id = setInterval(load, 30000);
+    /* Reduced from 30s → 120s to lower Firestore read pressure.
+     * Users can press the page refresh button for an immediate update. */
+    const id = setInterval(load, 120000);
     return () => clearInterval(id);
   }, [currentGroupId]);
 

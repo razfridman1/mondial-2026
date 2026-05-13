@@ -44,7 +44,8 @@ export default function RoastsFeed() {
 
   useEffect(() => { load(); }, [currentGroupId, lastSeenTs]);
   useEffect(() => {
-    const id = setInterval(load, 15000);
+    /* Reduced from 15s → 60s to lower Firestore read pressure. */
+    const id = setInterval(load, 60000);
     return () => clearInterval(id);
   }, [currentGroupId, lastSeenTs]);
 

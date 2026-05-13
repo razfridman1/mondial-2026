@@ -84,7 +84,8 @@ export default function MyPredictionsTab() {
   }
   useEffect(() => { load(); }, [currentGroupId, user?.uid]);
   useEffect(() => {
-    const id = setInterval(load, 30000);
+    /* Reduced from 30s → 120s to lower Firestore read pressure. */
+    const id = setInterval(load, 120000);
     return () => clearInterval(id);
   }, [currentGroupId]);
 
