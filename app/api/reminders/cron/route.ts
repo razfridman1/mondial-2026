@@ -47,24 +47,18 @@ export async function GET(req: Request) {
   }
 
   const remindersSnap = await db.collection("user_reminders").get();
-  const favSnap = await db.collection("user_favorites").get();
   const remindersByUid: Record<string, any> = {};
   remindersSnap.forEach(d => { remindersByUid[d.id] = d.data()?.reminders || {}; });
-  const favsByUid: Record<string, string[]> = {};
-  favSnap.forEach(d => { favsByUid[d.id] = d.data()?.teams || []; });
 
   const pending: ReminderRow[] = [];
   for (const u of usersWithPrefs) {
     if (!u.email) continue;
     const userReminders = remindersByUid[u.uid] || {};
-    const favs = new Set(favsByUid[u.uid] || []);
 
     for (const m of matchesEff) {
       const start = new Date(m.utc).getTime();
       if (start <= now) continue;
       if (start - now > 24 * 60 * 60 * 1000) continue;
-
-      if (u.favoritesOnly && !(favs.has(m.home) || favs.has(m.away))) continue;
 
       const checks: Array<["h60" | "m15" | "betsClose", number]> = [
         ["h60", start - 60 * 60 * 1000],

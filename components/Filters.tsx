@@ -36,12 +36,10 @@ export default function Filters() {
     setPref("selectedChannel", null);
     setPref("selectedTeam", null);
     setPref("statusFilter", "all");
-    setPref("showFavOnly", false);
   }
 
   const anyActive =
     advancedCount > 0 ||
-    prefs.showFavOnly ||
     dayIsToday ||
     dayIsTomorrow ||
     weekActive ||
@@ -65,11 +63,6 @@ export default function Filters() {
             else { setPref("selectedDay", null); setPref("statusFilter", "upcoming"); }
           }}
         >השבוע</button>
-        <button
-          className={`seg seg-fav ${prefs.showFavOnly ? "on" : ""}`}
-          onClick={() => setPref("showFavOnly", !prefs.showFavOnly)}
-        >⭐ מועדפים</button>
-
         <button
           className={`seg seg-adv ${advOpen ? "on" : ""}`}
           aria-expanded={advOpen}

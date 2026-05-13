@@ -213,7 +213,7 @@ function UsersAdmin() {
     load();
   }
   async function nuke(uid: string) {
-    if (!confirm("למחוק את המשתמש לצמיתות?\nכל הנתונים שלו (ניחושים, מועדפים, חברויות) יימחקו.")) return;
+    if (!confirm("למחוק את המשתמש לצמיתות?\nכל הנתונים שלו (ניחושים, חברויות) יימחקו.")) return;
     if (!confirm("פעולה בלתי הפיכה. להמשיך?")) return;
     await fetch("/api/admin/profiles", {
       method: "DELETE", headers: await adminAuthHeaders(),

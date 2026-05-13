@@ -10,7 +10,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "streak-3",       name: "סטריק 3",            description: "3 ניחושים נכונים ברצף",                  icon: "🔥" },
   { id: "streak-5",       name: "סטריק 5",            description: "5 ניחושים נכונים ברצף",                  icon: "🔥🔥" },
   { id: "streak-10",      name: "סטריק אגדי",         description: "10 ניחושים נכונים ברצף",                 icon: "👑" },
-  { id: "favorites-fan",  name: "אוהד אמיתי",        description: "סימן 3 קבוצות אהובות",                   icon: "⭐" },
   { id: "all-stages",     name: "כל השלבים",          description: "ניחוש לפחות במשחק אחד בכל שלב",          icon: "🏆" },
   { id: "social",         name: "מנחש חברתי",         description: "שיתף ניחוש בווטסאפ",                     icon: "💬" },
   { id: "joker-played",   name: "ג׳וקר על השולחן",    description: "השתמש ב-Joker למשחק",                    icon: "🃏" },
@@ -29,7 +28,6 @@ export interface UnlockSignals {
   resultCount: number;
   streak: number;
   predictionsCount: number;
-  favoritesCount: number;
   sharedToWhatsapp: boolean;
   stagesPredicted: Set<string>;
   jokerUsed: boolean;
@@ -46,7 +44,6 @@ export function evaluateUnlocks(s: UnlockSignals): string[] {
   if (s.streak >= 3)           out.push("streak-3");
   if (s.streak >= 5)           out.push("streak-5");
   if (s.streak >= 10)          out.push("streak-10");
-  if (s.favoritesCount >= 3)   out.push("favorites-fan");
   if (s.stagesPredicted.size >= 7) out.push("all-stages");
   if (s.sharedToWhatsapp)      out.push("social");
   if (s.jokerUsed)             out.push("joker-played");

@@ -14,7 +14,6 @@ export default function ProfileTab() {
   const user = useStore(s => s.user);
   const profile = useStore(s => s.profile);
   const groups = useStore(s => s.groups);
-  const favTeams = useStore(s => s.favTeams);
   const predictions = useStore(s => s.predictions);
   const signOut = useStore(s => s.signOut);
 
@@ -131,10 +130,6 @@ export default function ProfileTab() {
           <div className="stat-card">
             <div className="stat-val">🃏 {jokerCount}</div>
             <div className="stat-lbl">ג׳וקרים פעילים</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-val">⭐ {favTeams.size}</div>
-            <div className="stat-lbl">קבוצות אהובות</div>
           </div>
         </div>
 

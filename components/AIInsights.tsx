@@ -15,7 +15,6 @@ function spread(o: Match["odds"]): number {
 
 export default function AIInsights() {
   const overrides = useStore(s => s.overrides);
-  const favTeams = useStore(s => s.favTeams);
   const matches = useMemo(() => MATCHES.map(m => applyOverride(m, overrides[m.id])), [overrides]);
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -40,14 +39,9 @@ export default function AIInsights() {
 
   const recs = useMemo(() => {
     const arr = matches.filter(m => matchLiveStatus(m) !== "finished");
-    arr.sort((a,b) => {
-      const af = favTeams.has(a.home) || favTeams.has(a.away) ? 0 : 1;
-      const bf = favTeams.has(b.home) || favTeams.has(b.away) ? 0 : 1;
-      if (af !== bf) return af - bf;
-      return spread(a.odds) - spread(b.odds);
-    });
+    arr.sort((a,b) => spread(a.odds) - spread(b.odds));
     return arr.slice(0, 5);
-  }, [matches, favTeams]);
+  }, [matches]);
 
   return (
     <>

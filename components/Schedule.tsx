@@ -13,7 +13,7 @@ import MatchModal from "./MatchModal";
 import Filters from "./Filters";
 import Countdown from "./Countdown";
 
-function filtered(prefs: any, favTeams: Set<string>, overrides: any, simConfig: any): Match[] {
+function filtered(prefs: any, overrides: any, simConfig: any): Match[] {
   return MATCHES.map(m => effMatch(m, overrides[m.id], simConfig))
     .filter(m => {
       if (prefs.selectedDay && israelDateKey(m.utc) !== prefs.selectedDay) return false;
@@ -21,7 +21,6 @@ function filtered(prefs: any, favTeams: Set<string>, overrides: any, simConfig: 
       if (prefs.selectedGroup && m.group !== prefs.selectedGroup) return false;
       if (prefs.selectedChannel && !(m.channels || []).includes(prefs.selectedChannel)) return false;
       if (prefs.selectedTeam && m.home !== prefs.selectedTeam && m.away !== prefs.selectedTeam) return false;
-      if (prefs.showFavOnly && !(favTeams.has(m.home) || favTeams.has(m.away))) return false;
       const st = matchLiveStatus(m);
       if (prefs.statusFilter === "live" && st !== "live" && st !== "pregame") return false;
       if (prefs.statusFilter === "upcoming" && st === "finished") return false;
@@ -33,12 +32,11 @@ function filtered(prefs: any, favTeams: Set<string>, overrides: any, simConfig: 
 export default function Schedule() {
   const prefs = useStore(s => s.prefs);
   const setPref = useStore(s => s.setPref);
-  const favTeams = useStore(s => s.favTeams);
   const overrides = useStore(s => s.overrides);
   const simConfig = useStore(s => s.simConfig);
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const list = useMemo(() => filtered(prefs, favTeams, overrides, simConfig), [prefs, favTeams, overrides, simConfig]);
+  const list = useMemo(() => filtered(prefs, overrides, simConfig), [prefs, overrides, simConfig]);
 
   return (
     <>

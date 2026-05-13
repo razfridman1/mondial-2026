@@ -1,6 +1,6 @@
 /* =====================================================================
  * Client-side state store (Zustand) + persistent prefs.
- * Backs favorites/reminders to Firestore when authenticated,
+ * Backs reminders to Firestore when authenticated,
  * falls back to localStorage when anonymous.
  * ===================================================================*/
 "use client";
@@ -18,7 +18,6 @@ import { defaultAvatarId } from "./avatars";
 
 interface Prefs {
   view: "card" | "calendar" | "timeline";
-  showFavOnly: boolean;
   selectedDay: string | null;
   selectedGroup: string | null;
   selectedStage: string | null;
@@ -32,7 +31,6 @@ interface MondialState {
   user: AppUser | null;
   loadingAuth: boolean;
   profile: UserProfile | null;
-  favTeams: Set<string>;
   reminders: Record<string, { h60?: boolean; m15?: boolean; betsClose?: boolean }>;
   predictions: Record<string, Prediction>;  // by matchId
   emailPrefs: EmailPrefsDoc | null;
@@ -45,7 +43,6 @@ interface MondialState {
   prefs: Prefs;
   setUser: (u: AppUser | null) => void;
   setLoadingAuth: (b: boolean) => void;
-  toggleFavTeam: (code: string) => Promise<void>;
   setReminder: (matchId: string, key: "h60"|"m15"|"betsClose", val: boolean) => Promise<void>;
   setPrediction: (matchId: string, home: number, away: number, joker?: boolean) => Promise<void>;
   updateEmailPrefs: (patch: Partial<EmailPrefsDoc>) => Promise<void>;
@@ -65,7 +62,6 @@ export const useStore = create<MondialState>()(
       user: null,
       loadingAuth: true,
       profile: null,
-      favTeams: new Set(),
       reminders: {},
       predictions: {},
       emailPrefs: null,
@@ -77,7 +73,6 @@ export const useStore = create<MondialState>()(
       simConfig: null,
       prefs: {
         view: "card",
-        showFavOnly: false,
         selectedDay: null,
         selectedGroup: null,
         selectedStage: null,
@@ -88,13 +83,6 @@ export const useStore = create<MondialState>()(
       },
       setUser: (u) => set({ user: u }),
       setLoadingAuth: (b) => set({ loadingAuth: b }),
-      toggleFavTeam: async (code) => {
-        const s = new Set(get().favTeams);
-        s.has(code) ? s.delete(code) : s.add(code);
-        set({ favTeams: s });
-        const u = get().user;
-        if (u) await setUserDoc(`user_favorites/${u.uid}`, { teams: [...s] });
-      },
       setReminder: async (matchId, key, val) => {
         const r = { ...get().reminders };
         r[matchId] = { ...(r[matchId] || {}), [key]: val };
@@ -168,7 +156,6 @@ export const useStore = create<MondialState>()(
           h60: false,
           m15: false,
           betsClose: false,
-          favoritesOnly: false,
           ...(get().emailPrefs || {}),
           ...patch,
           updatedAt: Date.now(),
@@ -178,7 +165,6 @@ export const useStore = create<MondialState>()(
       },
       setPref: (key, val) => set(state => ({ prefs: { ...state.prefs, [key]: val } })),
       hydrateFromFirestore: async (uid) => {
-        const favDoc   = await getUserDoc<{ teams: string[] }>(`user_favorites/${uid}`);
         const remDoc   = await getUserDoc<{ reminders: any }>(`user_reminders/${uid}`);
         const prefsDoc = await getUserDoc<EmailPrefsDoc>(`email_prefs/${uid}`);
         const profDoc  = await getUserDoc<UserProfile>(`profiles/${uid}`);
@@ -197,7 +183,6 @@ export const useStore = create<MondialState>()(
           joinedAt: Date.now(),
         };
         set({
-          favTeams: new Set(favDoc?.teams || []),
           reminders: remDoc?.reminders || {},
           emailPrefs: prefsDoc || null,
           predictions,
@@ -207,7 +192,7 @@ export const useStore = create<MondialState>()(
       },
       signOut: async () => {
         await fbSignOut();
-        set({ user: null, favTeams: new Set(), reminders: {} });
+        set({ user: null, reminders: {} });
       },
       setOverrides: (o) => set({ overrides: o }),
       setSimConfig: (c) => set({ simConfig: c }),
@@ -215,16 +200,9 @@ export const useStore = create<MondialState>()(
     {
       name: "mondial26-store",
       partialize: (state) => ({
-        favTeams: [...state.favTeams],
         reminders: state.reminders,
         prefs: state.prefs,
       }),
-      onRehydrateStorage: () => (state) => {
-        // Convert favTeams array back to Set after rehydration
-        if (state && Array.isArray((state as any).favTeams)) {
-          (state as any).favTeams = new Set((state as any).favTeams);
-        }
-      },
     }
   )
 );

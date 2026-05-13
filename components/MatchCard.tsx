@@ -10,9 +10,7 @@ import type { Match } from "@/lib/types";
 import Countdown from "./Countdown";
 
 export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id: string) => void }) {
-  const favTeams = useStore(s => s.favTeams);
   const reminders = useStore(s => s.reminders);
-  const toggleFavTeam = useStore(s => s.toggleFavTeam);
   const setReminder = useStore(s => s.setReminder);
 
   const home = TEAMS[match.home] || { code: match.home, name: match.home, flag: "❓" };
@@ -62,9 +60,6 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
 
       <div className="mc-body">
         <div className="team team-home">
-          <button className={`fav-btn ${favTeams.has(home.code) ? "fav-on" : ""}`} onClick={() => toggleFavTeam(home.code)}>
-            {favTeams.has(home.code) ? "★" : "☆"}
-          </button>
           <span className="flag">{home.flag}</span>
           <span className="team-name">{home.name}</span>
         </div>
@@ -76,9 +71,6 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
         <div className="team team-away">
           <span className="team-name">{away.name}</span>
           <span className="flag">{away.flag}</span>
-          <button className={`fav-btn ${favTeams.has(away.code) ? "fav-on" : ""}`} onClick={() => toggleFavTeam(away.code)}>
-            {favTeams.has(away.code) ? "★" : "☆"}
-          </button>
         </div>
       </div>
 

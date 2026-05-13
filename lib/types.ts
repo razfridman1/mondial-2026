@@ -58,11 +58,6 @@ export interface Match {
 }
 
 /* Firestore documents */
-export interface UserFavoritesDoc {
-  uid: string;
-  teams: string[];
-  updatedAt: number;
-}
 export interface UserRemindersDoc {
   uid: string;
   reminders: Record<string, { h60?: boolean; m15?: boolean; betsClose?: boolean }>;
@@ -107,7 +102,6 @@ export interface EmailPrefsDoc {
   h60: boolean;              // שעה לפני
   m15: boolean;              // 15 דק׳ לפני
   betsClose: boolean;        // סגירת הימורים
-  favoritesOnly: boolean;    // רק עבור קבוצות מועדפות
   updatedAt: number;
 }
 

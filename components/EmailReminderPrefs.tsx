@@ -9,7 +9,7 @@ export default function EmailReminderPrefs() {
   if (!user) return null;
   const p = prefs || {
     uid: user.uid, email: user.email || "",
-    enabled: false, h60: false, m15: false, betsClose: false, favoritesOnly: false,
+    enabled: false, h60: false, m15: false, betsClose: false,
     updatedAt: 0,
   };
 
@@ -43,12 +43,6 @@ export default function EmailReminderPrefs() {
                disabled={!p.enabled}
                onChange={e => updateEmailPrefs({ betsClose: e.target.checked })} />
         <label htmlFor="email-bets">💰 ההימורים נסגרים בקרוב</label>
-      </div>
-      <div className="email-pref">
-        <input type="checkbox" id="email-fav" checked={p.favoritesOnly}
-               disabled={!p.enabled}
-               onChange={e => updateEmailPrefs({ favoritesOnly: e.target.checked })} />
-        <label htmlFor="email-fav">⭐ רק עבור הקבוצות המועדפות שלי</label>
       </div>
       <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>
         טיפ: כדי לקבל תזכורות למשחק מסוים, סמן את כפתורי התזכורת על הכרטיס. המייל יישלח רק אם הפעלת גם את התזכורת הספציפית וגם את הסוג כאן.

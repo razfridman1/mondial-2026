@@ -34,7 +34,6 @@ export async function GET(req: Request) {
 
   const profile = (await db.collection("profiles").doc(uid).get()).data() || null;
   const managed = (await db.collection("managed_users").doc(uid).get()).data() || null;
-  const favs    = (await db.collection("user_favorites").doc(uid).get()).data() || null;
   const reminders = (await db.collection("user_reminders").doc(uid).get()).data() || null;
   const emailPrefs = (await db.collection("email_prefs").doc(uid).get()).data() || null;
   const jokerUsage = (await db.collection("joker_usage").doc(uid).get()).data() || null;
@@ -47,7 +46,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     auth: authMeta,
-    profile, managed, favs, reminders, emailPrefs, jokerUsage,
+    profile, managed, reminders, emailPrefs, jokerUsage,
     predictions, memberships,
   });
 }
