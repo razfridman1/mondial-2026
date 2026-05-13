@@ -39,12 +39,24 @@ export async function GET(req: Request) {
     const managedByUid: Record<string, any> = {};
     managedSnap.forEach(d => { managedByUid[d.id] = d.data(); });
 
-    /* Fetch ALL auth metadata in a single batched call (auth.getUsers supports up to 100 uids per call).
-     * Avoids the per-user RESOURCE_EXHAUSTED throttling we'd hit with parallel auth.getUser calls. */
+    /* Also enumerate every user in Firebase Auth — catches admins/Google users
+     * who logged in but never triggered a profile doc write. */
+    const authUidsSet = new Set<string>();
+    let pageToken: string | undefined = undefined;
+    do {
+      const page: any = await auth.listUsers(1000, pageToken);
+      for (const u of page.users) authUidsSet.add(u.uid);
+      pageToken = page.pageToken;
+    } while (pageToken);
+    const profileUidsSet = new Set(profSnap.docs.map(d => d.id));
+
+    /* Fetch ALL auth metadata in a single batched call.
+     * We already have all auth uids from listUsers above. */
     const authMetaByUid: Record<string, any> = {};
     const allUids = [
       ...profSnap.docs.map(d => d.id),
       ...Object.keys(managedByUid),
+      ...authUidsSet,
     ];
     const uniqUids = [...new Set(allUids)];
     /* Chunk into groups of 100 */
@@ -55,6 +67,7 @@ export async function GET(req: Request) {
         for (const u of res.users) {
           authMetaByUid[u.uid] = {
             email: u.email,
+            displayName: u.displayName,
             disabled: u.disabled,
             createdAt: u.metadata.creationTime,
             lastLoginAt: u.metadata.lastSignInTime,
@@ -65,33 +78,62 @@ export async function GET(req: Request) {
     }
 
     const profiles: any[] = [];
+    const seenUids = new Set<string>();
+
+    /* 1. All profile docs (the common case) */
     for (const d of profSnap.docs) {
       const data = d.data() as any;
       const managed = managedByUid[d.id];
+      const authMeta = authMetaByUid[d.id] || {};
       profiles.push({
         uid: d.id,
+        displayName: data.displayName || authMeta.displayName || authMeta.email || "—",
         ...data,
-        ...(authMetaByUid[d.id] || {}),
+        ...authMeta,
         groupIds: groupsByUid[d.id] || [],
         isManaged: !!managed,
         username: managed?.username || null,
         role: managed?.role || (data.role || "user"),
       });
+      seenUids.add(d.id);
     }
 
-    /* Also include managed users who don't have a profile doc yet (edge case) */
+    /* 2. Managed users without a profile doc (edge case) */
     for (const [uid, managed] of Object.entries(managedByUid)) {
-      if (profiles.find(p => p.uid === uid)) continue;
+      if (seenUids.has(uid)) continue;
+      const authMeta = authMetaByUid[uid] || {};
       profiles.push({
         uid,
-        displayName: managed.displayName,
-        email: managed.email,
+        displayName: managed.displayName || authMeta.displayName,
+        email: managed.email || authMeta.email,
         username: managed.username,
         role: managed.role,
         disabled: managed.disabled,
         isManaged: true,
         groupIds: groupsByUid[uid] || [],
       });
+      seenUids.add(uid);
+    }
+
+    /* 3. Auth users with NO profile/managed doc — typically Google sign-ins
+     *    that never triggered a profile write (e.g. the super admin themselves). */
+    for (const uid of authUidsSet) {
+      if (seenUids.has(uid)) continue;
+      const authMeta = authMetaByUid[uid] || {};
+      profiles.push({
+        uid,
+        displayName: authMeta.displayName || authMeta.email?.split("@")[0] || "—",
+        email: authMeta.email,
+        provider: authMeta.provider,
+        disabled: authMeta.disabled,
+        createdAt: authMeta.createdAt,
+        lastLoginAt: authMeta.lastLoginAt,
+        isManaged: false,
+        username: null,
+        role: "user",
+        groupIds: groupsByUid[uid] || [],
+      });
+      seenUids.add(uid);
     }
 
     return NextResponse.json(profiles);
