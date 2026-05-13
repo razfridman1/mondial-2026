@@ -1,15 +1,15 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import AdminUsers from "./AdminUsers";
+import AdminGroups from "./AdminGroups";
 
-/* The original broadcast-overrides table lived here — it required manually
- * editing 104 matches and was removed at the user's request. The Firestore
- * `broadcast_overrides` collection + the /api/overrides endpoint still
- * exist so a CSV-import flow can be added later if needed. */
+type Sub = "users" | "groups";
 
 export default function AdminPanel() {
   const user = useStore(s => s.user);
+  const [sub, setSub] = useState<Sub>("users");
 
   if (!user) return (
     <div className="admin-locked">
@@ -29,11 +29,28 @@ export default function AdminPanel() {
   return (
     <>
       <div className="admin-bar">
-        <h3>👥 ניהול משתמשים — Super Admin</h3>
+        <h3>🛡️ ניהול — Super Admin</h3>
         <div className="muted">{user.email}</div>
       </div>
 
-      <AdminUsers />
+      {/* Sub-tab switcher */}
+      <div className="filter-row" style={{ marginBottom: 14 }}>
+        <button
+          className={`seg ${sub === "users" ? "on" : ""}`}
+          onClick={() => setSub("users")}
+        >
+          👥 משתמשים
+        </button>
+        <button
+          className={`seg ${sub === "groups" ? "on" : ""}`}
+          onClick={() => setSub("groups")}
+        >
+          👫 קבוצות
+        </button>
+      </div>
+
+      {sub === "users"  && <AdminUsers />}
+      {sub === "groups" && <AdminGroups />}
     </>
   );
 }
