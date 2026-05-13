@@ -246,10 +246,10 @@ export default function MyPredictionsTab() {
         )}
       </div>
 
-      {/* ============ MINI LEADERBOARD ============ */}
-      {leaderboard.length > 1 && (
+      {/* ============ MINI LEADERBOARDS — one per group, side by side ============ */}
+      {groups.length === 1 && leaderboard.length > 1 && (
         <div className="mypred-mini-lb">
-          <h3>🏅 מובילים{currentGroupId ? " בקבוצה" : ""}</h3>
+          <h3>🏅 מובילים בקבוצה</h3>
           <div className="mypred-mini-rows">
             {leaderboard.slice(0, 5).map((r, i) => (
               <div key={r.uid} className={`mypred-mini-row ${r.uid === user.uid ? "is-me" : ""}`}>
@@ -260,6 +260,17 @@ export default function MyPredictionsTab() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+      {groups.length > 1 && (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+          gap: 10,
+        }}>
+          {groups.map(g => (
+            <MiniGroupLeaderboard key={g.id} groupId={g.id} groupName={g.name} myUid={user.uid} />
+          ))}
         </div>
       )}
 
@@ -328,6 +339,60 @@ export default function MyPredictionsTab() {
 /* ===================================================================
  * Stat tile
  * =================================================================== */
+/* ===================================================================
+ * MiniGroupLeaderboard — small leaderboard for a specific group,
+ * shown side-by-side with siblings when user is in multiple groups.
+ * =================================================================== */
+function MiniGroupLeaderboard({
+  groupId, groupName, myUid,
+}: { groupId: string; groupName: string; myUid: string }) {
+  const [rows, setRows] = useState<LeaderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/leaderboard?groupId=${groupId}`);
+        if (r.ok) setRows(await r.json());
+      } finally { setLoading(false); }
+    })();
+  }, [groupId]);
+
+  const myRow = rows.find(r => r.uid === myUid);
+
+  return (
+    <div className="mypred-mini-lb" style={{ minWidth: 0 }}>
+      <h3 style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <span>🏅 {groupName}</span>
+        {myRow?.rank && (
+          <span className="chip chip-soft" style={{ fontSize: 11 }}>
+            אתה #{myRow.rank}
+          </span>
+        )}
+      </h3>
+      {loading && !rows.length ? (
+        <div className="muted" style={{ fontSize: 12 }}>…טוען</div>
+      ) : rows.length === 0 ? (
+        <div className="muted" style={{ fontSize: 12 }}>אין נתונים עדיין.</div>
+      ) : (
+        <div className="mypred-mini-rows">
+          {rows.slice(0, 5).map((r, i) => (
+            <div key={r.uid} className={`mypred-mini-row ${r.uid === myUid ? "is-me" : ""}`}>
+              <span className={`mypred-mini-rank rank-${i + 1}`}>
+                {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
+              </span>
+              <AvatarDisplay avatarId={r.avatarId} size={28} />
+              <span className="mypred-mini-name">{r.displayName}{r.uid === myUid && " (אני)"}</span>
+              <span className="mypred-mini-pts">{r.totalPoints}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatTile({ icon, value, label, big = false }: { icon: string; value: any; label: string; big?: boolean }) {
   return (
     <div className={`mypred-stat ${big ? "is-big" : ""}`}>
