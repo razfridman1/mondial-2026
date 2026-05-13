@@ -444,7 +444,7 @@ function GroupAssignModal({
           <div className="muted">
             מצב נוכחי: {memberOf.length === 0
               ? <span style={{ color: "var(--orange)", fontWeight: 700 }}>⚠ לא משויך לאף קבוצה</span>
-              : <span>חבר ב‑{memberOf.length} קבוצות</span>}
+              : <span>✓ חבר ב‑<strong style={{ color: "var(--accent)" }}>{memberOf.length}</strong> קבוצות</span>}
           </div>
         </header>
 
@@ -454,89 +454,109 @@ function GroupAssignModal({
           </p>
         ) : (
           <>
-            {/* Quick switcher — move to one specific group or none */}
+            {/* PRIMARY: Multi-select — user can be in multiple groups simultaneously */}
             <div style={{
-              marginTop: 14, padding: 10,
-              background: "rgba(0,212,255,0.06)",
-              border: "1px dashed var(--accent)",
+              marginTop: 14, padding: 12,
+              background: "rgba(0,212,255,0.05)",
+              border: "1px solid var(--accent)",
               borderRadius: 10,
             }}>
-              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-                🔄 העברה מהירה (מסיר משאר הקבוצות):
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                ✓ סמן את הקבוצות שהמשתמש חבר בהן
               </div>
-              <select
-                disabled={busy !== null}
-                onChange={e => {
-                  const val = e.target.value;
-                  if (val === "") return;
-                  moveToOnly(val === "__none__" ? null : val);
-                  e.target.value = "";
-                }}
-                defaultValue=""
-                style={{ width: "100%", padding: 8, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
-              >
-                <option value="" disabled>— בחר יעד —</option>
-                <option value="__none__">⚠ ללא שיוך לאף קבוצה</option>
-                {groups.map(g => (
-                  <option key={g.id} value={g.id} disabled={memberOf.length === 1 && memberOf[0] === g.id}>
-                    🔹 רק "{g.name}"
-                  </option>
-                ))}
-              </select>
+              <div className="muted" style={{ fontSize: 11, marginBottom: 10 }}>
+                💡 משתמש יכול להיות חבר ב‑<strong>כמה קבוצות במקביל</strong> — סמן את כולן. השמירה אוטומטית.
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {groups.map(g => {
+                  const isMember = memberOf.includes(g.id);
+                  return (
+                    <label
+                      key={g.id}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "10px 12px",
+                        background: isMember ? "rgba(0,212,255,0.12)" : "var(--bg-elev)",
+                        border: `1px solid ${isMember ? "var(--accent)" : "var(--border)"}`,
+                        borderRadius: 10,
+                        cursor: busy === g.id ? "wait" : "pointer",
+                        transition: "background .15s, border-color .15s",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isMember}
+                        disabled={busy !== null}
+                        onChange={() => toggle(g.id, isMember)}
+                        style={{ width: 18, height: 18 }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <strong>{g.name}</strong>
+                        <span className="muted" style={{ marginInlineStart: 8, fontSize: 11 }}>
+                          קוד: <code className="invite-code">{g.inviteCode}</code>
+                          {" · "}{g.memberCount || 0} חברים
+                        </span>
+                      </div>
+                      {busy === g.id && <span className="muted" style={{ fontSize: 11 }}>שומר…</span>}
+                      {isMember && busy === null && <span style={{ color: "var(--accent)", fontWeight: 700 }}>✓</span>}
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Multi-select — check/uncheck individual groups */}
-            <div style={{ fontSize: 12, fontWeight: 700, margin: "16px 0 8px" }}>
-              ✓ שיוך מרובה (בחר כמה קבוצות):
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {groups.map(g => {
-                const isMember = memberOf.includes(g.id);
-                return (
-                  <label
-                    key={g.id}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "10px 12px",
-                      background: isMember ? "rgba(0,212,255,0.08)" : "var(--bg-elev)",
-                      border: `1px solid ${isMember ? "var(--accent)" : "var(--border)"}`,
-                      borderRadius: 10,
-                      cursor: busy === g.id ? "wait" : "pointer",
+            {/* SECONDARY: Advanced actions (collapsible) */}
+            <details style={{ marginTop: 14 }}>
+              <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--text-muted)" }}>
+                ⚙ פעולות מתקדמות (העברה מהירה / הסרה מכל)
+              </summary>
+              <div style={{
+                marginTop: 8, padding: 10,
+                background: "var(--bg-elev)",
+                border: "1px dashed var(--border)",
+                borderRadius: 10,
+                display: "flex", flexDirection: "column", gap: 8,
+              }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                    🔄 העברה לקבוצה אחת בלבד (מסיר משאר):
+                  </div>
+                  <select
+                    disabled={busy !== null}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === "") return;
+                      moveToOnly(val === "__none__" ? null : val);
+                      e.target.value = "";
                     }}
+                    defaultValue=""
+                    style={{ width: "100%", padding: 7, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 12 }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={isMember}
-                      disabled={busy !== null}
-                      onChange={() => toggle(g.id, isMember)}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <strong>{g.name}</strong>
-                      <span className="muted" style={{ marginInlineStart: 8, fontSize: 11 }}>
-                        קוד: <code className="invite-code">{g.inviteCode}</code>
-                        {" · "}{g.memberCount || 0} חברים
-                      </span>
-                    </div>
-                    {busy === g.id && <span className="muted" style={{ fontSize: 11 }}>שומר…</span>}
-                  </label>
-                );
-              })}
-            </div>
+                    <option value="" disabled>— בחר יעד —</option>
+                    <option value="__none__">⚠ ללא שיוך לאף קבוצה</option>
+                    {groups.map(g => (
+                      <option key={g.id} value={g.id} disabled={memberOf.length === 1 && memberOf[0] === g.id}>
+                        🔹 רק "{g.name}"
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {memberOf.length > 0 && (
-              <button
-                className="btn"
-                style={{
-                  marginTop: 12,
-                  background: "rgba(239,68,68,0.10)",
-                  borderColor: "var(--red)", color: "var(--red)",
-                }}
-                disabled={busy !== null}
-                onClick={() => moveToOnly(null)}
-              >
-                ⚠ הסר את {user.displayName || user.email} מכל הקבוצות
-              </button>
-            )}
+                {memberOf.length > 0 && (
+                  <button
+                    className="btn btn-small"
+                    style={{
+                      background: "rgba(239,68,68,0.10)",
+                      borderColor: "var(--red)", color: "var(--red)",
+                    }}
+                    disabled={busy !== null}
+                    onClick={() => moveToOnly(null)}
+                  >
+                    ⚠ הסר את {user.displayName || user.email} מכל הקבוצות
+                  </button>
+                )}
+              </div>
+            </details>
           </>
         )}
 
