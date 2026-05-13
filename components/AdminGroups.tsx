@@ -84,6 +84,28 @@ export default function AdminGroups() {
   }
   useEffect(() => { load(); }, [me?.isAdmin]);
 
+  async function createGroup() {
+    const name = prompt("שם הקבוצה:");
+    if (!name || !name.trim()) return;
+    const description = prompt("תיאור קצר (אופציונלי):") || "";
+    setBusy(true);
+    try {
+      const r = await fetch("/api/groups", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ name: name.trim(), description: description.trim() }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        alert(d.error || d.message || "שגיאה ביצירת הקבוצה");
+        return;
+      }
+      const data = await r.json();
+      alert(`✓ הקבוצה "${name}" נוצרה!\nקוד הזמנה: ${data.inviteCode}`);
+      load();
+    } finally { setBusy(false); }
+  }
+
   async function patch(id: string, body: any) {
     setBusy(true);
     try {
@@ -185,10 +207,13 @@ export default function AdminGroups() {
     <section>
       <div className="admin-bar">
         <h3>👫 ניהול קבוצות</h3>
+        <button className="btn btn-primary" onClick={createGroup} disabled={busy}>
+          ➕ צור קבוצה חדשה
+        </button>
       </div>
 
       <p className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
-        ניהול מלא של קבוצות החברים: עריכה, הקפאה, מחיקה, ניהול חברים, ושיתוף הזמנות.
+        ניהול מלא של קבוצות החברים: יצירה, עריכה, הקפאה, מחיקה, ניהול חברים, ושיתוף הזמנות.
       </p>
 
       {/* Filters bar */}

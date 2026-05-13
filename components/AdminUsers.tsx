@@ -450,7 +450,8 @@ function GroupAssignModal({
 
         {groups.length === 0 ? (
           <p className="muted" style={{ marginTop: 14 }}>
-            עוד לא נוצרו קבוצות. צור קבוצה דרך לשונית "דירוג חברים" קודם.
+            עוד לא נוצרו קבוצות. עבור ללשונית <strong>👫 קבוצות</strong> ולחץ "➕ צור קבוצה חדשה",
+            או דרך לשונית <strong>🏆 דירוג חברים</strong> בקליק "➕ צור קבוצה".
           </p>
         ) : (
           <>
