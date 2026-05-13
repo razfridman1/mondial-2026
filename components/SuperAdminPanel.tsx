@@ -84,7 +84,7 @@ export default function SuperAdminPanel() {
       </details>
 
       <details className="adm-section">
-        <summary>🔮 ניחושים של משתמשים — עריכה ומחיקה</summary>
+        <summary>🔮 כל הניחושים של כל המשתמשים — צפייה ועריכה</summary>
         <PredictionsAdmin />
       </details>
 
@@ -302,21 +302,47 @@ function UserRowEditor({ profile, onPatch, onDelete }: any) {
 
 /* ============================ 3. PREDICTIONS ============================ */
 function PredictionsAdmin() {
-  const [uid, setUid] = useState("");
-  const [matchId, setMatchId] = useState("");
   const [rows, setRows] = useState<PredictionRow[]>([]);
+  const [profilesByUid, setProfilesByUid] = useState<Record<string, { displayName: string; avatarId: string }>>({});
+  const [resultsByMatch, setResultsByMatch] = useState<Record<string, { home: number; away: number }>>({});
   const [busy, setBusy] = useState(false);
+
+  /* Filters */
+  const [search, setSearch]   = useState("");
+  const [matchId, setMatchId] = useState("");
+  const [stage, setStage]     = useState<string>("ALL");
+  const [groupId, setGroupId] = useState<string>("");
+  const [groups, setGroups]   = useState<{ id: string; name: string; memberUids: string[] }[]>([]);
 
   async function load() {
     setBusy(true);
     try {
-      const params = new URLSearchParams();
-      if (uid)     params.set("uid", uid);
-      if (matchId) params.set("matchId", matchId);
-      const r = await fetch(`/api/admin/predictions?${params}`, { headers: await adminAuthHeaders() });
-      if (r.ok) setRows(await r.json());
+      const [predR, profR, resR, grpR] = await Promise.all([
+        fetch(`/api/admin/predictions`, { headers: await adminAuthHeaders() }),
+        fetch(`/api/admin/profiles`,   { headers: await adminAuthHeaders() }),
+        fetch(`/api/match-results`),
+        fetch(`/api/admin/groups`,     { headers: await adminAuthHeaders() }),
+      ]);
+      if (predR.ok) setRows(await predR.json());
+      if (profR.ok) {
+        const arr = await profR.json();
+        const map: Record<string, any> = {};
+        for (const p of arr) map[p.uid] = { displayName: p.displayName || p.email || "—", avatarId: p.avatarId || "messi" };
+        setProfilesByUid(map);
+      }
+      if (resR.ok) setResultsByMatch(await resR.json());
+      if (grpR.ok) {
+        const arr = await grpR.json();
+        setGroups(arr.map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          memberUids: (g.members || []).map((m: any) => m.uid),
+        })));
+      }
     } finally { setBusy(false); }
   }
+  useEffect(() => { load(); }, []);
+
   async function patch(id: string, body: any) {
     await fetch("/api/admin/predictions", {
       method: "PATCH", headers: await adminAuthHeaders(),
@@ -333,30 +359,134 @@ function PredictionsAdmin() {
     load();
   }
   async function bulkDelete() {
-    if (!uid && !matchId) { alert("הזן uid או matchId לפני מחיקה בכמות"); return; }
-    if (!confirm(`למחוק את כל הניחושים התואמים את הפילטר? (${rows.length} ניחושים)`)) return;
-    await fetch("/api/admin/predictions", {
-      method: "DELETE", headers: await adminAuthHeaders(),
-      body: JSON.stringify({ uid: uid || undefined, matchId: matchId || undefined }),
-    });
-    load();
+    if (!confirm(`למחוק את כל ${filtered.length} הניחושים המסוננים?`)) return;
+    if (!confirm("פעולה זו בלתי הפיכה. להמשיך?")) return;
+    /* Use individual deletes via id to honor the current filter view */
+    setBusy(true);
+    try {
+      for (const p of filtered) {
+        await fetch("/api/admin/predictions", {
+          method: "DELETE", headers: await adminAuthHeaders(),
+          body: JSON.stringify({ id: p.id }),
+        });
+      }
+      await load();
+    } finally { setBusy(false); }
   }
+
+  /* Build filtered, enriched, sorted rows */
+  const filtered = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    const groupUids = groupId ? new Set(groups.find(g => g.id === groupId)?.memberUids || []) : null;
+    return rows.filter(p => {
+      if (matchId && p.matchId !== matchId) return false;
+      if (stage !== "ALL") {
+        const m = MATCHES.find(x => x.id === p.matchId);
+        if (!m) return false;
+        if (stage === "KNOCKOUT" ? m.stage === "GROUP" : m.stage !== stage) return false;
+      }
+      if (groupUids && !groupUids.has(p.uid)) return false;
+      if (s) {
+        const prof = profilesByUid[p.uid];
+        const name = (prof?.displayName || "").toLowerCase();
+        if (!name.includes(s) && !p.uid.toLowerCase().includes(s)) return false;
+      }
+      return true;
+    });
+  }, [rows, profilesByUid, groups, search, matchId, stage, groupId]);
+
+  const totalsByUid = useMemo(() => {
+    const t: Record<string, { count: number; points: number; exact: number }> = {};
+    for (const p of filtered) {
+      const r = resultsByMatch[p.matchId];
+      const e = t[p.uid] || { count: 0, points: 0, exact: 0 };
+      e.count++;
+      if (r) {
+        const exact = p.homeScore === r.home && p.awayScore === r.away;
+        const sgnP = Math.sign(p.homeScore - p.awayScore);
+        const sgnR = Math.sign(r.home - r.away);
+        const resOk = sgnP === sgnR;
+        const diffOk = (p.homeScore - p.awayScore) === (r.home - r.away);
+        const pts = exact ? 7 : resOk ? (diffOk ? 4 : 3) : 0;
+        e.points += pts;
+        if (exact) e.exact++;
+      }
+      t[p.uid] = e;
+    }
+    return t;
+  }, [filtered, resultsByMatch]);
 
   return (
     <div className="adm-body">
-      <div className="filter-row">
-        <input type="text" placeholder="uid" value={uid} onChange={e => setUid(e.target.value)} style={{ flex: 1, padding: 6, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }} />
-        <input type="text" placeholder="matchId (M001-M104)" value={matchId} onChange={e => setMatchId(e.target.value)} style={{ flex: 1, padding: 6, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }} />
-        <button className="btn btn-primary" onClick={load}>🔎 חפש</button>
-        {rows.length > 0 && <button className="btn" style={{ color: "var(--red)" }} onClick={bulkDelete}>🗑️ מחק הכל</button>}
+      <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+        💡 כל הניחושים של כל המשתמשים מוצגים. השתמש בפילטרים כדי לצמצם תצוגה.
+        בעמודה "נקודות" — חישוב לפי תוצאות שכבר קיימות (משחקים שלא הסתיימו = 0).
+      </p>
+
+      <div className="filter-row" style={{ flexWrap: "wrap" }}>
+        <input type="text" placeholder="🔎 חפש לפי שם משתמש או uid…" value={search} onChange={e => setSearch(e.target.value)}
+               style={{ flex: "1 1 200px", padding: 6, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }} />
+        <select value={stage} onChange={e => setStage(e.target.value)}
+                style={{ padding: 6, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}>
+          <option value="ALL">כל השלבים</option>
+          <option value="GROUP">שלב הבתים</option>
+          <option value="KNOCKOUT">נוקאאוט בלבד</option>
+          <option value="R32">שלב 32</option>
+          <option value="R16">שלב 16</option>
+          <option value="QF">רבע גמר</option>
+          <option value="SF">חצי גמר</option>
+          <option value="THIRD">המקום ה‑3</option>
+          <option value="FINAL">הגמר</option>
+        </select>
+        <select value={groupId} onChange={e => setGroupId(e.target.value)}
+                style={{ padding: 6, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}>
+          <option value="">כל הקבוצות (כולל אורחים)</option>
+          {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
+        <input type="text" placeholder="matchId (M001-M104)" value={matchId} onChange={e => setMatchId(e.target.value)}
+               style={{ width: 130, padding: 6, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }} />
+        <button className="btn" onClick={load} disabled={busy}>↻ רענן</button>
+        {filtered.length > 0 && (
+          <button className="btn" style={{ color: "var(--red)" }} onClick={bulkDelete} disabled={busy}>
+            🗑️ מחק {filtered.length}
+          </button>
+        )}
       </div>
 
-      <div className="adm-table-wrap" style={{ maxHeight: 400, overflowY: "auto", marginTop: 10 }}>
+      <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+        {busy ? "טוען…" : `סה"כ: ${filtered.length.toLocaleString("he-IL")} ניחושים · ${Object.keys(totalsByUid).length} משתמשים`}
+      </div>
+
+      <div className="adm-table-wrap" style={{ maxHeight: 560, overflowY: "auto", marginTop: 10 }}>
         <table className="admin-table">
-          <thead><tr><th>uid</th><th>משחק</th><th>בית</th><th>חוץ</th><th>auto</th><th>פעולות</th></tr></thead>
+          <thead>
+            <tr>
+              <th>משתמש</th>
+              <th>משחק</th>
+              <th>שלב</th>
+              <th>ניחוש</th>
+              <th>תוצאה</th>
+              <th>נק׳</th>
+              <th>auto</th>
+              <th>פעולות</th>
+            </tr>
+          </thead>
           <tbody>
-            {rows.map(p => <PredictionRowEditor key={p.id} pred={p} onPatch={patch} onDelete={del} />)}
-            {!rows.length && !busy && <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 20 }}>אין תוצאות. מלא uid או matchId ולחץ חפש.</td></tr>}
+            {filtered.map(p => (
+              <PredictionRowEditor
+                key={p.id}
+                pred={p}
+                profile={profilesByUid[p.uid]}
+                result={resultsByMatch[p.matchId]}
+                onPatch={patch}
+                onDelete={del}
+              />
+            ))}
+            {!filtered.length && !busy && (
+              <tr><td colSpan={8} className="muted" style={{ textAlign: "center", padding: 20 }}>
+                אין ניחושים תואמים את הפילטר.
+              </td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -364,19 +494,74 @@ function PredictionsAdmin() {
   );
 }
 
-function PredictionRowEditor({ pred, onPatch, onDelete }: any) {
+function PredictionRowEditor({ pred, profile, result, onPatch, onDelete }: any) {
   const [h, setH] = useState(pred.homeScore);
   const [a, setA] = useState(pred.awayScore);
+  const [editing, setEditing] = useState(false);
   const match = MATCHES.find(m => m.id === pred.matchId);
+  const stageName = match ? (match.stage === "GROUP" ? `בית ${match.group || ""}` : ({GROUP:"בתים",R32:"32",R16:"16",QF:"רבע",SF:"חצי",THIRD:"3-4",FINAL:"גמר"} as any)[match.stage] || match.stage) : "—";
+
+  let points = "—";
+  let pointsColor = "";
+  if (result) {
+    const exact = pred.homeScore === result.home && pred.awayScore === result.away;
+    const sgnP = Math.sign(pred.homeScore - pred.awayScore);
+    const sgnR = Math.sign(result.home - result.away);
+    const resOk = sgnP === sgnR;
+    const diffOk = (pred.homeScore - pred.awayScore) === (result.home - result.away);
+    const pts = exact ? 7 : resOk ? (diffOk ? 4 : 3) : 0;
+    points = String(pts);
+    pointsColor = pts >= 7 ? "#22c55e" : pts > 0 ? "var(--accent)" : "var(--red)";
+  }
+
   return (
     <tr>
-      <td style={{ fontFamily: "monospace", fontSize: 10 }}>{pred.uid.slice(0, 12)}…</td>
-      <td>{match ? `${TEAMS[match.home]?.name || match.home}-${TEAMS[match.away]?.name || match.away}` : pred.matchId}</td>
-      <td><input type="number" min={0} max={30} value={h} onChange={e => setH(Number(e.target.value))} style={{ width: 55 }} /></td>
-      <td><input type="number" min={0} max={30} value={a} onChange={e => setA(Number(e.target.value))} style={{ width: 55 }} /></td>
-      <td>{pred.auto ? "🤖" : ""}</td>
       <td>
-        <button className="btn btn-small btn-primary" onClick={() => onPatch(pred.id, { homeScore: h, awayScore: a })}>💾</button>
+        <strong style={{ fontSize: 13 }}>{profile?.displayName || "—"}</strong>
+        <br />
+        <span className="muted" style={{ fontFamily: "monospace", fontSize: 10 }}>{pred.uid.slice(0, 10)}…</span>
+      </td>
+      <td style={{ fontSize: 12 }}>
+        {match
+          ? <>
+              <span>{TEAMS[match.home]?.flag || ""} {TEAMS[match.home]?.name || match.home}</span>
+              <span className="muted"> נגד </span>
+              <span>{TEAMS[match.away]?.name || match.away} {TEAMS[match.away]?.flag || ""}</span>
+              <br/>
+              <span className="muted" style={{ fontSize: 10 }}>{match.id}</span>
+            </>
+          : pred.matchId}
+      </td>
+      <td><span className="chip" style={{ fontSize: 11 }}>{stageName}</span></td>
+      <td>
+        {editing ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input type="number" min={0} max={30} value={h} onChange={e => setH(Number(e.target.value))} style={{ width: 44 }} />
+            <span>:</span>
+            <input type="number" min={0} max={30} value={a} onChange={e => setA(Number(e.target.value))} style={{ width: 44 }} />
+          </div>
+        ) : (
+          <strong style={{ fontVariantNumeric: "tabular-nums" }}>{pred.homeScore} : {pred.awayScore}</strong>
+        )}
+      </td>
+      <td>
+        {result
+          ? <strong style={{ color: "var(--accent-2)", fontVariantNumeric: "tabular-nums" }}>{result.home} : {result.away}</strong>
+          : <span className="muted">—</span>}
+      </td>
+      <td>
+        <strong style={{ color: pointsColor, fontVariantNumeric: "tabular-nums" }}>{points}</strong>
+      </td>
+      <td>{pred.auto ? "🤖" : ""}</td>
+      <td style={{ whiteSpace: "nowrap" }}>
+        {editing ? (
+          <>
+            <button className="btn btn-small btn-primary" onClick={() => { onPatch(pred.id, { homeScore: h, awayScore: a }); setEditing(false); }}>💾</button>
+            <button className="btn btn-small" onClick={() => { setH(pred.homeScore); setA(pred.awayScore); setEditing(false); }} style={{ marginInlineStart: 4 }}>↩</button>
+          </>
+        ) : (
+          <button className="btn btn-small" onClick={() => setEditing(true)}>✏️</button>
+        )}
         <button className="btn btn-small" onClick={() => onDelete(pred.id)} style={{ color: "var(--red)", marginInlineStart: 4 }}>🗑️</button>
       </td>
     </tr>
@@ -396,9 +581,19 @@ function GroupsAdmin() {
   }
   useEffect(() => { load(); }, []);
 
-  async function rename(id: string, name: string) {
-    await fetch("/api/admin/groups", { method: "PATCH", headers: await adminAuthHeaders(), body: JSON.stringify({ id, name }) });
+  async function patch(id: string, body: any) {
+    const r = await fetch("/api/admin/groups", {
+      method: "PATCH",
+      headers: await adminAuthHeaders(),
+      body: JSON.stringify({ id, ...body }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      alert(d.error || "שגיאה");
+      return false;
+    }
     load();
+    return true;
   }
   async function nuke(id: string) {
     if (!confirm("למחוק את הקבוצה לצמיתות? כל החברויות יוסרו.")) return;
@@ -408,29 +603,99 @@ function GroupsAdmin() {
 
   return (
     <div className="adm-body">
-      <div className="adm-table-wrap" style={{ maxHeight: 360, overflowY: "auto" }}>
+      <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+        💡 לחץ <strong>✏️ ערוך</strong> כדי לשנות את שם הקבוצה, התיאור, או קוד ההזמנה.
+      </p>
+      <div className="adm-table-wrap" style={{ maxHeight: 480, overflowY: "auto" }}>
         <table className="admin-table">
-          <thead><tr><th>שם</th><th>קוד</th><th>חברים</th><th>פעולות</th></tr></thead>
+          <thead><tr><th>שם / תיאור</th><th>קוד הזמנה</th><th>חברים</th><th>פעולות</th></tr></thead>
           <tbody>
             {groups.map(g => (
-              <tr key={g.id}>
-                <td><strong>{g.name}</strong>{g.description && <><br /><span className="muted" style={{ fontSize: 11 }}>{g.description}</span></>}</td>
-                <td><code className="invite-code">{g.inviteCode}</code></td>
-                <td>{g.members?.length || 0}</td>
-                <td>
-                  <button className="btn btn-small" onClick={() => {
-                    const name = prompt("שם חדש לקבוצה:", g.name);
-                    if (name) rename(g.id, name);
-                  }}>✏️</button>
-                  <button className="btn btn-small" onClick={() => nuke(g.id)} style={{ color: "var(--red)", marginInlineStart: 4 }}>🗑️</button>
-                </td>
-              </tr>
+              <GroupRowEditor key={g.id} g={g} onPatch={patch} onDelete={nuke} />
             ))}
             {!groups.length && !busy && <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: 20 }}>אין קבוצות עדיין.</td></tr>}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+function GroupRowEditor({ g, onPatch, onDelete }: any) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(g.name || "");
+  const [desc, setDesc] = useState(g.description || "");
+  const [code, setCode] = useState(g.inviteCode || "");
+
+  /* Reset inputs when group data refreshes from server */
+  useEffect(() => {
+    setName(g.name || "");
+    setDesc(g.description || "");
+    setCode(g.inviteCode || "");
+  }, [g.name, g.description, g.inviteCode]);
+
+  async function save() {
+    const body: any = {};
+    if (name.trim() && name.trim() !== g.name) body.name = name.trim();
+    if (desc !== (g.description || "")) body.description = desc.trim();
+    if (code.trim() && code.trim().toUpperCase() !== g.inviteCode) body.inviteCode = code.trim().toUpperCase();
+    if (!Object.keys(body).length) { setEditing(false); return; }
+    const ok = await onPatch(g.id, body);
+    if (ok) setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <tr>
+        <td>
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="שם הקבוצה"
+            style={{ width: "100%", padding: 6, background: "var(--bg-elev)", border: "1px solid var(--accent)", borderRadius: 6, color: "var(--text)", marginBottom: 4 }}
+          />
+          <input
+            type="text"
+            value={desc}
+            onChange={e => setDesc(e.target.value)}
+            placeholder="תיאור (אופציונלי)"
+            style={{ width: "100%", padding: 6, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 12 }}
+          />
+        </td>
+        <td>
+          <input
+            type="text"
+            value={code}
+            onChange={e => setCode(e.target.value.toUpperCase())}
+            style={{ width: 100, padding: 6, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontFamily: "monospace" }}
+          />
+        </td>
+        <td>{g.members?.length || 0}</td>
+        <td style={{ whiteSpace: "nowrap" }}>
+          <button className="btn btn-small btn-primary" onClick={save}>💾 שמור</button>
+          <button className="btn btn-small" onClick={() => {
+            setName(g.name); setDesc(g.description || ""); setCode(g.inviteCode);
+            setEditing(false);
+          }} style={{ marginInlineStart: 4 }}>ביטול</button>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr>
+      <td>
+        <strong>{g.name}</strong>
+        {g.description && <><br /><span className="muted" style={{ fontSize: 11 }}>{g.description}</span></>}
+      </td>
+      <td><code className="invite-code">{g.inviteCode}</code></td>
+      <td>{g.members?.length || 0}</td>
+      <td style={{ whiteSpace: "nowrap" }}>
+        <button className="btn btn-small btn-primary" onClick={() => setEditing(true)}>✏️ ערוך</button>
+        <button className="btn btn-small" onClick={() => onDelete(g.id)} style={{ color: "var(--red)", marginInlineStart: 4 }}>🗑️ מחק</button>
+      </td>
+    </tr>
   );
 }
 
