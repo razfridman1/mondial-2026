@@ -3,16 +3,17 @@ import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
 
-interface ManagedUser {
+interface UserRow {
   uid: string;
-  username: string;
-  email: string;
-  displayName: string;
-  role: "admin" | "user";
-  disabled: boolean;
-  createdBy?: string;
-  createdAt?: number;
-  passwordResetAt?: number;
+  email?: string;
+  displayName?: string;
+  username?: string | null;
+  role?: "admin" | "user";
+  disabled?: boolean;
+  isManaged?: boolean;
+  provider?: string;
+  createdAt?: string;
+  lastLoginAt?: string;
   aiBlocked?: boolean;
   groupIds?: string[];
 }
@@ -25,12 +26,14 @@ interface GroupRow {
 }
 
 export default function AdminUsers() {
-  const user = useStore(s => s.user);
-  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const me = useStore(s => s.user);
+  const [users, setUsers] = useState<UserRow[]>([]);
   const [groups, setGroups] = useState<GroupRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [groupModal, setGroupModal] = useState<ManagedUser | null>(null);
+  const [groupModal, setGroupModal] = useState<UserRow | null>(null);
+  const [filter, setFilter] = useState("");
+  const [onlyUnassigned, setOnlyUnassigned] = useState(false);
 
   async function authHeaders() {
     const token = await getFirebase().auth!.currentUser!.getIdToken();
@@ -38,22 +41,22 @@ export default function AdminUsers() {
   }
 
   async function load() {
-    if (!user?.isAdmin) return;
+    if (!me?.isAdmin) return;
     setBusy(true); setError(null);
     try {
-      const [uR, gR] = await Promise.all([
-        fetch("/api/admin/users", { headers: await authHeaders() }),
-        fetch("/api/admin/groups", { headers: await authHeaders() }),
+      const [pR, gR] = await Promise.all([
+        fetch("/api/admin/profiles", { headers: await authHeaders() }),
+        fetch("/api/admin/groups",   { headers: await authHeaders() }),
       ]);
-      if (!uR.ok) { setError("שגיאה בטעינת המשתמשים"); return; }
-      setUsers(await uR.json());
+      if (!pR.ok) { setError("שגיאה בטעינת המשתמשים"); return; }
+      setUsers(await pR.json());
       if (gR.ok) setGroups(await gR.json());
     } finally { setBusy(false); }
   }
 
-  useEffect(() => { load(); }, [user?.isAdmin]);
+  useEffect(() => { load(); }, [me?.isAdmin]);
 
-  async function createUser() {
+  async function createManaged() {
     const username = prompt("שם משתמש (3-30 תווים, אותיות קטנות, מספרים, ._-):");
     if (!username) return;
     const displayName = prompt("שם תצוגה (אופציונלי):") || username;
@@ -75,7 +78,7 @@ export default function AdminUsers() {
     } finally { setBusy(false); }
   }
 
-  async function patch(uid: string, body: any, errMsg = "שגיאה") {
+  async function patchManaged(uid: string, body: any, errMsg = "שגיאה") {
     setBusy(true);
     try {
       const r = await fetch(`/api/admin/users/${uid}`, {
@@ -93,77 +96,146 @@ export default function AdminUsers() {
     } finally { setBusy(false); }
   }
 
-  async function resetPassword(u: ManagedUser) {
-    const password = prompt(`סיסמה חדשה ל-${u.username} (לפחות 6 תווים):`);
+  async function patchProfile(uid: string, body: any, errMsg = "שגיאה") {
+    /* Updates regular (non-managed) profiles via /api/admin/profiles */
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/profiles", {
+        method: "PATCH",
+        headers: await authHeaders(),
+        body: JSON.stringify({ uid, ...body }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        alert(d.error || errMsg);
+        return false;
+      }
+      load();
+      return true;
+    } finally { setBusy(false); }
+  }
+
+  async function patchUser(u: UserRow, body: any, errMsg = "שגיאה") {
+    /* Dispatches to the right API based on user type */
+    return u.isManaged ? patchManaged(u.uid, body, errMsg) : patchProfile(u.uid, body, errMsg);
+  }
+
+  async function resetPassword(u: UserRow) {
+    if (!u.isManaged) {
+      alert("רק משתמשים פנימיים (username/password) ניתנים לאיפוס סיסמה דרך הפאנל.\nמשתמשי Google מנהלים את הסיסמה דרך Google.");
+      return;
+    }
+    const password = prompt(`סיסמה חדשה ל-${u.username || u.displayName} (לפחות 6 תווים):`);
     if (!password || password.length < 6) return;
-    await patch(u.uid, { password }, "שגיאה באיפוס סיסמה");
+    await patchManaged(u.uid, { password }, "שגיאה באיפוס סיסמה");
   }
 
-  async function renameDisplay(u: ManagedUser) {
-    const displayName = prompt("שם תצוגה חדש:", u.displayName);
+  async function renameDisplay(u: UserRow) {
+    const displayName = prompt("שם תצוגה חדש:", u.displayName || "");
     if (!displayName) return;
-    await patch(u.uid, { displayName });
+    await patchUser(u, { displayName });
   }
 
-  async function renameUsername(u: ManagedUser) {
+  async function renameUsername(u: UserRow) {
+    if (!u.isManaged) {
+      alert("שינוי שם משתמש זמין רק למשתמשים פנימיים שנוצרו דרך הפאנל.");
+      return;
+    }
     const username = prompt(
       `שם משתמש חדש ל-${u.username}:\n(3-30 תווים, אותיות קטנות, מספרים, ._-)\nאחרי השינוי הוא יתחבר עם השם החדש.`,
-      u.username
+      u.username || ""
     );
     if (!username || username === u.username) return;
-    await patch(u.uid, { username }, "שגיאה בשינוי שם המשתמש");
+    await patchManaged(u.uid, { username }, "שגיאה בשינוי שם המשתמש");
   }
 
-  async function toggleRole(u: ManagedUser) {
+  async function toggleRole(u: UserRow) {
+    if (!u.isManaged) {
+      alert("שינוי תפקיד דרך הפאנל זמין רק למשתמשים פנימיים.\nGoogle admins מוגדרים דרך ADMIN_EMAILS ב‑Vercel.");
+      return;
+    }
     const role = u.role === "admin" ? "user" : "admin";
     if (!confirm(`לשנות את התפקיד של ${u.username} ל-${role}?`)) return;
-    await patch(u.uid, { role });
+    await patchManaged(u.uid, { role });
   }
 
-  async function toggleDisable(u: ManagedUser) {
+  async function toggleDisable(u: UserRow) {
     const disabled = !u.disabled;
     const verb = disabled ? "להשבית" : "להפעיל";
-    if (!confirm(`${verb} את ${u.username}?`)) return;
-    await patch(u.uid, { disabled });
+    if (!confirm(`${verb} את ${u.displayName || u.email}?`)) return;
+    await patchUser(u, { disabled });
   }
 
-  async function toggleAi(u: ManagedUser) {
-    await patch(u.uid, { aiBlocked: !u.aiBlocked });
+  async function toggleAi(u: UserRow) {
+    await patchUser(u, { aiBlocked: !u.aiBlocked });
   }
 
-  async function deleteUser(u: ManagedUser) {
-    if (!confirm(`למחוק את ${u.username} לצמיתות? כל הניחושים והנתונים שלו יימחקו.`)) return;
+  async function deleteUser(u: UserRow) {
+    if (u.uid === me?.uid) { alert("אי אפשר למחוק את עצמך."); return; }
+    if (!confirm(`למחוק את ${u.displayName || u.email} לצמיתות? כל הניחושים והנתונים שלו יימחקו.`)) return;
     if (!confirm("פעולה זו בלתי הפיכה. להמשיך?")) return;
     setBusy(true);
     try {
-      const r = await fetch(`/api/admin/users/${u.uid}`, {
+      /* Both managed and Google users go through the same delete endpoint */
+      const url = u.isManaged
+        ? `/api/admin/users/${u.uid}`
+        : `/api/admin/profiles`;
+      const r = await fetch(url, {
         method: "DELETE",
         headers: await authHeaders(),
+        body: u.isManaged ? undefined : JSON.stringify({ uid: u.uid }),
       });
       if (!r.ok) { alert("שגיאה במחיקה"); return; }
       load();
     } finally { setBusy(false); }
   }
 
-  if (!user) return null;
-  if (!user.isAdmin) return null;
+  if (!me) return null;
+  if (!me.isAdmin) return null;
+
+  const filtered = users.filter(u => {
+    if (onlyUnassigned && (u.groupIds || []).length > 0) return false;
+    if (!filter) return true;
+    const q = filter.toLowerCase();
+    return (u.displayName || "").toLowerCase().includes(q)
+        || (u.email || "").toLowerCase().includes(q)
+        || (u.username || "").toLowerCase().includes(q)
+        || u.uid.toLowerCase().includes(q);
+  });
+
+  const unassignedCount = users.filter(u => (u.groupIds || []).length === 0).length;
 
   return (
     <section style={{ marginTop: 26 }}>
       <div className="admin-bar">
         <h3>👥 ניהול משתמשים פנימי</h3>
-        <button className="btn btn-primary" onClick={createUser} disabled={busy}>
-          ➕ צור משתמש חדש
+        <button className="btn btn-primary" onClick={createManaged} disabled={busy}>
+          ➕ צור משתמש פנימי חדש
         </button>
       </div>
 
       <p className="muted" style={{ marginBottom: 10 }}>
-        אתה (כמנהל) יכול ליצור חשבונות עם שם משתמש וסיסמה בלבד — ללא צורך באימייל אמיתי או אימות.
-        משתמשים יתחברו דרך עמוד הכניסה הרגיל עם שם המשתמש שתיתן להם.
+        מציג את <strong>כל המשתמשים</strong> במערכת — גם משתמשי Google וגם משתמשים פנימיים (username/password) שאתה יצרת.
+        ניתן ליצור משתמש פנימי חדש עם שם משתמש וסיסמה (ללא צורך באימייל אמיתי).
       </p>
       <p className="muted" style={{ marginBottom: 10, fontSize: 12 }}>
-        💡 <strong>מקרא פעולות:</strong> 🔑 סיסמה · 👤 שם משתמש · ✏️ שם תצוגה · 👥 שיוך לקבוצות · 🤖 חסימת AI · 🚫 השבתה · 🗑️ מחיקה
+        💡 <strong>פעולות:</strong> 🔑 סיסמה · 👤 שם משתמש · ✏️ שם תצוגה · 👥 שיוך לקבוצות · 🤖 חסימת AI · 🚫 השבתה · 🗑️ מחיקה
       </p>
+
+      <div className="filter-row" style={{ marginBottom: 10 }}>
+        <input
+          type="text"
+          placeholder="🔎 חפש לפי שם / אימייל / username..."
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          style={{ flex: 1, padding: 7, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
+        />
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+          <input type="checkbox" checked={onlyUnassigned} onChange={e => setOnlyUnassigned(e.target.checked)} />
+          הצג רק לא משויכים לקבוצה
+          {unassignedCount > 0 && <span className="chip" style={{ background: "var(--orange)", color: "#fff" }}>{unassignedCount}</span>}
+        </label>
+      </div>
 
       {error && <p className="pred-msg is-locked">{error}</p>}
 
@@ -171,26 +243,36 @@ export default function AdminUsers() {
         <table className="admin-table">
           <thead>
             <tr>
-              <th>שם משתמש</th>
               <th>שם תצוגה</th>
-              <th>תפקיד</th>
+              <th>אימייל / שם משתמש</th>
+              <th>סוג</th>
               <th>סטטוס</th>
               <th>קבוצות</th>
               <th>פעולות</th>
             </tr>
           </thead>
           <tbody>
-            {users.length === 0 && !busy && (
+            {filtered.length === 0 && !busy && (
               <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 20 }}>
-                אין משתמשים מנוהלים עדיין. לחץ "צור משתמש חדש" כדי להתחיל.
+                {users.length === 0 ? "אין משתמשים במערכת." : "אין תוצאות מתאימות לחיפוש."}
               </td></tr>
             )}
-            {users.map(u => (
-              <tr key={u.uid}>
-                <td><strong>{u.username}</strong></td>
-                <td>{u.displayName}</td>
+            {filtered.map(u => (
+              <tr key={u.uid} style={u.uid === me.uid ? { background: "rgba(0,212,255,0.06)" } : {}}>
                 <td>
-                  <span className={`chip ${u.role === "admin" ? "chip-strong" : ""}`}>
+                  <strong>{u.displayName || "—"}</strong>
+                  {u.uid === me.uid && <span className="chip chip-strong" style={{ marginInlineStart: 6, fontSize: 10 }}>אתה</span>}
+                </td>
+                <td style={{ fontSize: 12 }}>
+                  {u.username && <><strong>@{u.username}</strong><br /></>}
+                  <span className="muted">{u.email || "—"}</span>
+                </td>
+                <td>
+                  {u.isManaged
+                    ? <span className="chip">פנימי</span>
+                    : <span className="chip chip-soft">{u.provider === "google.com" ? "🌐 Google" : "🌐 חיצוני"}</span>}
+                  <br/>
+                  <span className={`chip ${u.role === "admin" ? "chip-strong" : ""}`} style={{ fontSize: 10, marginTop: 3 }}>
                     {u.role === "admin" ? "🛡️ Admin" : "👤 User"}
                   </span>
                 </td>
@@ -202,15 +284,35 @@ export default function AdminUsers() {
                     {u.aiBlocked && <span className="badge badge-finished" style={{ background: "rgba(239,68,68,0.18)" }}>🤖 AI חסום</span>}
                   </div>
                 </td>
-                <td className="muted" style={{ fontSize: 11 }}>
-                  {(u.groupIds || []).length === 0 ? "—" : (u.groupIds || []).map(gid => {
-                    const g = groups.find(x => x.id === gid);
-                    return g ? <span key={gid} className="chip" style={{ marginInlineEnd: 4 }}>{g.name}</span> : null;
-                  })}
+                <td style={{ minWidth: 130 }}>
+                  {(u.groupIds || []).length === 0 ? (
+                    <span style={{
+                      display: "inline-block",
+                      padding: "3px 10px",
+                      background: "rgba(245,158,11,0.18)",
+                      color: "var(--orange)",
+                      border: "1px solid var(--orange)",
+                      borderRadius: 999,
+                      fontSize: 11, fontWeight: 700,
+                    }}>⚠ לא משויך</span>
+                  ) : (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                      {(u.groupIds || []).map(gid => {
+                        const g = groups.find(x => x.id === gid);
+                        return g
+                          ? <span key={gid} className="chip" style={{ fontSize: 11 }}>{g.name}</span>
+                          : <span key={gid} className="muted" style={{ fontSize: 10 }}>{gid.slice(0, 6)}…</span>;
+                      })}
+                    </div>
+                  )}
                 </td>
                 <td className="adm-actions" style={{ whiteSpace: "nowrap" }}>
-                  <button className="btn btn-small btn-primary" onClick={() => resetPassword(u)} disabled={busy} title="איפוס סיסמה">🔑</button>
-                  <button className="btn btn-small" onClick={() => renameUsername(u)} disabled={busy} title="שינוי שם משתמש">👤</button>
+                  {u.isManaged && (
+                    <>
+                      <button className="btn btn-small btn-primary" onClick={() => resetPassword(u)} disabled={busy} title="איפוס סיסמה">🔑</button>
+                      <button className="btn btn-small" onClick={() => renameUsername(u)} disabled={busy} title="שינוי שם משתמש">👤</button>
+                    </>
+                  )}
                   <button className="btn btn-small" onClick={() => renameDisplay(u)} disabled={busy} title="שינוי שם תצוגה">✏️</button>
                   <button className="btn btn-small" onClick={() => setGroupModal(u)} disabled={busy} title="שיוך לקבוצות">👥</button>
                   <button className="btn btn-small" onClick={() => toggleAi(u)} disabled={busy}
@@ -218,19 +320,23 @@ export default function AdminUsers() {
                           style={{ background: u.aiBlocked ? "rgba(239,68,68,0.15)" : "transparent" }}>
                     {u.aiBlocked ? "🤖🚫" : "🤖"}
                   </button>
-                  <button className="btn btn-small" onClick={() => toggleRole(u)} disabled={busy}
-                          title={u.role === "admin" ? "הפוך למשתמש רגיל" : "הפוך לאדמין"}>
-                    {u.role === "admin" ? "⬇" : "⬆"}
-                  </button>
+                  {u.isManaged && (
+                    <button className="btn btn-small" onClick={() => toggleRole(u)} disabled={busy}
+                            title={u.role === "admin" ? "הפוך למשתמש רגיל" : "הפוך לאדמין"}>
+                      {u.role === "admin" ? "⬇" : "⬆"}
+                    </button>
+                  )}
                   <button className="btn btn-small" onClick={() => toggleDisable(u)} disabled={busy}
                           title={u.disabled ? "הפעל" : "השבת"}>
                     {u.disabled ? "✓" : "🚫"}
                   </button>
-                  <button className="btn btn-small" onClick={() => deleteUser(u)} disabled={busy}
-                          title="מחיקה לצמיתות"
-                          style={{ background: "rgba(239,68,68,0.15)", borderColor: "var(--red)", color: "var(--red)" }}>
-                    🗑️
-                  </button>
+                  {u.uid !== me.uid && (
+                    <button className="btn btn-small" onClick={() => deleteUser(u)} disabled={busy}
+                            title="מחיקה לצמיתות"
+                            style={{ background: "rgba(239,68,68,0.15)", borderColor: "var(--red)", color: "var(--red)" }}>
+                      🗑️
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -257,7 +363,7 @@ export default function AdminUsers() {
 function GroupAssignModal({
   user, groups, onClose, onChange, authHeaders,
 }: {
-  user: ManagedUser;
+  user: UserRow;
   groups: GroupRow[];
   onClose: () => void;
   onChange: () => void;
@@ -271,6 +377,7 @@ function GroupAssignModal({
       const body = currentlyMember
         ? { removeFromGroupId: groupId }
         : { addToGroupId: groupId };
+      /* Both managed and external users can be assigned via /api/admin/users/{uid} */
       const r = await fetch(`/api/admin/users/${user.uid}`, {
         method: "PATCH",
         headers: await authHeaders(),
@@ -290,7 +397,7 @@ function GroupAssignModal({
       <div className="modal" role="dialog" style={{ maxWidth: 520 }}>
         <button className="modal-close" onClick={onClose} aria-label="סגור">✕</button>
         <header className="modal-header">
-          <h2>👥 שיוך {user.displayName} לקבוצות</h2>
+          <h2>👥 שיוך {user.displayName || user.email} לקבוצות</h2>
           <div className="muted">סמן את הקבוצות שהמשתמש יהיה חבר בהן</div>
         </header>
 

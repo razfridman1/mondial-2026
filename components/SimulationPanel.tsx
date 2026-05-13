@@ -112,6 +112,25 @@ export default function SimulationPanel() {
     } finally { setBusy(false); }
   }
 
+  /* One-click: generate random results for a specific stage only */
+  async function instantResultsForStage(stageId: string, stageLabel: string, matchCount: number) {
+    if (!confirm(
+      `ליצור תוצאות אקראיות ל-${matchCount} משחקי "${stageLabel}"?\n` +
+      "תוצאות קיימות יידרסו."
+    )) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/sim/instant-results", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ stage: stageId, includePlaceholders: true, overwrite: true }),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      alert(`✓ נוצרו ${data.inserted} תוצאות ל"${stageLabel}"`);
+    } finally { setBusy(false); }
+  }
+
   /* One-click: generate random results for ALL 104 matches across every stage */
   async function instantResultsAll() {
     if (!confirm(
@@ -414,6 +433,51 @@ export default function SimulationPanel() {
         borderRadius: 12,
       }}>
         <h4 style={{ marginTop: 0, marginBottom: 10 }}>⚡ פעולות מהירות</h4>
+
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, opacity: 0.85 }}>
+          תוצאות מיידיות לפי שלב:
+        </div>
+        <div className="mc-actions" style={{ flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+          {(() => {
+            const STAGE_BTNS: Array<{ id: string; label: string }> = [
+              { id: "GROUP", label: "שלב הבתים" },
+              { id: "R32",   label: "שלב 32" },
+              { id: "R16",   label: "שלב 16" },
+              { id: "QF",    label: "רבע גמר" },
+              { id: "SF",    label: "חצי גמר" },
+              { id: "THIRD", label: "3-4" },
+              { id: "FINAL", label: "הגמר" },
+            ];
+            const countByStage = MATCHES.reduce((acc, m) => {
+              acc[m.stage] = (acc[m.stage] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>);
+            return STAGE_BTNS.map(s => (
+              <button
+                key={s.id}
+                className="btn"
+                style={{
+                  background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                  borderColor: "#16a34a",
+                  color: "#fff", fontWeight: 700,
+                }}
+                onClick={() => instantResultsForStage(s.id, s.label, countByStage[s.id] || 0)}
+                disabled={busy}
+                title={`צור תוצאות ל-${countByStage[s.id] || 0} משחקים בשלב "${s.label}"`}
+              >
+                ⚽ {s.label}
+                <span style={{
+                  marginInlineStart: 6,
+                  background: "rgba(0,0,0,0.18)",
+                  padding: "1px 7px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                }}>{countByStage[s.id] || 0}</span>
+              </button>
+            ));
+          })()}
+        </div>
+
         <div className="mc-actions" style={{ flexWrap: "wrap", gap: 10 }}>
           <button className="btn btn-primary"
                   style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", borderColor: "#16a34a", fontWeight: 700 }}
@@ -427,7 +491,8 @@ export default function SimulationPanel() {
           </button>
         </div>
         <p className="muted" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
-          ⚽⚽ <strong>תוצאות לכל המשחקים:</strong> ממלא רנדומלי לכל 104 המשחקים בלחיצה אחת (תוצאות קיימות יידרסו).<br/>
+          ⚽ <strong>כפתור לכל שלב:</strong> יוצר תוצאות אקראיות רק למשחקים של אותו שלב. שימושי לבדיקה צעד‑אחר‑צעד.<br/>
+          ⚽⚽ <strong>תוצאות לכל המשחקים:</strong> ממלא רנדומלי לכל 104 המשחקים בלחיצה אחת.<br/>
           🔄 <strong>אפס סימולציה:</strong> מוחק רק תוצאות + overrides + מכבה סימולציה. <strong>הניחושים נשמרים!</strong>
         </p>
       </div>

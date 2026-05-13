@@ -30,26 +30,31 @@ export async function PATCH(req: Request, ctx: { params: { uid: string } }) {
   const { auth, db } = getAdmin();
   const body = await req.json();
 
+  /* Managed user doc may or may not exist (Google users don't have one).
+   * Only managed-only fields (username, role) require it. */
   const userDoc = await db.collection("managed_users").doc(uid).get();
-  if (!userDoc.exists) return NextResponse.json({ error: "user not found" }, { status: 404 });
-  const existing = userDoc.data() as any;
+  const isManaged = userDoc.exists;
+  const existing = (userDoc.data() as any) || {};
 
   const updates: any = { updatedAt: Date.now(), updatedBy: admin.email };
 
-  /* ---------- displayName ---------- */
+  /* ---------- displayName (works for ALL users) ---------- */
   if (typeof body.displayName === "string" && body.displayName.length) {
-    updates.displayName = body.displayName.slice(0, 60);
-    await auth.updateUser(uid, { displayName: updates.displayName });
-    await db.collection("profiles").doc(uid).set({ displayName: updates.displayName }, { merge: true });
+    const dn = body.displayName.slice(0, 60);
+    try { await auth.updateUser(uid, { displayName: dn }); } catch {}
+    await db.collection("profiles").doc(uid).set({ displayName: dn }, { merge: true });
+    if (isManaged) updates.displayName = dn;
   }
 
-  /* ---------- username (rename) ---------- */
+  /* ---------- username (MANAGED ONLY) ---------- */
   if (typeof body.username === "string" && body.username !== existing.username) {
+    if (!isManaged) {
+      return NextResponse.json({ error: "username change only available for managed users" }, { status: 400 });
+    }
     const next = body.username.trim().toLowerCase();
     if (!USERNAME_RE.test(next)) {
       return NextResponse.json({ error: "username invalid (3-30 chars, a-z 0-9 . _ -, must start with letter/digit)" }, { status: 400 });
     }
-    /* Check uniqueness */
     const lookupRef = db.collection("username_lookup").doc(next);
     const lookupSnap = await lookupRef.get();
     if (lookupSnap.exists) {
@@ -61,7 +66,6 @@ export async function PATCH(req: Request, ctx: { params: { uid: string } }) {
     } catch (e: any) {
       return NextResponse.json({ error: "auth update failed", details: e.message }, { status: 500 });
     }
-    /* Move username_lookup doc: delete old, create new */
     if (existing.username) {
       await db.collection("username_lookup").doc(existing.username).delete().catch(() => {});
     }
@@ -75,8 +79,11 @@ export async function PATCH(req: Request, ctx: { params: { uid: string } }) {
     updates.email = newEmail;
   }
 
-  /* ---------- role ---------- */
+  /* ---------- role (MANAGED ONLY — Google admins go via ADMIN_EMAILS) ---------- */
   if (body.role === "admin" || body.role === "user") {
+    if (!isManaged) {
+      return NextResponse.json({ error: "role change only available for managed users" }, { status: 400 });
+    }
     updates.role = body.role;
     const username = updates.username || existing.username;
     if (username) {
@@ -84,19 +91,22 @@ export async function PATCH(req: Request, ctx: { params: { uid: string } }) {
     }
   }
 
-  /* ---------- disabled ---------- */
+  /* ---------- disabled (works for ALL users) ---------- */
   if (typeof body.disabled === "boolean") {
-    updates.disabled = body.disabled;
-    await auth.updateUser(uid, { disabled: body.disabled });
+    try { await auth.updateUser(uid, { disabled: body.disabled }); } catch {}
+    if (isManaged) updates.disabled = body.disabled;
   }
 
-  /* ---------- password ---------- */
+  /* ---------- password (MANAGED ONLY — Google users handle their own) ---------- */
   if (typeof body.password === "string" && body.password.length >= 6) {
+    if (!isManaged) {
+      return NextResponse.json({ error: "password change only available for managed users" }, { status: 400 });
+    }
     await auth.updateUser(uid, { password: body.password });
     updates.passwordResetAt = Date.now();
   }
 
-  /* ---------- aiBlocked ---------- */
+  /* ---------- aiBlocked (works for ALL users) ---------- */
   if (typeof body.aiBlocked === "boolean") {
     await db.collection("profiles").doc(uid).set({ aiBlocked: body.aiBlocked }, { merge: true });
   }
@@ -133,7 +143,10 @@ export async function PATCH(req: Request, ctx: { params: { uid: string } }) {
     }
   }
 
-  await db.collection("managed_users").doc(uid).set(updates, { merge: true });
+  /* Only write to managed_users for managed accounts */
+  if (isManaged) {
+    await db.collection("managed_users").doc(uid).set(updates, { merge: true });
+  }
   return NextResponse.json({ ok: true });
 }
 

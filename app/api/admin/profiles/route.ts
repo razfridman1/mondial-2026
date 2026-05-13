@@ -13,11 +13,26 @@ async function authedAdmin(req: Request) {
   return decoded;
 }
 
-/* GET /api/admin/profiles — all profiles, including Google sign-ups */
+/* GET /api/admin/profiles — all profiles, including Google sign-ups.
+ * Enriches each profile with auth metadata, group memberships, and managed-user info. */
 export async function GET(req: Request) {
   try { await authedAdmin(req); }
   catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.status || 401 }); }
   const { db, auth } = getAdmin();
+
+  /* Pre-load all memberships and managed-user docs once for O(1) lookups */
+  const memSnap = await db.collection("group_memberships").get();
+  const groupsByUid: Record<string, string[]> = {};
+  memSnap.forEach(d => {
+    const data = d.data() as any;
+    if (!groupsByUid[data.uid]) groupsByUid[data.uid] = [];
+    groupsByUid[data.uid].push(data.groupId);
+  });
+
+  const managedSnap = await db.collection("managed_users").get();
+  const managedByUid: Record<string, any> = {};
+  managedSnap.forEach(d => { managedByUid[d.id] = d.data(); });
+
   const profSnap = await db.collection("profiles").get();
   const profiles: any[] = [];
   for (const d of profSnap.docs) {
@@ -34,8 +49,33 @@ export async function GET(req: Request) {
         provider: rec.providerData[0]?.providerId,
       };
     } catch {}
-    profiles.push({ uid: d.id, ...data, ...authMeta });
+    const managed = managedByUid[d.id];
+    profiles.push({
+      uid: d.id,
+      ...data,
+      ...authMeta,
+      groupIds: groupsByUid[d.id] || [],
+      isManaged: !!managed,
+      username: managed?.username || null,
+      role: managed?.role || (data.role || "user"),
+    });
   }
+
+  /* Also include managed users who don't have a profile doc yet (edge case) */
+  for (const [uid, managed] of Object.entries(managedByUid)) {
+    if (profiles.find(p => p.uid === uid)) continue;
+    profiles.push({
+      uid,
+      displayName: managed.displayName,
+      email: managed.email,
+      username: managed.username,
+      role: managed.role,
+      disabled: managed.disabled,
+      isManaged: true,
+      groupIds: groupsByUid[uid] || [],
+    });
+  }
+
   return NextResponse.json(profiles);
 }
 
