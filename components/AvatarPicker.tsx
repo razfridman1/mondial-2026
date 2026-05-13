@@ -15,7 +15,7 @@ export default function AvatarPicker({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay avatar-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal avatar-modal" role="dialog">
         <button className="modal-close" onClick={onClose} aria-label="סגור">✕</button>
         <header className="modal-header">

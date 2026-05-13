@@ -1211,13 +1211,37 @@ button { font-family: inherit; cursor: pointer; }
 .avatar-display svg { display: block; }
 
 /* ---------- AVATAR PICKER ---------- */
-.avatar-modal {
-  max-width: 1200px !important;
-  width: 95vw;
-  max-height: 92vh;
-  display: flex; flex-direction: column;
+/* Full-screen avatar picker modal — different from regular modals.
+ * Overrides the centered/padded layout of .modal-overlay parent so the
+ * picker fills the viewport and the avatars are clearly visible. */
+.avatar-overlay {
+  padding: 0 !important;
+  align-items: stretch !important;
+  z-index: 200 !important;
 }
-.avatar-modal .avatar-grid { flex: 1; overflow-y: auto; }
+.avatar-modal {
+  max-width: 100vw !important;
+  width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0 !important;
+  padding: 22px 18px !important;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.avatar-modal .modal-header { flex-shrink: 0; }
+.avatar-modal .avatar-grid {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.avatar-modal > .mc-actions {
+  flex-shrink: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-card);
+  position: sticky; bottom: 0;
+}
 .avatar-grid {
   display: grid; gap: 16px;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
