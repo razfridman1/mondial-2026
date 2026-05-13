@@ -112,6 +112,51 @@ export default function SimulationPanel() {
     } finally { setBusy(false); }
   }
 
+  /* One-click: generate random results for ALL 104 matches across every stage */
+  async function instantResultsAll() {
+    if (!confirm(
+      "ליצור תוצאות אקראיות לכל 104 המשחקים בכל השלבים?\n" +
+      "פעולה זו תיצור תוצאות לכל הטורניר בבת אחת — לרבות שלבי נוקאאוט שעוד לא נקבעו.\n" +
+      "תוצאות קיימות יידרסו."
+    )) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/sim/instant-results", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ stage: "ALL", includePlaceholders: true, overwrite: true }),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      alert(`✓ נוצרו ${data.inserted} תוצאות לכל המונדיאל`);
+    } finally { setBusy(false); }
+  }
+
+  /* Lighter reset: only clears simulation state (results + overrides + sim config),
+   * does NOT delete predictions or user data. */
+  async function resetSimulationOnly() {
+    if (!confirm(
+      "🔄 איפוס סימולציה בלבד\n\n" +
+      "פעולה זו תמחק:\n" +
+      "• כל תוצאות המשחקים\n" +
+      "• כל ה‑broadcast overrides\n" +
+      "• תכבה את מצב הסימולציה הזמן‑אמת\n\n" +
+      "הניחושים של המשתמשים, הקבוצות והפרופילים — יישמרו.\n\n" +
+      "להמשיך?"
+    )) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/sim/reset", {
+        method: "POST",
+        headers: await authHeaders(),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      const c = data.counts;
+      alert(`✓ הסימולציה אופסה\n\nתוצאות: ${c.results}\nOverrides: ${c.overrides}`);
+    } finally { setBusy(false); }
+  }
+
   async function fullReset() {
     if (!confirm(
       "🔄 איפוס כללי\n\n" +
@@ -349,9 +394,35 @@ export default function SimulationPanel() {
         </div>
       )}
 
+      {/* ============= קיצורי דרך מהירים ============= */}
+      <div style={{
+        marginTop: 24, padding: 14,
+        background: "linear-gradient(135deg, rgba(0,212,255,0.08), rgba(46,107,255,0.06))",
+        border: "1px solid var(--accent)",
+        borderRadius: 12,
+      }}>
+        <h4 style={{ marginTop: 0, marginBottom: 10 }}>⚡ פעולות מהירות</h4>
+        <div className="mc-actions" style={{ flexWrap: "wrap", gap: 10 }}>
+          <button className="btn btn-primary"
+                  style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", borderColor: "#16a34a", fontWeight: 700 }}
+                  onClick={instantResultsAll} disabled={busy}>
+            ⚽⚽ תוצאות לכל 104 המשחקים בבת אחת
+          </button>
+          <button className="btn"
+                  style={{ background: "rgba(167,139,250,0.15)", borderColor: "var(--purple)", color: "var(--purple)", fontWeight: 700 }}
+                  onClick={resetSimulationOnly} disabled={busy}>
+            🔄 אפס סימולציה בלבד
+          </button>
+        </div>
+        <p className="muted" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
+          ⚽⚽ <strong>תוצאות לכל המשחקים:</strong> ממלא רנדומלי לכל 104 המשחקים בלחיצה אחת (תוצאות קיימות יידרסו).<br/>
+          🔄 <strong>אפס סימולציה:</strong> מוחק רק תוצאות + overrides + מכבה סימולציה. <strong>הניחושים נשמרים!</strong>
+        </p>
+      </div>
+
       {/* ============= סימולציה לפי שלבים ============= */}
       <div style={{
-        marginTop: 28, padding: 16,
+        marginTop: 16, padding: 16,
         background: "var(--bg-card)", border: "1px solid var(--border-soft)",
         borderRadius: 12,
       }}>
