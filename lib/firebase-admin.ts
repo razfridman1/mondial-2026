@@ -31,8 +31,17 @@ export async function verifyIdToken(token: string) {
   return auth.verifyIdToken(token);
 }
 
+/* Built-in super-admin emails — always recognized regardless of env vars.
+ * Matches the hardcoded whitelist in firestore.rules. */
+const BUILTIN_ADMINS = ["raz.fridman1@gmail.com"];
+
 export function adminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+  const fromEnv = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+  const builtin = BUILTIN_ADMINS.map(e => e.toLowerCase());
+  return [...new Set([...builtin, ...fromEnv])];
 }
 
 export function isAdminEmail(email: string | null | undefined): boolean {
