@@ -2,9 +2,23 @@
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
-import { MATCHES } from "@/lib/data";
+import { MATCHES, STAGES } from "@/lib/data";
 import { SIM_PRESETS } from "@/lib/sim";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
+
+interface GroupRow { id: string; name: string; memberCount?: number; }
+
+const STAGE_OPTIONS: Array<{ id: string; label: string }> = [
+  { id: "ALL",      label: "כל השלבים" },
+  { id: "GROUP",    label: "שלב הבתים" },
+  { id: "KNOCKOUT", label: "כל שלבי הנוקאאוט" },
+  { id: "R32",      label: "שלב 32" },
+  { id: "R16",      label: "שלב 16" },
+  { id: "QF",       label: "רבע גמר" },
+  { id: "SF",       label: "חצי גמר" },
+  { id: "THIRD",    label: "המקום השלישי" },
+  { id: "FINAL",    label: "הגמר" },
+];
 
 export default function SimulationPanel() {
   const user = useStore(s => s.user);
@@ -14,9 +28,148 @@ export default function SimulationPanel() {
   const [anchorId, setAnchorId] = useState(MATCHES[0]?.id || "M001");
   const [label, setLabel] = useState("");
 
+  /* Group filling state */
+  const [groups, setGroups] = useState<GroupRow[]>([]);
+  const [fillGroupId, setFillGroupId] = useState<string>("");
+  const [fillStage, setFillStage] = useState<string>("ALL");
+  const [includePh, setIncludePh] = useState(false);
+
   async function authHeaders() {
     const token = await getFirebase().auth!.currentUser!.getIdToken();
     return { "content-type": "application/json", authorization: `Bearer ${token}` };
+  }
+
+  /* Load groups list once when component mounts (admin-only) */
+  useEffect(() => {
+    if (!user?.isAdmin) return;
+    (async () => {
+      try {
+        const r = await fetch("/api/admin/groups", { headers: await authHeaders() });
+        if (r.ok) {
+          const data = await r.json();
+          setGroups(data);
+          if (data[0]) setFillGroupId(data[0].id);
+        }
+      } catch {}
+    })();
+  }, [user?.isAdmin]);
+
+  async function randomFill() {
+    if (!fillGroupId) { alert("בחר קבוצה."); return; }
+    const stageLabel = STAGE_OPTIONS.find(s => s.id === fillStage)?.label || fillStage;
+    const group = groups.find(g => g.id === fillGroupId);
+    if (!confirm(
+      `למלא ניחושים רנדומליים לכל חברי "${group?.name || fillGroupId}"?\n` +
+      `שלב: ${stageLabel}\n` +
+      (includePh ? "כולל משחקים שעוד אין להם קבוצות (placeholder)\n" : "") +
+      "\nניחושים קיימים יידרסו."
+    )) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/sim/random-fill", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ groupId: fillGroupId, stage: fillStage, includePlaceholders: includePh }),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      alert(`✓ מולאו ${data.filled} ניחושים\n${data.users} משתמשים × ${data.matches} משחקים`);
+    } finally { setBusy(false); }
+  }
+
+  async function instantResults() {
+    const stageLabel = STAGE_OPTIONS.find(s => s.id === fillStage)?.label || fillStage;
+    if (!confirm(
+      `ליצור תוצאות מיידיות לכל המשחקים בשלב "${stageLabel}"?\n` +
+      "התוצאות יהיו רנדומליות (0-3 שערים). משחקים שכבר יש להם תוצאה — לא ידרסו."
+    )) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/sim/instant-results", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ stage: fillStage, includePlaceholders: includePh }),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      alert(`✓ נוצרו ${data.inserted} תוצאות${data.skipped ? ` (דולגו ${data.skipped} עם תוצאה קיימת)` : ""}`);
+    } finally { setBusy(false); }
+  }
+
+  async function clearResultsOnly() {
+    const stageLabel = STAGE_OPTIONS.find(s => s.id === fillStage)?.label || fillStage;
+    if (!confirm(`למחוק את כל התוצאות בשלב "${stageLabel}"?`)) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/sim/instant-results", {
+        method: "DELETE",
+        headers: await authHeaders(),
+        body: JSON.stringify({ stage: fillStage }),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      alert(`✓ נמחקו ${data.deleted} תוצאות`);
+    } finally { setBusy(false); }
+  }
+
+  async function fullReset() {
+    if (!confirm(
+      "🔄 איפוס כללי\n\n" +
+      "פעולה זו תמחק:\n" +
+      "• כל הניחושים של כל המשתמשים\n" +
+      "• כל תוצאות המשחקים\n" +
+      "• כל ה‑broadcast overrides\n" +
+      "• כל פיד הפעילות\n" +
+      "• תכבה את מצב הסימולציה\n\n" +
+      "משתמשים, קבוצות, וחברויות יישמרו.\n\n" +
+      "להמשיך?"
+    )) return;
+    if (!confirm("פעולה בלתי הפיכה! לאשר סופית?")) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/sim/full-reset", {
+        method: "POST",
+        headers: await authHeaders(),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      const c = data.counts;
+      alert(
+        `✓ איפוס הושלם\n\n` +
+        `ניחושים: ${c.predictions}\n` +
+        `תוצאות: ${c.results}\n` +
+        `Overrides: ${c.overrides}\n` +
+        `פיד פעילות: ${c.activity}\n\n` +
+        `המערכת נקייה ומוכנה לבדיקות חדשות.`
+      );
+    } finally { setBusy(false); }
+  }
+
+  async function clearPredictions(scope: "group" | "all") {
+    let body: any = {};
+    let msg = "";
+    if (scope === "group") {
+      if (!fillGroupId) { alert("בחר קבוצה."); return; }
+      const group = groups.find(g => g.id === fillGroupId);
+      body = { groupId: fillGroupId };
+      msg = `למחוק את כל הניחושים של כל חברי "${group?.name || fillGroupId}"?`;
+    } else {
+      body = {};
+      msg = "⚠️ למחוק את כל הניחושים של כל המשתמשים במערכת?\nפעולה זו לא ניתנת לביטול.";
+    }
+    if (!confirm(msg)) return;
+    if (scope === "all" && !confirm("פעולה בלתי הפיכה! האם אתה בטוח לחלוטין?")) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/sim/random-fill", {
+        method: "DELETE",
+        headers: await authHeaders(),
+        body: JSON.stringify(body),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      alert(`✓ נמחקו ${data.deletedPredictions} ניחושים`);
+    } finally { setBusy(false); }
   }
 
   async function start() {
@@ -195,6 +348,118 @@ export default function SimulationPanel() {
           </div>
         </div>
       )}
+
+      {/* ============= סימולציה לפי שלבים ============= */}
+      <div style={{
+        marginTop: 28, padding: 16,
+        background: "var(--bg-card)", border: "1px solid var(--border-soft)",
+        borderRadius: 12,
+      }}>
+        <h4 style={{ marginTop: 0, marginBottom: 6 }}>🎲 סימולציה מיידית לפי שלבים</h4>
+        <p className="muted" style={{ fontSize: 13, marginBottom: 6 }}>
+          זרימת עבודה לבדיקות: <strong>1)</strong> מלא ניחושים לשלב הנוכחי →
+          <strong> 2)</strong> צור תוצאות מיידיות לאותו שלב →
+          <strong> 3)</strong> צפה בשינויים ב‑leaderboard וב"הניחושים שלי" →
+          <strong> 4)</strong> עבור לשלב הבא וחזור.
+        </p>
+        <p className="muted" style={{ fontSize: 12, marginBottom: 14 }}>
+          ⚡ אין צורך בסימולציה זמן‑אמת לבדיקות האלה — הכל מיידי.
+        </p>
+
+        <div className="sim-row">
+          <label>👥 קבוצה:</label>
+          <select value={fillGroupId} onChange={e => setFillGroupId(e.target.value)} disabled={busy}>
+            <option value="">— בחר קבוצה —</option>
+            {groups.map(g => (
+              <option key={g.id} value={g.id}>
+                {g.name} {g.memberCount ? `(${g.memberCount} חברים)` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="sim-row">
+          <label>🏁 שלב:</label>
+          <select value={fillStage} onChange={e => setFillStage(e.target.value)} disabled={busy}>
+            {STAGE_OPTIONS.map(s => (
+              <option key={s.id} value={s.id}>{s.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="sim-row">
+          <label>
+            <input type="checkbox" checked={includePh} onChange={e => setIncludePh(e.target.checked)} disabled={busy} />
+            {" "}כלול משחקי נוקאאוט שעוד אין להם קבוצות (placeholder)
+          </label>
+        </div>
+
+        <div style={{ marginTop: 14, padding: 12, background: "var(--bg-elev)", borderRadius: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>שלב 1️⃣ — ניחושים</div>
+          <div className="mc-actions" style={{ flexWrap: "wrap" }}>
+            <button className="btn btn-primary" onClick={randomFill} disabled={busy || !fillGroupId}>
+              🎲 מלא ניחושים רנדומליים לקבוצה
+            </button>
+            <button className="btn"
+                    style={{ background: "rgba(245,158,11,0.15)", borderColor: "var(--orange)", color: "var(--orange)" }}
+                    onClick={() => clearPredictions("group")} disabled={busy || !fillGroupId}>
+              🗑️ נקה ניחושים של הקבוצה
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 10, padding: 12, background: "var(--bg-elev)", borderRadius: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>שלב 2️⃣ — תוצאות (לאחר שכולם ניחשו)</div>
+          <div className="mc-actions" style={{ flexWrap: "wrap" }}>
+            <button className="btn btn-primary"
+                    style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", borderColor: "#16a34a" }}
+                    onClick={instantResults} disabled={busy}>
+              ⚽ צור תוצאות מיידיות לשלב
+            </button>
+            <button className="btn"
+                    style={{ background: "rgba(245,158,11,0.15)", borderColor: "var(--orange)", color: "var(--orange)" }}
+                    onClick={clearResultsOnly} disabled={busy}>
+              🗑️ מחק תוצאות של השלב
+            </button>
+          </div>
+          <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>
+            ⚡ תוצאות מיוצרות מיידית (לא ידרסו תוצאות קיימות). אחרי שנוצרו —
+            ה‑leaderboard מתעדכן אוטומטית לפי הניחושים שכבר היו.
+          </p>
+        </div>
+
+        <p className="muted" style={{ fontSize: 11, marginTop: 14, lineHeight: 1.6 }}>
+          💡 <strong>זרימה מומלצת:</strong> בחר "שלב הבתים" → 🎲 → ⚽ → צפה ב‑leaderboard
+          → בחר "שלב 16" + סמן ✓ "כלול placeholders" → 🎲 → ⚽ → וכך הלאה עד הגמר.
+        </p>
+      </div>
+
+      {/* ============= איפוס כללי ============= */}
+      <div style={{
+        marginTop: 20, padding: 16,
+        background: "rgba(239,68,68,0.05)",
+        border: "1px solid rgba(239,68,68,0.3)",
+        borderRadius: 12,
+      }}>
+        <h4 style={{ marginTop: 0, marginBottom: 6, color: "var(--red)" }}>🔄 איפוס כללי — חזרה למצב טרום בדיקות</h4>
+        <p className="muted" style={{ fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>
+          מוחק את כל הניחושים, כל התוצאות, את כל ה‑broadcast overrides, את פיד הפעילות,
+          ומכבה את הסימולציה. <strong>המשתמשים, הקבוצות, והחברויות יישמרו.</strong>
+          מומלץ להריץ זאת כשתסיים את כל בדיקות הסימולציה לפני המונדיאל האמיתי.
+        </p>
+        <div className="mc-actions">
+          <button className="btn"
+                  style={{ background: "rgba(239,68,68,0.15)", borderColor: "var(--red)", color: "var(--red)", fontWeight: 700 }}
+                  onClick={fullReset} disabled={busy}>
+            🔄 איפוס כללי
+          </button>
+          <button className="btn"
+                  style={{ background: "rgba(239,68,68,0.10)", borderColor: "var(--red)", color: "var(--red)" }}
+                  onClick={() => clearPredictions("all")} disabled={busy}>
+            ⚠️ נקה רק ניחושים (לא תוצאות)
+          </button>
+        </div>
+      </div>
     </section>
   );
 }
