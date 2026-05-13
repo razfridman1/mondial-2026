@@ -90,6 +90,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------- Leaderboard snapshots (admin-only via API) ----------
+    match /leaderboard_snapshots/{dateKey} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
     // ---------- Broadcast overrides (admin whitelist) ----------
     match /broadcast_overrides/{matchId} {
       allow read: if true;

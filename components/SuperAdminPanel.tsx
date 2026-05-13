@@ -107,6 +107,11 @@ export default function SuperAdminPanel() {
         <summary>💾 גיבוי מלא — ייצוא לקובץ JSON</summary>
         <BackupAdmin />
       </details>
+
+      <details className="adm-section">
+        <summary>📅 גיבוי תוצאות יומי</summary>
+        <LeaderboardSnapshots />
+      </details>
     </section>
   );
 }
@@ -828,6 +833,210 @@ function BackupAdmin() {
               ))}
             </div>
           </details>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================ 8. LEADERBOARD SNAPSHOTS ============================ */
+interface SnapshotSummary {
+  dateKey: string;
+  savedAt: number;
+  triggeredBy: string;
+  totals?: { users: number; groups: number; finishedMatches: number };
+  topThree?: Array<{ rank: number; displayName: string; totalPoints: number }>;
+}
+
+function LeaderboardSnapshots() {
+  const [list, setList] = useState<SnapshotSummary[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<any>(null);
+
+  async function load() {
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch("/api/admin/leaderboard-snapshots", { headers: await adminAuthHeaders() });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setError(d.error || "שגיאה בטעינה");
+        return;
+      }
+      setList(await r.json());
+    } finally { setBusy(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function snapshotNow() {
+    if (!confirm("ליצור snapshot של לוח התוצאות עכשיו? אם כבר קיים גיבוי להיום — הוא יידרס.")) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/cron/snapshot-leaderboard", {
+        method: "POST",
+        headers: await adminAuthHeaders(),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || data.message || r.status}`); return; }
+      alert(`✓ נשמר snapshot לתאריך ${data.dateKey}\nמשתמשים: ${data.totals?.users || 0}\nקבוצות: ${data.totals?.groups || 0}`);
+      load();
+    } finally { setBusy(false); }
+  }
+
+  async function viewSnapshot(dateKey: string) {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/admin/leaderboard-snapshots?date=${dateKey}`, { headers: await adminAuthHeaders() });
+      if (!r.ok) { alert("שגיאה בטעינת הגיבוי"); return; }
+      setViewing(await r.json());
+    } finally { setBusy(false); }
+  }
+
+  async function downloadSnapshot(dateKey: string) {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/admin/leaderboard-snapshots?date=${dateKey}`, { headers: await adminAuthHeaders() });
+      if (!r.ok) { alert("שגיאה"); return; }
+      const data = await r.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `leaderboard-${dateKey}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } finally { setBusy(false); }
+  }
+
+  async function deleteSnapshot(dateKey: string) {
+    if (!confirm(`למחוק את הגיבוי של ${dateKey}? פעולה זו בלתי הפיכה.`)) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/leaderboard-snapshots", {
+        method: "DELETE",
+        headers: await adminAuthHeaders(),
+        body: JSON.stringify({ dateKey }),
+      });
+      if (!r.ok) { alert("שגיאה במחיקה"); return; }
+      load();
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="adm-body">
+      <p className="muted" style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 10 }}>
+        🗓️ הגיבוי היומי <strong>רץ אוטומטית כל יום בחצות (שעון ישראל)</strong> ושומר את לוח התוצאות הגלובלי וזה של כל קבוצה.
+        הקבצים נשמרים באוסף <code>leaderboard_snapshots</code> ב‑Firestore.
+      </p>
+
+      <div className="mc-actions" style={{ marginBottom: 12 }}>
+        <button className="btn btn-primary" onClick={snapshotNow} disabled={busy}>
+          📸 צלם snapshot עכשיו
+        </button>
+        <button className="btn" onClick={load} disabled={busy}>
+          ↻ רענן רשימה
+        </button>
+      </div>
+
+      {error && <p className="pred-msg is-locked">{error}</p>}
+
+      <div className="adm-table-wrap" style={{ maxHeight: 480, overflowY: "auto" }}>
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>תאריך</th>
+              <th>נשמר ב</th>
+              <th>נוצר ע"י</th>
+              <th>סיכום</th>
+              <th>מובילים (טופ 3)</th>
+              <th>פעולות</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.length === 0 && !busy && (
+              <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 20 }}>
+                עדיין אין snapshots. ה‑cron ירוץ אוטומטית בחצות הקרובה, או לחץ "📸 צלם עכשיו".
+              </td></tr>
+            )}
+            {list.map(s => (
+              <tr key={s.dateKey}>
+                <td><strong>{s.dateKey}</strong></td>
+                <td className="muted" style={{ fontSize: 11 }}>
+                  {new Date(s.savedAt).toLocaleString("he-IL", { hour: "2-digit", minute: "2-digit" })}
+                </td>
+                <td className="muted" style={{ fontSize: 11 }}>
+                  {s.triggeredBy === "cron"
+                    ? <span className="chip chip-soft">⏰ cron</span>
+                    : <span className="chip">{s.triggeredBy?.replace("admin:", "👤 ")}</span>}
+                </td>
+                <td style={{ fontSize: 12 }}>
+                  👥 {s.totals?.users ?? 0} · 🏆 {s.totals?.groups ?? 0} · ⚽ {s.totals?.finishedMatches ?? 0}
+                </td>
+                <td style={{ fontSize: 11 }}>
+                  {(s.topThree || []).map(t => (
+                    <div key={t.rank}>
+                      {t.rank === 1 ? "🥇" : t.rank === 2 ? "🥈" : "🥉"} {t.displayName} ({t.totalPoints})
+                    </div>
+                  ))}
+                </td>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <button className="btn btn-small btn-primary" onClick={() => viewSnapshot(s.dateKey)} disabled={busy} title="צפה">👁️</button>
+                  <button className="btn btn-small" onClick={() => downloadSnapshot(s.dateKey)} disabled={busy} title="הורד JSON" style={{ marginInlineStart: 4 }}>⬇️</button>
+                  <button className="btn btn-small" onClick={() => deleteSnapshot(s.dateKey)} disabled={busy} title="מחק" style={{ color: "var(--red)", marginInlineStart: 4 }}>🗑️</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {viewing && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setViewing(null)}>
+          <div className="modal" role="dialog" style={{ maxWidth: 720 }}>
+            <button className="modal-close" onClick={() => setViewing(null)}>✕</button>
+            <header className="modal-header">
+              <h2>📅 לוח תוצאות — {viewing.dateKey}</h2>
+              <div className="muted">{new Date(viewing.savedAt).toLocaleString("he-IL")}</div>
+            </header>
+            <h3 className="sec-title" style={{ marginTop: 16, fontSize: 14 }}>🌍 גלובלי</h3>
+            <div style={{ maxHeight: 260, overflowY: "auto", marginTop: 8 }}>
+              {(viewing.global || []).map((r: any) => (
+                <div key={r.uid} style={{
+                  display: "grid", gridTemplateColumns: "40px 1fr auto",
+                  gap: 8, padding: "6px 10px", borderBottom: "1px solid var(--border-soft)",
+                  fontSize: 13,
+                }}>
+                  <span style={{ fontWeight: 700, color: "var(--accent)" }}>#{r.rank}</span>
+                  <span>{r.displayName}</span>
+                  <span style={{ fontWeight: 700 }}>{r.totalPoints} נק׳</span>
+                </div>
+              ))}
+            </div>
+            {Object.entries(viewing.groups || {}).map(([gid, g]: any) => (
+              <details key={gid} style={{ marginTop: 12 }}>
+                <summary style={{ cursor: "pointer", fontWeight: 700 }}>👥 {g.name}</summary>
+                <div style={{ maxHeight: 200, overflowY: "auto", marginTop: 6 }}>
+                  {(g.rows || []).map((r: any) => (
+                    <div key={r.uid} style={{
+                      display: "grid", gridTemplateColumns: "40px 1fr auto",
+                      gap: 8, padding: "5px 10px", borderBottom: "1px solid var(--border-soft)",
+                      fontSize: 12,
+                    }}>
+                      <span style={{ color: "var(--accent)" }}>#{r.rank}</span>
+                      <span>{r.displayName}</span>
+                      <span>{r.totalPoints}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+            <div className="mc-actions" style={{ marginTop: 16 }}>
+              <button className="btn btn-primary" onClick={() => downloadSnapshot(viewing.dateKey)}>⬇️ הורד JSON</button>
+              <button className="btn" onClick={() => setViewing(null)}>סגור</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

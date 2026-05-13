@@ -3,6 +3,12 @@
   "buildCommand": "next build",
   "installCommand": "npm install",
   "regions": ["fra1"],
+  "crons": [
+    {
+      "path": "/api/cron/snapshot-leaderboard",
+      "schedule": "0 21 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
