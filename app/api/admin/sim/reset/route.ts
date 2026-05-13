@@ -28,20 +28,30 @@ export async function POST(req: Request) {
   const { db } = getAdmin();
   const counts = { results: 0, overrides: 0 };
 
-  async function wipe(coll: string, ctrKey: keyof typeof counts) {
-    const snap = await db.collection(coll).get();
-    let batch = db.batch();
-    let ops = 0;
-    for (const d of snap.docs) {
-      batch.delete(d.ref);
-      ops++; counts[ctrKey]++;
-      if (ops >= 450) { await batch.commit(); batch = db.batch(); ops = 0; }
-    }
-    if (ops > 0) await batch.commit();
+  /* SAFETY: only delete results marked sim:true (i.e. simulation-generated).
+   * Real results entered manually by admin during the actual World Cup are
+   * preserved because they don't carry that flag. */
+  const simResults = await db.collection("match_results").where("sim", "==", true).get();
+  let batch = db.batch();
+  let ops = 0;
+  for (const d of simResults.docs) {
+    batch.delete(d.ref);
+    ops++; counts.results++;
+    if (ops >= 450) { await batch.commit(); batch = db.batch(); ops = 0; }
   }
+  if (ops > 0) await batch.commit();
 
-  await wipe("match_results", "results");
-  await wipe("broadcast_overrides", "overrides");
+  /* Broadcast overrides are admin-set channel changes; safe to wipe entirely
+   * because they apply to specific matches and we're resetting state. */
+  const ovs = await db.collection("broadcast_overrides").get();
+  batch = db.batch();
+  ops = 0;
+  for (const d of ovs.docs) {
+    batch.delete(d.ref);
+    ops++; counts.overrides++;
+    if (ops >= 450) { await batch.commit(); batch = db.batch(); ops = 0; }
+  }
+  if (ops > 0) await batch.commit();
 
   /* Disable simulation */
   await db.collection("sim_config").doc("global").set({

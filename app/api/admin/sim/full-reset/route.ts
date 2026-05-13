@@ -25,9 +25,9 @@ export async function POST(req: Request) {
   if (!isAdminEmail(decoded.email)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const { db } = getAdmin();
-  const counts = { predictions: 0, results: 0, overrides: 0, activity: 0 };
+  const counts = { predictions: 0, results: 0, overrides: 0, activity: 0, skippedRealResults: 0 };
 
-  async function wipe(coll: string, ctrKey: keyof typeof counts) {
+  async function wipeAll(coll: string, ctrKey: "predictions" | "overrides" | "activity") {
     const snap = await db.collection(coll).get();
     let batch = db.batch();
     let ops = 0;
@@ -40,10 +40,24 @@ export async function POST(req: Request) {
     if (ops > 0) await batch.commit();
   }
 
-  await wipe("predictions", "predictions");
-  await wipe("match_results", "results");
-  await wipe("broadcast_overrides", "overrides");
-  await wipe("activity", "activity");
+  await wipeAll("predictions", "predictions");
+  await wipeAll("broadcast_overrides", "overrides");
+  await wipeAll("activity", "activity");
+
+  /* SAFETY: only delete sim-generated match_results. Real results entered
+   * manually by admin (during the actual World Cup) survive. */
+  const simRes = await db.collection("match_results").where("sim", "==", true).get();
+  let rBatch = db.batch();
+  let rOps = 0;
+  for (const d of simRes.docs) {
+    rBatch.delete(d.ref);
+    rOps++; counts.results++;
+    if (rOps >= 450) { await rBatch.commit(); rBatch = db.batch(); rOps = 0; }
+  }
+  if (rOps > 0) await rBatch.commit();
+  /* Count real results that were preserved */
+  const realRes = await db.collection("match_results").get();
+  counts.skippedRealResults = realRes.size;
 
   /* Disable simulation */
   await db.collection("sim_config").doc("global").set({

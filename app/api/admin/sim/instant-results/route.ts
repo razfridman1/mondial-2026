@@ -103,8 +103,12 @@ export async function POST(req: Request) {
 }
 
 /* =====================================================================
- * DELETE /api/admin/sim/instant-results { stage? }
+ * DELETE /api/admin/sim/instant-results { stage?, force? }
  * Wipes match_results for the given stage (or all stages).
+ *
+ * SAFETY: by default deletes ONLY sim-generated results (sim:true) so that
+ * real admin-entered results during the actual World Cup are preserved.
+ * Pass `force: true` to also delete real results (advanced/dangerous).
  * ===================================================================*/
 export async function DELETE(req: Request) {
   try { await authedAdmin(req); }
@@ -112,6 +116,7 @@ export async function DELETE(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const stage: string = body.stage || "ALL";
+  const force: boolean = !!body.force;
 
   const { db } = getAdmin();
   let matchIds: string[] | null = null;
@@ -124,13 +129,21 @@ export async function DELETE(req: Request) {
   }
 
   let deleted = 0;
+  let skippedReal = 0;
   if (matchIds) {
     for (const id of matchIds) {
-      await db.collection("match_results").doc(id).delete().catch(() => {});
+      const ref = db.collection("match_results").doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) continue;
+      const data = snap.data() as any;
+      if (!force && data?.sim !== true) { skippedReal++; continue; }
+      await ref.delete().catch(() => {});
       deleted++;
     }
   } else {
-    const snap = await db.collection("match_results").get();
+    /* Stage = "ALL": query only sim:true unless force=true */
+    const q = force ? db.collection("match_results") : db.collection("match_results").where("sim", "==", true);
+    const snap = await q.get();
     let batch = db.batch();
     let ops = 0;
     for (const d of snap.docs) {
@@ -141,5 +154,5 @@ export async function DELETE(req: Request) {
     if (ops > 0) await batch.commit();
   }
 
-  return NextResponse.json({ ok: true, deleted, stage });
+  return NextResponse.json({ ok: true, deleted, skippedReal, stage });
 }

@@ -132,16 +132,16 @@ export default function SimulationPanel() {
     } finally { setBusy(false); }
   }
 
-  /* Lighter reset: only clears simulation state (results + overrides + sim config),
-   * does NOT delete predictions or user data. */
+  /* Lighter reset: only clears simulation state (sim-marked results + overrides + sim config),
+   * does NOT delete predictions, real match results, or user data. */
   async function resetSimulationOnly() {
     if (!confirm(
       "🔄 איפוס סימולציה בלבד\n\n" +
       "פעולה זו תמחק:\n" +
-      "• כל תוצאות המשחקים\n" +
+      "• תוצאות שנוצרו על-ידי הסימולציה (sim:true בלבד)\n" +
       "• כל ה‑broadcast overrides\n" +
       "• תכבה את מצב הסימולציה הזמן‑אמת\n\n" +
-      "הניחושים של המשתמשים, הקבוצות והפרופילים — יישמרו.\n\n" +
+      "✅ הניחושים של המשתמשים, הקבוצות, הפרופילים, ותוצאות אמיתיות שהוזנו ידנית — יישמרו.\n\n" +
       "להמשיך?"
     )) return;
     setBusy(true);
@@ -162,11 +162,11 @@ export default function SimulationPanel() {
       "🔄 איפוס כללי\n\n" +
       "פעולה זו תמחק:\n" +
       "• כל הניחושים של כל המשתמשים\n" +
-      "• כל תוצאות המשחקים\n" +
+      "• תוצאות שנוצרו על-ידי הסימולציה בלבד (תוצאות אמיתיות יישמרו!)\n" +
       "• כל ה‑broadcast overrides\n" +
       "• כל פיד הפעילות\n" +
       "• תכבה את מצב הסימולציה\n\n" +
-      "משתמשים, קבוצות, וחברויות יישמרו.\n\n" +
+      "✅ משתמשים, קבוצות, חברויות, פרופילים, ותוצאות אמיתיות שהוזנו ידנית — יישמרו.\n\n" +
       "להמשיך?"
     )) return;
     if (!confirm("פעולה בלתי הפיכה! לאשר סופית?")) return;
@@ -316,6 +316,18 @@ export default function SimulationPanel() {
           תוצאות מתחוללות אוטומטית עם סוף כל משחק. ניתן להריץ <strong>כמה סבבי סימולציה ברצף</strong>:
           סיים את הסבב הנוכחי → הגדר חדש → צא לדרך. רק כשתסיים סופית את כל הבדיקות וזה אכן הזמן להחזיר את האפליקציה למצב המונדיאל האמיתי — לחץ על הכפתור האדום.
         </p>
+        <div style={{
+          marginTop: 10, padding: 10,
+          background: "rgba(34,197,94,0.08)",
+          border: "1px solid rgba(34,197,94,0.3)",
+          borderRadius: 8,
+          fontSize: 12, lineHeight: 1.6,
+        }}>
+          🛡️ <strong>הפרדה בין מצב סימולציה למצב אמיתי:</strong> כל תוצאה שנוצרת על-ידי הסימולציה מסומנת במערכת כ‑<code>sim: true</code>.
+          כשמסיימים את הסימולציה — נמחקות <em>רק</em> התוצאות המסומנות כך.
+          תוצאות אמיתיות שתזין דרך 🏁 <strong>ניהול תוצאות</strong> (פעם שהמונדיאל יתחיל ב‑11.6.2026) <strong>לא יסומנו כ‑sim</strong>,
+          ולכן כל הסקריפטים של איפוס סימולציה לא יגעו בהן. המעבר ממצב בדיקה למצב אמיתי הוא חלק לחלוטין.
+        </div>
       </div>
 
       {sim?.enabled ? (
