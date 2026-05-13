@@ -2,7 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
-import { shareToWhatsApp } from "@/lib/share";
+import { shareToWhatsApp, leaderboardShareText } from "@/lib/share";
+import type { LeaderRow } from "@/lib/types";
 import { AvatarDisplay } from "./AvatarPicker";
 import { userTotals } from "@/lib/scoring";
 
@@ -54,6 +55,7 @@ export default function AdminGroups() {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [sort, setSort] = useState<SortKey>("members");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAllLeaderboards, setShowAllLeaderboards] = useState(false);
 
   async function authHeaders() {
     const token = await getFirebase().auth!.currentUser!.getIdToken();
@@ -207,9 +209,14 @@ export default function AdminGroups() {
     <section>
       <div className="admin-bar">
         <h3>👫 ניהול קבוצות</h3>
-        <button className="btn btn-primary" onClick={createGroup} disabled={busy}>
-          ➕ צור קבוצה חדשה
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="btn" onClick={() => setShowAllLeaderboards(true)} disabled={busy || groups.length === 0}>
+            📊 כל לוחות התוצאות
+          </button>
+          <button className="btn btn-primary" onClick={createGroup} disabled={busy}>
+            ➕ צור קבוצה חדשה
+          </button>
+        </div>
       </div>
 
       <p className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
@@ -330,7 +337,134 @@ export default function AdminGroups() {
           authHeaders={authHeaders}
         />
       )}
+
+      {showAllLeaderboards && (
+        <AllLeaderboardsModal
+          groups={groups.filter(g => (g.status || "active") !== "archive")}
+          onClose={() => setShowAllLeaderboards(false)}
+        />
+      )}
     </section>
+  );
+}
+
+/* ===================================================================
+ * AllLeaderboardsModal — admin view of every group's leaderboard
+ * stacked together, each with its own WhatsApp share button.
+ * =================================================================== */
+function AllLeaderboardsModal({
+  groups, onClose,
+}: { groups: GroupRow[]; onClose: () => void }) {
+  const [boards, setBoards] = useState<Record<string, LeaderRow[]>>({});
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      setBusy(true);
+      try {
+        const out: Record<string, LeaderRow[]> = {};
+        await Promise.all(groups.map(async g => {
+          try {
+            const r = await fetch(`/api/leaderboard?groupId=${g.id}`);
+            if (r.ok) out[g.id] = await r.json();
+          } catch {}
+        }));
+        /* Also load global */
+        try {
+          const r = await fetch(`/api/leaderboard`);
+          if (r.ok) out["__global__"] = await r.json();
+        } catch {}
+        setBoards(out);
+      } finally { setBusy(false); }
+    })();
+  }, [groups]);
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog" style={{ maxWidth: 760 }}>
+        <button className="modal-close" onClick={onClose}>✕</button>
+        <header className="modal-header">
+          <h2>📊 כל לוחות התוצאות</h2>
+          <div className="muted">{groups.length} קבוצות + לוח גלובלי</div>
+        </header>
+
+        {busy && Object.keys(boards).length === 0 && (
+          <div className="muted" style={{ marginTop: 14 }}>…טוען</div>
+        )}
+
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Global */}
+          {boards["__global__"] && boards["__global__"].length > 0 && (
+            <LbCard
+              title="🌍 דירוג גלובלי (כל המשתמשים)"
+              rows={boards["__global__"]}
+              groupName={null}
+            />
+          )}
+          {groups.map(g => {
+            const rows = boards[g.id] || [];
+            return (
+              <LbCard
+                key={g.id}
+                title={`👫 ${g.name}`}
+                rows={rows}
+                groupName={g.name}
+              />
+            );
+          })}
+        </div>
+
+        <div className="mc-actions" style={{ marginTop: 16 }}>
+          <button className="btn btn-primary" onClick={onClose}>סגור</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LbCard({ title, rows, groupName }: { title: string; rows: LeaderRow[]; groupName: string | null }) {
+  return (
+    <div style={{
+      background: "var(--bg-elev)",
+      border: "1px solid var(--border)",
+      borderRadius: 10,
+      padding: 12,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <strong style={{ fontSize: 14 }}>{title}</strong>
+        {rows.length > 0 && (
+          <button
+            className="btn btn-small wa-btn"
+            onClick={() => shareToWhatsApp(leaderboardShareText({ rows, groupName, limit: 10 }))}
+          >
+            💬 שתף
+          </button>
+        )}
+      </div>
+      {rows.length === 0 ? (
+        <div className="muted" style={{ fontSize: 12 }}>אין נתונים עדיין.</div>
+      ) : (
+        <div style={{ maxHeight: 260, overflowY: "auto" }}>
+          {rows.map(r => (
+            <div key={r.uid} style={{
+              display: "grid",
+              gridTemplateColumns: "36px auto 1fr auto",
+              gap: 8, alignItems: "center",
+              padding: "6px 8px",
+              borderBottom: "1px solid var(--border-soft)",
+              fontSize: 13,
+            }}>
+              <span style={{ fontWeight: 700, color: "var(--accent)" }}>
+                {r.rank === 1 ? "🥇" : r.rank === 2 ? "🥈" : r.rank === 3 ? "🥉" : `#${r.rank}`}
+              </span>
+              <AvatarDisplay avatarId={r.avatarId} size={24} />
+              <span>{r.displayName}</span>
+              <span style={{ fontWeight: 800 }}>{r.totalPoints} נק׳</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -601,7 +735,36 @@ function GroupEditModal({
                   <Stat label="נקודות" value={Object.values(memberStats).reduce((s, x) => s + x.points, 0)} icon="🏆" />
                   <Stat label="מדויקים" value={Object.values(memberStats).reduce((s, x) => s + x.exact, 0)} icon="🎯" />
                 </div>
-                <h4 style={{ fontSize: 13, marginBottom: 8 }}>👑 חברים מובילים בקבוצה:</h4>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <h4 style={{ fontSize: 13, margin: 0 }}>👑 חברים מובילים בקבוצה:</h4>
+                  {Object.keys(memberStats).length > 0 && (
+                    <button
+                      className="btn btn-small wa-btn"
+                      onClick={() => {
+                        const sorted = Object.entries(memberStats)
+                          .sort((a, b) => b[1].points - a[1].points)
+                          .map(([uid, st], i) => ({
+                            uid,
+                            displayName: profilesByUid[uid]?.displayName || "—",
+                            avatarId: profilesByUid[uid]?.avatarId || "messi",
+                            totalPoints: st.points,
+                            exactCount: st.exact,
+                            resultCount: 0,
+                            predictionsCount: st.preds,
+                            streak: 0,
+                            rank: i + 1,
+                          }));
+                        shareToWhatsApp(leaderboardShareText({
+                          rows: sorted as LeaderRow[],
+                          groupName: group.name,
+                          limit: 10,
+                        }));
+                      }}
+                    >
+                      💬 שתף בווטסאפ
+                    </button>
+                  )}
+                </div>
                 <div style={{ maxHeight: 280, overflowY: "auto" }}>
                   {Object.entries(memberStats)
                     .sort((a, b) => b[1].points - a[1].points)

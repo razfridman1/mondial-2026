@@ -4,7 +4,7 @@ import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
 import { TEAMS } from "@/lib/data";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
-import { shareToWhatsApp } from "@/lib/share";
+import { shareToWhatsApp, leaderboardShareText } from "@/lib/share";
 import { AvatarDisplay } from "./AvatarPicker";
 import MatchModal from "./MatchModal";
 import type { LeaderRow, ActivityEvent } from "@/lib/types";
@@ -140,13 +140,29 @@ export default function FriendsRanking() {
         </div>
       )}
 
-      {/* Leaderboard */}
-      <h3 className="sec-title">📊 לוח התוצאות</h3>
-      {loading && !leaderboard.length ? (
-        <div className="muted">…טוען</div>
-      ) : (
-        <Leaderboard rows={leaderboard} myUid={user.uid} predictionRows={rows} />
-      )}
+      {/* Leaderboards — one per group the user is a member of, plus global */}
+      <h3 className="sec-title" style={{ marginTop: 18 }}>
+        📊 לוחות התוצאות {groups.length > 1 ? `שלך (${groups.length} קבוצות)` : ""}
+      </h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {groups.map(g => (
+          <GroupLeaderboardCard
+            key={g.id}
+            groupId={g.id}
+            groupName={g.name}
+            myUid={user.uid}
+            predictionRows={g.id === currentGroupId ? rows : []}
+          />
+        ))}
+        <GroupLeaderboardCard
+          key="global"
+          groupId={null}
+          groupName="🌍 דירוג גלובלי (כל המשתמשים)"
+          myUid={user.uid}
+          predictionRows={!currentGroupId ? rows : []}
+          collapsed={groups.length > 0}
+        />
+      </div>
 
       {/* Predictions per match */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18 }}>
@@ -254,6 +270,82 @@ function JoinGroupBtn({ onJoined }: { onJoined: () => void }) {
     } finally { setBusy(false); }
   }
   return <button className="btn" onClick={join} disabled={busy}>🔑 הצטרף עם קוד</button>;
+}
+
+/* ===================================================================
+ * GroupLeaderboardCard — leaderboard for a specific group (or global)
+ * with its own fetch + WhatsApp share button.
+ * =================================================================== */
+function GroupLeaderboardCard({
+  groupId, groupName, myUid, predictionRows, collapsed = false,
+}: {
+  groupId: string | null;
+  groupName: string;
+  myUid: string;
+  predictionRows: MatchRow[];
+  collapsed?: boolean;
+}) {
+  const [rows, setRows] = useState<LeaderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(!collapsed);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const q = groupId ? `?groupId=${groupId}` : "";
+      const r = await fetch(`/api/leaderboard${q}`);
+      if (r.ok) setRows(await r.json());
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { if (open) load(); }, [groupId, open]);
+
+  return (
+    <div style={{
+      background: "var(--bg-card)",
+      border: "1px solid var(--border-soft)",
+      borderRadius: 12,
+      padding: 12,
+    }}>
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: open ? 10 : 0,
+      }}>
+        <button
+          onClick={() => setOpen(o => !o)}
+          style={{
+            background: "transparent", border: "none", padding: 0, cursor: "pointer",
+            color: "var(--text)", fontSize: 15, fontWeight: 800,
+            display: "flex", alignItems: "center", gap: 6,
+          }}
+        >
+          <span>{open ? "▾" : "▸"}</span>
+          <span>{groupName}</span>
+          {rows.length > 0 && <span className="chip chip-soft" style={{ fontSize: 11 }}>👥 {rows.length}</span>}
+        </button>
+        {rows.length > 0 && open && (
+          <button
+            className="btn btn-small wa-btn"
+            onClick={() => shareToWhatsApp(leaderboardShareText({
+              rows,
+              groupName: groupId ? groupName.replace(/^[🌍🏆📊]+\s*/, "") : null,
+              limit: 10,
+            }))}
+            title="שתף את לוח התוצאות בווטסאפ"
+          >
+            💬 שתף
+          </button>
+        )}
+      </div>
+      {open && (
+        loading && !rows.length
+          ? <div className="muted">…טוען</div>
+          : <Leaderboard rows={rows} myUid={myUid} predictionRows={predictionRows} />
+      )}
+    </div>
+  );
 }
 
 function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid: string; predictionRows: MatchRow[] }) {
