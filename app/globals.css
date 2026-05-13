@@ -476,39 +476,38 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------- MATCH CARD ---------- */
 .card-grid {
-  display: grid; gap: 10px;
-  grid-template-columns: repeat(4, 1fr);
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(3, 1fr);
 }
-@media (max-width: 1100px) { .card-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 860px)  { .card-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 1000px) { .card-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px)  { .card-grid { grid-template-columns: 1fr; } }
 .match-card {
   background: linear-gradient(180deg, var(--bg-card), var(--bg-card-2));
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  padding: 10px 12px;
-  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 10px;
   position: relative;
   transition: transform .15s, box-shadow .15s, border-color .15s;
-  font-size: 13px;
+  font-size: 14px;
 }
-.match-card .mc-header { gap: 6px; }
-.match-card .mc-stage { gap: 4px; flex-wrap: wrap; }
-.match-card .chip { padding: 2px 8px; font-size: 11px; }
-.match-card .mc-time-time { font-size: 16px; }
-.match-card .mc-time-date { font-size: 10px; }
-.match-card .flag { font-size: 22px; }
-.match-card .team-name { font-size: 13px; }
-.match-card .mc-vs { min-width: 60px; }
-.match-card .vs-cd { font-size: 11px; padding: 1px 6px; }
-.match-card .vs-label { font-size: 10px; }
-.match-card .mc-venue { font-size: 11px; }
-.match-card .mc-broadcast .bc-label { font-size: 11px; }
-.match-card .mc-broadcast .channel-chip { font-size: 11px; padding: 3px 8px; }
-.match-card .status-pill { font-size: 11px; padding: 4px 10px; }
-.match-card .odds { gap: 4px; }
-.match-card .odd { padding: 4px 6px; }
-.match-card .odd-v { font-size: 13px; }
+.match-card .mc-header { gap: 8px; }
+.match-card .mc-stage { gap: 6px; flex-wrap: wrap; }
+.match-card .chip { padding: 3px 10px; font-size: 12px; }
+.match-card .mc-time-time { font-size: 18px; }
+.match-card .mc-time-date { font-size: 11px; }
+.match-card .flag { font-size: 26px; }
+.match-card .team-name { font-size: 14px; }
+.match-card .mc-vs { min-width: 72px; }
+.match-card .vs-cd { font-size: 12px; padding: 2px 8px; }
+.match-card .vs-label { font-size: 11px; }
+.match-card .mc-venue { font-size: 12px; }
+.match-card .mc-broadcast .bc-label { font-size: 12px; }
+.match-card .mc-broadcast .channel-chip { font-size: 12px; padding: 4px 10px; }
+.match-card .status-pill { font-size: 12px; padding: 5px 12px; }
+.match-card .odds { gap: 6px; }
+.match-card .odd { padding: 5px 8px; }
+.match-card .odd-v { font-size: 14px; }
 .match-card:hover {
   transform: translateY(-2px);
   border-color: var(--border);
@@ -1210,36 +1209,57 @@ button { font-family: inherit; cursor: pointer; }
 .avatar-display svg { display: block; }
 
 /* ---------- AVATAR PICKER ---------- */
+.avatar-modal {
+  max-width: 1200px !important;
+  width: 95vw;
+  max-height: 92vh;
+  display: flex; flex-direction: column;
+}
+.avatar-modal .avatar-grid { flex: 1; overflow-y: auto; }
 .avatar-grid {
-  display: grid; gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  margin-top: 18px;
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  margin-top: 22px;
+  padding: 4px;
 }
 .avatar-item {
   background: var(--bg-elev);
   border: 2px solid var(--border);
-  border-radius: 14px;
-  padding: 18px 12px 12px;
+  border-radius: 18px;
+  padding: 22px 14px 16px;
   text-align: center;
   cursor: pointer;
   color: var(--text);
   font-family: inherit;
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  transition: transform .15s, border-color .15s;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  transition: transform .15s, border-color .15s, box-shadow .15s;
 }
-.avatar-item:hover { transform: translateY(-2px); border-color: var(--accent); }
-.avatar-item.is-selected { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,210,74,0.25); }
+.avatar-item:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+.avatar-item.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(255,210,74,0.28), 0 6px 22px rgba(0,0,0,0.3);
+}
 .avatar-img {
   display: flex; justify-content: center; align-items: center;
-  width: 100%; min-height: 120px;
+  width: 100%; min-height: 170px;
 }
 .avatar-img svg { width: auto; height: auto; max-width: 100%; }
-.avatar-name { font-weight: 700; margin-top: 4px; font-size: 14px; }
-.avatar-sub  { font-size: 11px; }
-.avatar-sig  { font-size: 11px; color: var(--accent); margin-top: 2px; }
+.avatar-name { font-weight: 800; margin-top: 6px; font-size: 16px; }
+.avatar-sub  { font-size: 12px; }
+.avatar-sig  { font-size: 12px; color: var(--accent); margin-top: 2px; font-weight: 600; }
+
+@media (max-width: 900px) {
+  .avatar-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+}
 @media (max-width: 640px) {
   .avatar-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .avatar-img { min-height: 100px; }
+  .avatar-item { padding: 16px 10px 12px; }
+  .avatar-img { min-height: 130px; }
+  .avatar-name { font-size: 14px; }
 }
 
 /* ---------- PITCH ---------- */

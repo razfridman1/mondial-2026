@@ -16,7 +16,7 @@ export default function AvatarPicker({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" style={{ maxWidth: 720 }}>
+      <div className="modal avatar-modal" role="dialog">
         <button className="modal-close" onClick={onClose} aria-label="סגור">✕</button>
         <header className="modal-header">
           <h2>👤 בחר אווטר מאגדות הכדורגל</h2>
@@ -33,7 +33,7 @@ export default function AvatarPicker({ onClose }: { onClose: () => void }) {
             >
               <div
                 className="avatar-img"
-                dangerouslySetInnerHTML={{ __html: a.svg(110) }}
+                dangerouslySetInnerHTML={{ __html: a.svg(160) }}
               />
               <div className="avatar-name">{a.name}</div>
               <div className="avatar-sub muted">{a.flag} · {a.era}</div>
