@@ -4,7 +4,7 @@
  * ===================================================================*/
 import { TEAMS, CHANNELS, STAGES, VENUES } from "./data";
 import { formatIsraelDate, formatIsraelTime } from "./utils";
-import type { Match } from "./types";
+import type { Match, LeaderRow } from "./types";
 
 function appUrl(): string {
   if (typeof window !== "undefined") return window.location.origin;
@@ -41,6 +41,39 @@ export function predictionShareText(m: Match, home: number, away: number): strin
     ``,
     `מה הניחוש שלך? בוא נראה מי יצדק 😎`,
   ].join("\n");
+}
+
+export function leaderboardShareText(args: {
+  rows: LeaderRow[];
+  groupName?: string | null;
+  limit?: number;
+}): string {
+  const limit = args.limit ?? 10;
+  const top = args.rows.slice(0, limit);
+  const medal = (rank: number) =>
+    rank === 1 ? "🥇" :
+    rank === 2 ? "🥈" :
+    rank === 3 ? "🥉" :
+                 `${rank}.`;
+  const heading = args.groupName
+    ? `🏆 *לוח התוצאות — ${args.groupName}*`
+    : `🏆 *לוח התוצאות — מונדיאל 2026*`;
+
+  const lines = [
+    heading,
+    `_עודכן: ${formatIsraelDate(new Date().toISOString())} ${formatIsraelTime(new Date().toISOString())}_`,
+    ``,
+    ...top.map(r => {
+      const m = medal(r.rank || 0);
+      const stats = `🎯${r.exactCount} ✅${r.resultCount}/${r.predictionsCount} 🔥${r.streak}`;
+      return `${m} *${r.displayName}* — ${r.totalPoints} נק׳\n   ${stats}`;
+    }),
+  ];
+  if (args.rows.length > limit) {
+    lines.push(``, `_+ עוד ${args.rows.length - limit} משתתפים_`);
+  }
+  lines.push(``, `מי יצדק במונדיאל 2026? 🤔`, `🔗 ${appUrl()}`);
+  return lines.join("\n");
 }
 
 export function whatsappUrl(text: string): string {
