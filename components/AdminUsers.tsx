@@ -48,9 +48,19 @@ export default function AdminUsers() {
         fetch("/api/admin/profiles", { headers: await authHeaders() }),
         fetch("/api/admin/groups",   { headers: await authHeaders() }),
       ]);
-      if (!pR.ok) { setError("שגיאה בטעינת המשתמשים"); return; }
+      if (!pR.ok) {
+        let detail = `HTTP ${pR.status}`;
+        try {
+          const d = await pR.json();
+          detail = d.message || d.error || detail;
+        } catch {}
+        setError(`שגיאה בטעינת המשתמשים: ${detail}`);
+        return;
+      }
       setUsers(await pR.json());
       if (gR.ok) setGroups(await gR.json());
+    } catch (e: any) {
+      setError(`שגיאה בטעינת המשתמשים: ${e?.message || "רשת לא זמינה"}`);
     } finally { setBusy(false); }
   }
 

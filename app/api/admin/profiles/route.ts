@@ -3,6 +3,7 @@ import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 async function authedAdmin(req: Request) {
   const auth = req.headers.get("authorization") || "";
@@ -16,67 +17,78 @@ async function authedAdmin(req: Request) {
 /* GET /api/admin/profiles — all profiles, including Google sign-ups.
  * Enriches each profile with auth metadata, group memberships, and managed-user info. */
 export async function GET(req: Request) {
-  try { await authedAdmin(req); }
-  catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.status || 401 }); }
-  const { db, auth } = getAdmin();
+  try {
+    try { await authedAdmin(req); }
+    catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.status || 401 }); }
+    const { db, auth } = getAdmin();
 
-  /* Pre-load all memberships and managed-user docs once for O(1) lookups */
-  const memSnap = await db.collection("group_memberships").get();
-  const groupsByUid: Record<string, string[]> = {};
-  memSnap.forEach(d => {
-    const data = d.data() as any;
-    if (!groupsByUid[data.uid]) groupsByUid[data.uid] = [];
-    groupsByUid[data.uid].push(data.groupId);
-  });
+    /* Pre-load all memberships and managed-user docs once for O(1) lookups */
+    const [memSnap, managedSnap, profSnap] = await Promise.all([
+      db.collection("group_memberships").get(),
+      db.collection("managed_users").get(),
+      db.collection("profiles").get(),
+    ]);
 
-  const managedSnap = await db.collection("managed_users").get();
-  const managedByUid: Record<string, any> = {};
-  managedSnap.forEach(d => { managedByUid[d.id] = d.data(); });
-
-  const profSnap = await db.collection("profiles").get();
-  const profiles: any[] = [];
-  for (const d of profSnap.docs) {
-    const data = d.data() as any;
-    /* Pull Firebase Auth metadata too — email, disabled state, lastLogin */
-    let authMeta: any = {};
-    try {
-      const rec = await auth.getUser(d.id);
-      authMeta = {
-        email: rec.email,
-        disabled: rec.disabled,
-        createdAt: rec.metadata.creationTime,
-        lastLoginAt: rec.metadata.lastSignInTime,
-        provider: rec.providerData[0]?.providerId,
-      };
-    } catch {}
-    const managed = managedByUid[d.id];
-    profiles.push({
-      uid: d.id,
-      ...data,
-      ...authMeta,
-      groupIds: groupsByUid[d.id] || [],
-      isManaged: !!managed,
-      username: managed?.username || null,
-      role: managed?.role || (data.role || "user"),
+    const groupsByUid: Record<string, string[]> = {};
+    memSnap.forEach(d => {
+      const data = d.data() as any;
+      if (!groupsByUid[data.uid]) groupsByUid[data.uid] = [];
+      groupsByUid[data.uid].push(data.groupId);
     });
-  }
 
-  /* Also include managed users who don't have a profile doc yet (edge case) */
-  for (const [uid, managed] of Object.entries(managedByUid)) {
-    if (profiles.find(p => p.uid === uid)) continue;
-    profiles.push({
-      uid,
-      displayName: managed.displayName,
-      email: managed.email,
-      username: managed.username,
-      role: managed.role,
-      disabled: managed.disabled,
-      isManaged: true,
-      groupIds: groupsByUid[uid] || [],
-    });
-  }
+    const managedByUid: Record<string, any> = {};
+    managedSnap.forEach(d => { managedByUid[d.id] = d.data(); });
 
-  return NextResponse.json(profiles);
+    /* Fetch ALL auth metadata in parallel — way faster than sequential per-uid */
+    const authMetaByUid: Record<string, any> = {};
+    await Promise.all(profSnap.docs.map(async d => {
+      try {
+        const rec = await auth.getUser(d.id);
+        authMetaByUid[d.id] = {
+          email: rec.email,
+          disabled: rec.disabled,
+          createdAt: rec.metadata.creationTime,
+          lastLoginAt: rec.metadata.lastSignInTime,
+          provider: rec.providerData[0]?.providerId,
+        };
+      } catch { /* auth user might be deleted but profile still exists — that's OK */ }
+    }));
+
+    const profiles: any[] = [];
+    for (const d of profSnap.docs) {
+      const data = d.data() as any;
+      const managed = managedByUid[d.id];
+      profiles.push({
+        uid: d.id,
+        ...data,
+        ...(authMetaByUid[d.id] || {}),
+        groupIds: groupsByUid[d.id] || [],
+        isManaged: !!managed,
+        username: managed?.username || null,
+        role: managed?.role || (data.role || "user"),
+      });
+    }
+
+    /* Also include managed users who don't have a profile doc yet (edge case) */
+    for (const [uid, managed] of Object.entries(managedByUid)) {
+      if (profiles.find(p => p.uid === uid)) continue;
+      profiles.push({
+        uid,
+        displayName: managed.displayName,
+        email: managed.email,
+        username: managed.username,
+        role: managed.role,
+        disabled: managed.disabled,
+        isManaged: true,
+        groupIds: groupsByUid[uid] || [],
+      });
+    }
+
+    return NextResponse.json(profiles);
+  } catch (e: any) {
+    console.error("[/api/admin/profiles] GET failed:", e);
+    return NextResponse.json({ error: "server_error", message: e?.message || String(e) }, { status: 500 });
+  }
 }
 
 /* PATCH /api/admin/profiles { uid, displayName?, avatarId?, bio?, theme? } */
