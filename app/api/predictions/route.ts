@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken } from "@/lib/firebase-admin";
 import { MATCHES } from "@/lib/data";
-import { canUseJoker, recordJokerUsage, type JokerUsage } from "@/lib/joker";
 import { effectiveUtc, type SimConfig } from "@/lib/sim";
 
 export const runtime = "nodejs";
@@ -26,7 +25,7 @@ export async function POST(req: Request) {
   catch (e: any) { return NextResponse.json({ error: e.message }, { status: 401 }); }
 
   const body = await req.json();
-  const { matchId, homeScore, awayScore, joker } = body;
+  const { matchId, homeScore, awayScore } = body;
   const match = MATCHES.find(x => x.id === matchId);
   if (!match) return NextResponse.json({ error: "match not found" }, { status: 404 });
 
@@ -45,46 +44,12 @@ export async function POST(req: Request) {
   }
 
   const docId = `${decoded.uid}_${matchId}`;
-  let appliedJoker = false;
-  const existingSnap = await db.collection("predictions").doc(docId).get();
-  const existing: any = existingSnap.data() || {};
-  const wantJoker = !!joker;
-  const hadJoker = !!existing.joker;
-
-  if (wantJoker && !hadJoker) {
-    const usageRef = db.collection("joker_usage").doc(decoded.uid);
-    const usageSnap = await usageRef.get();
-    const usage = (usageSnap.data() as JokerUsage) || null;
-    const check = canUseJoker(usage, match.stage);
-    if (!check.ok) {
-      return NextResponse.json({ error: "joker_blocked", message: check.reason }, { status: 403 });
-    }
-    appliedJoker = true;
-    const next = recordJokerUsage(usage, match.stage);
-    await usageRef.set(next, { merge: true });
-  } else if (!wantJoker && hadJoker) {
-    const usageRef = db.collection("joker_usage").doc(decoded.uid);
-    const usageSnap = await usageRef.get();
-    const usage = (usageSnap.data() as JokerUsage) || null;
-    if (usage?.perStage?.[match.stage]) {
-      const stageKey = match.stage as keyof typeof usage.perStage;
-      const refunded: JokerUsage = {
-        perStage: { ...usage.perStage, [stageKey]: Math.max(0, (usage.perStage[stageKey] || 0) - 1) },
-        lastUsedAt: usage.lastUsedAt,
-      };
-      await usageRef.set(refunded, { merge: true });
-    }
-    appliedJoker = false;
-  } else {
-    appliedJoker = hadJoker;
-  }
-
   await db.collection("predictions").doc(docId).set({
     uid: decoded.uid, matchId,
     homeScore: h, awayScore: a,
-    joker: appliedJoker,
+    joker: false,
     updatedAt: Date.now(),
   }, { merge: true });
 
-  return NextResponse.json({ ok: true, joker: appliedJoker });
+  return NextResponse.json({ ok: true, joker: false });
 }

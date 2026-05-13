@@ -12,7 +12,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "streak-10",      name: "סטריק אגדי",         description: "10 ניחושים נכונים ברצף",                 icon: "👑" },
   { id: "all-stages",     name: "כל השלבים",          description: "ניחוש לפחות במשחק אחד בכל שלב",          icon: "🏆" },
   { id: "social",         name: "מנחש חברתי",         description: "שיתף ניחוש בווטסאפ",                     icon: "💬" },
-  { id: "joker-played",   name: "ג׳וקר על השולחן",    description: "השתמש ב-Joker למשחק",                    icon: "🃏" },
   { id: "first-100",      name: "מועדון ה-100",       description: "הגיע ל-100 נקודות",                      icon: "💯" },
   { id: "first-500",      name: "מועדון ה-500",       description: "הגיע ל-500 נקודות",                      icon: "🏅" },
   { id: "perfect-day",    name: "יום מושלם",          description: "כל הניחושים של אותו יום היו נכונים",     icon: "✨" },
@@ -30,7 +29,6 @@ export interface UnlockSignals {
   predictionsCount: number;
   sharedToWhatsapp: boolean;
   stagesPredicted: Set<string>;
-  jokerUsed: boolean;
   groupOwner: boolean;
   groupWinner: boolean;
   perfectDay: boolean;
@@ -46,7 +44,6 @@ export function evaluateUnlocks(s: UnlockSignals): string[] {
   if (s.streak >= 10)          out.push("streak-10");
   if (s.stagesPredicted.size >= 7) out.push("all-stages");
   if (s.sharedToWhatsapp)      out.push("social");
-  if (s.jokerUsed)             out.push("joker-played");
   if (s.totalPoints >= 100)    out.push("first-100");
   if (s.totalPoints >= 500)    out.push("first-500");
   if (s.perfectDay)            out.push("perfect-day");

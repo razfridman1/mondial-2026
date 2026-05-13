@@ -1,7 +1,24 @@
 /* =====================================================================
  * Time / formatting utilities — Asia/Jerusalem with DST awareness.
  * ===================================================================*/
-import type { Match, MatchStatus } from "./types";
+import type { Match, MatchStatus, Odds } from "./types";
+
+/* Convert decimal bookmaker odds into normalized implied probabilities (%).
+ * Removes the bookmaker overround so the three values sum to 100. */
+export function oddsToProbabilities(odds: Odds | null | undefined): { home: number; draw: number; away: number } | null {
+  if (!odds) return null;
+  const h = parseFloat(odds.home);
+  const d = parseFloat(odds.draw);
+  const a = parseFloat(odds.away);
+  if (!h || !d || !a) return null;
+  const ih = 1 / h, id = 1 / d, ia = 1 / a;
+  const sum = ih + id + ia;
+  const home = Math.round((ih / sum) * 100);
+  const draw = Math.round((id / sum) * 100);
+  // Force exact 100% by computing 'away' as remainder
+  const away = 100 - home - draw;
+  return { home, draw, away };
+}
 
 export const TZ = "Asia/Jerusalem";
 

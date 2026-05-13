@@ -3,6 +3,7 @@ import { useStore } from "@/lib/store";
 import AuthProvider from "@/components/AuthProvider";
 import Header from "@/components/Header";
 import Schedule from "@/components/Schedule";
+import MyPredictionsTab from "@/components/MyPredictionsTab";
 import Broadcasts from "@/components/Broadcasts";
 import Bracket from "@/components/Bracket";
 import AIInsights from "@/components/AIInsights";
@@ -24,8 +25,9 @@ function HomeInner() {
       <Header />
       <SimulationBanner />
       <main className="container">
-        {tab === "schedule"   && <Schedule />}
-        {tab === "ranking"    && <FriendsRanking />}
+        {tab === "schedule"      && <Schedule />}
+        {tab === "mypredictions" && <MyPredictionsTab />}
+        {tab === "ranking"       && <FriendsRanking />}
         {tab === "broadcasts" && <Broadcasts />}
         {tab === "teams"      && <TeamsTab />}
         {tab === "bracket"    && <Bracket />}

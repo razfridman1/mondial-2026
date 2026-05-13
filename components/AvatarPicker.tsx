@@ -33,7 +33,7 @@ export default function AvatarPicker({ onClose }: { onClose: () => void }) {
             >
               <div
                 className="avatar-img"
-                dangerouslySetInnerHTML={{ __html: a.svg(72) }}
+                dangerouslySetInnerHTML={{ __html: a.svg(110) }}
               />
               <div className="avatar-name">{a.name}</div>
               <div className="avatar-sub muted">{a.flag} · {a.era}</div>

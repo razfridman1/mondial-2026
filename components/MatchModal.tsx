@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { TEAMS, VENUES, CHANNELS, STAGES } from "@/lib/data";
 import { useStore } from "@/lib/store";
-import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
+import { formatIsraelDate, formatIsraelTime, oddsToProbabilities } from "@/lib/utils";
 import { effMatch } from "@/lib/sim";
 import { MATCHES } from "@/lib/data";
 import { shareToWhatsApp, matchShareText } from "@/lib/share";
@@ -66,17 +66,21 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
             👥 קיבולת: {venue.capacity ? venue.capacity.toLocaleString("he-IL") : "—"}
           </div>
         </section>
-        {m.odds && (
-          <section className="modal-section">
-            <h3>📊 יחסי הימורים</h3>
-            <div className="odds">
-              <div className="odd"><span className="odd-k">{home.name}</span><span className="odd-v">{m.odds.home}</span></div>
-              <div className="odd"><span className="odd-k">תיקו</span><span className="odd-v">{m.odds.draw}</span></div>
-              <div className="odd"><span className="odd-k">{away.name}</span><span className="odd-v">{m.odds.away}</span></div>
-            </div>
-            <PredictionForm match={m} />
-          </section>
-        )}
+        {(() => {
+          const p = oddsToProbabilities(m.odds);
+          if (!p) return null;
+          return (
+            <section className="modal-section">
+              <h3>📊 הסתברויות לתוצאה</h3>
+              <div className="odds">
+                <div className="odd"><span className="odd-k">{home.name}</span><span className="odd-v">{p.home}%</span></div>
+                <div className="odd"><span className="odd-k">תיקו</span><span className="odd-v">{p.draw}%</span></div>
+                <div className="odd"><span className="odd-k">{away.name}</span><span className="odd-v">{p.away}%</span></div>
+              </div>
+              <PredictionForm match={m} />
+            </section>
+          );
+        })()}
 
         {!m.odds && (
           <section className="modal-section">
@@ -108,7 +112,7 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
               const { openShareCard } = await import("@/lib/share-cards");
               openShareCard("match", { match: m });
             }}>
-              📷 כרטיס לאינסטה
+              📷 שתף באינסטה
             </button>
             <button className="btn" onClick={async () => {
               const { openShareCard } = await import("@/lib/share-cards");

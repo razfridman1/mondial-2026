@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { TEAMS, VENUES, CHANNELS, STAGES } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import {
-  formatIsraelDate, formatIsraelTime, matchLiveStatus, relativeLabel,
+  formatIsraelDate, formatIsraelTime, matchLiveStatus, relativeLabel, oddsToProbabilities,
 } from "@/lib/utils";
 import { shareToWhatsApp, matchShareText } from "@/lib/share";
 import type { Match } from "@/lib/types";
@@ -81,13 +81,17 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
         </span>
       </div>
 
-      {match.odds && (
-        <div className="odds">
-          <div className="odd"><span className="odd-k">1</span><span className="odd-v">{match.odds.home}</span></div>
-          <div className="odd"><span className="odd-k">X</span><span className="odd-v">{match.odds.draw}</span></div>
-          <div className="odd"><span className="odd-k">2</span><span className="odd-v">{match.odds.away}</span></div>
-        </div>
-      )}
+      {(() => {
+        const p = oddsToProbabilities(match.odds);
+        if (!p) return null;
+        return (
+          <div className="odds">
+            <div className="odd"><span className="odd-k">1</span><span className="odd-v">{p.home}%</span></div>
+            <div className="odd"><span className="odd-k">X</span><span className="odd-v">{p.draw}%</span></div>
+            <div className="odd"><span className="odd-k">2</span><span className="odd-v">{p.away}%</span></div>
+          </div>
+        );
+      })()}
 
       <div className="mc-broadcast">
         <div className="bc-label">שידור בישראל:</div>

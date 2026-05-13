@@ -5,6 +5,7 @@
  *   correct goal diff   : +1 pt (added to the 3 if applicable)
  *   no prediction       : 0 pts
  * Streak: every consecutive match with any correct prediction +1 bonus.
+ * Joker (legacy field) is now ignored — all predictions count ×1.
  * ===================================================================*/
 
 export interface ScoreInput {
@@ -54,7 +55,6 @@ export function userTotals(
   results: Record<string, { home: number; away: number; finishedAt: number }>,
 ) {
   let total = 0, exact = 0, result = 0, streak = 0, currentStreak = 0;
-  let jokersHit = 0;
   // sort predictions by finish time
   const finished = preds
     .map(p => ({ p, r: results[p.matchId] }))
@@ -66,11 +66,7 @@ export function userTotals(
       predictedHome: p.homeScore, predictedAway: p.awayScore,
       actualHome: r.home, actualAway: r.away,
     });
-    let pts = sc.points;
-    if (p.joker) {
-      pts *= 2;                            // ×2 Joker bonus
-      if (pts > 0) jokersHit++;
-    }
+    const pts = sc.points;
     total += pts;
     if (sc.exact) exact++;
     if (sc.resultCorrect) result++;
@@ -89,6 +85,6 @@ export function userTotals(
     resultCount: result,
     predictionsCount: preds.length,
     streak,
-    jokersHit,
+    jokersHit: 0,
   };
 }

@@ -180,12 +180,6 @@ function buildPredictionCard({ match, home, away, joker }: PredictionCardArgs) {
     <text x="${W*0.78}" y="120" font-size="50" font-weight="800">${awayTeam.name}</text>
   </g>
 
-  ${joker ? `
-  <g transform="translate(${W/2} 850)" text-anchor="middle">
-    <rect x="-180" y="-44" width="360" height="80" rx="40" fill="rgba(255,210,74,0.16)" stroke="#ffd24a" stroke-width="3"/>
-    <text font-family="Heebo" font-size="40" font-weight="900" fill="#ffd24a" y="10">🃏 ג׳וקר ×2</text>
-  </g>` : ""}
-
   <g transform="translate(${W/2} ${H - 100})" text-anchor="middle">
     <text font-family="Heebo" font-size="26" fill="#9aa3c7">${formatIsraelDate(match.utc)} · ${formatIsraelTime(match.utc)}</text>
     <text y="40" font-family="Heebo" font-size="22" fill="#9aa3c7">#מונדיאל2026 #מי_יצדק</text>
@@ -257,7 +251,7 @@ export function openShareCard(kind: CardKind, args: any) {
     <div class="modal" role="dialog" style="max-width: 540px;">
       <button class="modal-close" aria-label="סגור">✕</button>
       <header class="modal-header">
-        <h2>🖼️ כרטיס שיתוף</h2>
+        <h2>📷 שתף באינסטה</h2>
         <div class="muted">${kind === "match-twitter" ? "X / Twitter 1200×675" : "Instagram / WhatsApp 1080×1080"}</div>
       </header>
       <div class="share-card-preview">${svg}</div>

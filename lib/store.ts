@@ -22,7 +22,7 @@ interface Prefs {
   selectedChannel: string | null;
   selectedTeam: string | null;
   statusFilter: "all" | "live" | "upcoming";
-  tab: "schedule" | "ranking" | "broadcasts" | "teams" | "bracket" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
+  tab: "schedule" | "mypredictions" | "ranking" | "broadcasts" | "teams" | "bracket" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 }
 
 interface MondialState {

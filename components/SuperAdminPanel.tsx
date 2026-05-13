@@ -348,10 +348,10 @@ function PredictionsAdmin() {
 
       <div className="adm-table-wrap" style={{ maxHeight: 400, overflowY: "auto", marginTop: 10 }}>
         <table className="admin-table">
-          <thead><tr><th>uid</th><th>משחק</th><th>בית</th><th>חוץ</th><th>ג׳וקר</th><th>auto</th><th>פעולות</th></tr></thead>
+          <thead><tr><th>uid</th><th>משחק</th><th>בית</th><th>חוץ</th><th>auto</th><th>פעולות</th></tr></thead>
           <tbody>
             {rows.map(p => <PredictionRowEditor key={p.id} pred={p} onPatch={patch} onDelete={del} />)}
-            {!rows.length && !busy && <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 20 }}>אין תוצאות. מלא uid או matchId ולחץ חפש.</td></tr>}
+            {!rows.length && !busy && <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 20 }}>אין תוצאות. מלא uid או matchId ולחץ חפש.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -362,7 +362,6 @@ function PredictionsAdmin() {
 function PredictionRowEditor({ pred, onPatch, onDelete }: any) {
   const [h, setH] = useState(pred.homeScore);
   const [a, setA] = useState(pred.awayScore);
-  const [j, setJ] = useState(!!pred.joker);
   const match = MATCHES.find(m => m.id === pred.matchId);
   return (
     <tr>
@@ -370,10 +369,9 @@ function PredictionRowEditor({ pred, onPatch, onDelete }: any) {
       <td>{match ? `${TEAMS[match.home]?.name || match.home}-${TEAMS[match.away]?.name || match.away}` : pred.matchId}</td>
       <td><input type="number" min={0} max={30} value={h} onChange={e => setH(Number(e.target.value))} style={{ width: 55 }} /></td>
       <td><input type="number" min={0} max={30} value={a} onChange={e => setA(Number(e.target.value))} style={{ width: 55 }} /></td>
-      <td><input type="checkbox" checked={j} onChange={e => setJ(e.target.checked)} /></td>
       <td>{pred.auto ? "🤖" : ""}</td>
       <td>
-        <button className="btn btn-small btn-primary" onClick={() => onPatch(pred.id, { homeScore: h, awayScore: a, joker: j })}>💾</button>
+        <button className="btn btn-small btn-primary" onClick={() => onPatch(pred.id, { homeScore: h, awayScore: a })}>💾</button>
         <button className="btn btn-small" onClick={() => onDelete(pred.id)} style={{ color: "var(--red)", marginInlineStart: 4 }}>🗑️</button>
       </td>
     </tr>

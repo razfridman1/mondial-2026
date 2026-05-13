@@ -6,19 +6,20 @@ import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { AvatarDisplay } from "./AvatarPicker";
 import AvatarPicker from "./AvatarPicker";
 
-type Tab = "schedule" | "ranking" | "broadcasts" | "teams" | "bracket" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
+type Tab = "schedule" | "mypredictions" | "ranking" | "broadcasts" | "teams" | "bracket" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 
 const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean }[] = [
-  { id: "schedule",   label: "📋 לוח משחקים" },
-  { id: "ranking",    label: "🏆 דירוג חברים" },
-  { id: "broadcasts", label: "📺 שידורים בישראל" },
-  { id: "teams",      label: "🌍 קבוצות ושחקנים" },
-  { id: "bracket",    label: "🏆 שלב הנוקאאוט" },
-  { id: "ai",         label: "🤖 AI" },
-  { id: "profile",    label: "👤 פרופיל" },
-  { id: "admin",      label: "👥 ניהול משתמשים", adminOnly: true },
-  { id: "simulation", label: "🧪 ניהול סימולציה", adminOnly: true },
-  { id: "superadmin", label: "🛡️ שליטה מלאה",    adminOnly: true },
+  { id: "schedule",      label: "📋 לוח משחקים" },
+  { id: "mypredictions", label: "🔮 הניחושים שלי" },
+  { id: "ranking",       label: "🏆 דירוג חברים" },
+  { id: "broadcasts",    label: "📺 שידורים בישראל" },
+  { id: "teams",         label: "🌍 קבוצות ושחקנים" },
+  { id: "bracket",       label: "🏆 שלב הנוקאאוט" },
+  { id: "ai",            label: "🤖 AI" },
+  { id: "profile",       label: "👤 פרופיל" },
+  { id: "admin",         label: "👥 ניהול משתמשים", adminOnly: true },
+  { id: "simulation",    label: "🧪 ניהול סימולציה", adminOnly: true },
+  { id: "superadmin",    label: "🛡️ שליטה מלאה",    adminOnly: true },
 ];
 
 export default function Header() {

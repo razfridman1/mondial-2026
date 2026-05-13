@@ -14,10 +14,8 @@ export default function PredictionForm({ match }: { match: Match }) {
 
   const [home, setHome] = useState<string>("");
   const [away, setAway] = useState<string>("");
-  const [joker, setJoker] = useState<boolean>(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [jokerInfo, setJokerInfo] = useState<{ remaining: Record<string, number>; cooldownLeftMs: number } | null>(null);
 
   /* live countdown to compute lock */
   const [now, setNow] = useState(Date.now());
@@ -36,22 +34,8 @@ export default function PredictionForm({ match }: { match: Match }) {
     if (existing) {
       setHome(String(existing.homeScore));
       setAway(String(existing.awayScore));
-      setJoker(!!existing.joker);
     }
   }, [existing?.matchId]);
-
-  /* fetch joker availability */
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      try {
-        const { getFirebase } = await import("@/lib/firebase");
-        const token = await getFirebase().auth!.currentUser!.getIdToken();
-        const r = await fetch("/api/joker", { headers: { authorization: `Bearer ${token}` } });
-        if (r.ok) setJokerInfo(await r.json());
-      } catch {}
-    })();
-  }, [user?.uid, savedAt]);
 
   const homeTeam = TEAMS[match.home] || { name: match.home, flag: "❓" };
   const awayTeam = TEAMS[match.away] || { name: match.away, flag: "❓" };
@@ -67,7 +51,7 @@ export default function PredictionForm({ match }: { match: Match }) {
     }
     setError(null);
     try {
-      await setPrediction(match.id, h, a, joker);
+      await setPrediction(match.id, h, a, false);
       setSavedAt(Date.now());
       setTimeout(() => setSavedAt(null), 3000);
     } catch (e: any) {
@@ -106,28 +90,9 @@ export default function PredictionForm({ match }: { match: Match }) {
         <div className="pred-team">{awayTeam.name} {awayTeam.flag}</div>
       </div>
 
-      {user && !locked && (
-        <div className="joker-row">
-          <label className="joker-label">
-            <input
-              type="checkbox"
-              checked={joker}
-              disabled={!joker && (jokerInfo?.remaining?.[match.stage] || 0) <= 0}
-              onChange={e => setJoker(e.target.checked)}
-            />
-            <span>🃏 הפעל ג׳וקר ×2</span>
-            {jokerInfo && (
-              <span className="muted joker-info">
-                · {jokerInfo.remaining[match.stage] ?? 0} ג׳וקרים פנויים בשלב הזה
-              </span>
-            )}
-          </label>
-        </div>
-      )}
-
       <div className="mc-actions" style={{ marginTop: 8 }}>
         <button className="btn btn-primary" onClick={save} disabled={locked || !user}>
-          {existing ? "💾 עדכן ניחוש" : "💾 שמור ניחוש"}{joker && " 🃏"}
+          {existing ? "💾 עדכן ניחוש" : "💾 שמור ניחוש"}
         </button>
         <button className="btn wa-btn" onClick={shareWA}>
           💬 שתף בווטסאפ
@@ -136,9 +101,9 @@ export default function PredictionForm({ match }: { match: Match }) {
           const { openShareCard } = await import("@/lib/share-cards");
           const h = parseInt(home, 10) || 0;
           const a = parseInt(away, 10) || 0;
-          openShareCard("prediction", { match, home: h, away: a, joker });
+          openShareCard("prediction", { match, home: h, away: a, joker: false });
         }}>
-          🖼️ כרטיס שיתוף
+          📷 שתף באינסטה
         </button>
       </div>
 

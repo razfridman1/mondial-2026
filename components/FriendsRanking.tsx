@@ -335,7 +335,6 @@ function MatchBlock({ row, onOpen }: { row: MatchRow; onOpen: () => void }) {
               ) : (
                 <>
                   <strong>{p.homeScore} : {p.awayScore}</strong>
-                  {p.joker && <span title="ג׳וקר ×2" className="fr-tag">🃏</span>}
                   {p.auto && <span title="ניחוש אוטומטי" className="fr-tag">🤖</span>}
                 </>
               )}

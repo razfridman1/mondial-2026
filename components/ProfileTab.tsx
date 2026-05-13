@@ -37,10 +37,6 @@ export default function ProfileTab() {
     })();
   }, [user?.uid]);
 
-  const jokerCount = useMemo(() =>
-    Object.values(predictions).filter(p => p.joker).length,
-  [predictions]);
-
   if (!user) {
     return (
       <section style={{ textAlign: "center", padding: 40 }}>
@@ -126,10 +122,6 @@ export default function ProfileTab() {
           <div className="stat-card">
             <div className="stat-val">🔥 {myRow?.streak ?? 0}</div>
             <div className="stat-lbl">סטריק הכי ארוך</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-val">🃏 {jokerCount}</div>
-            <div className="stat-lbl">ג׳וקרים פעילים</div>
           </div>
         </div>
 
