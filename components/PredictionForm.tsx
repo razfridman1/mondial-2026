@@ -11,6 +11,7 @@ export default function PredictionForm({ match }: { match: Match }) {
   const user = useStore(s => s.user);
   const existing = useStore(s => s.predictions[match.id]);
   const setPrediction = useStore(s => s.setPrediction);
+  const clearPrediction = useStore(s => s.clearPrediction);
 
   const [home, setHome] = useState<string>("");
   const [away, setAway] = useState<string>("");
@@ -87,6 +88,19 @@ export default function PredictionForm({ match }: { match: Match }) {
     }
   }
 
+  async function clearMyPrediction() {
+    if (locked) { setError("הניחוש נעול — לא ניתן למחוק יותר."); return; }
+    if (!existing) return;
+    if (!confirm("למחוק את הניחוש שלך למשחק זה?")) return;
+    setError(null);
+    try {
+      await clearPrediction(match.id);
+      setHome(""); setAway(""); setWinner("");
+    } catch (e: any) {
+      setError(e?.message || "שגיאה במחיקה");
+    }
+  }
+
   async function shareWA() {
     const h = parseInt(home, 10) || 0;
     const a = parseInt(away, 10) || 0;
@@ -159,6 +173,12 @@ export default function PredictionForm({ match }: { match: Match }) {
         <button className="btn btn-primary" onClick={save} disabled={locked || !user}>
           {existing ? "💾 עדכן ניחוש" : "💾 שמור ניחוש"}
         </button>
+        {existing && !locked && (
+          <button className="btn" onClick={clearMyPrediction}
+                  style={{ background: "rgba(239,68,68,0.12)", borderColor: "var(--red)", color: "var(--red)" }}>
+            🗑 נקה ניחוש
+          </button>
+        )}
         <button className="btn wa-btn" onClick={shareWA}>
           💬 שתף בווטסאפ
         </button>

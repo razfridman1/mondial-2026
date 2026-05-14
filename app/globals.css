@@ -4223,3 +4223,56 @@ html[data-theme="light"] .chat-panel {
   .sim-step { flex-direction: column; align-items: flex-start; }
   .sim-step .btn { width: 100%; }
 }
+
+/* ---- Stage-level clear button (MyPredictionsTab) ---- */
+.mypred-stage-clear {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  margin: 10px 0;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+
+/* ---- Header center domain link ---- */
+.header-domain {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  letter-spacing: 1.5px;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--text, #e7ecff);
+  background: linear-gradient(135deg, #4f7dff 0%, #7c4dff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 8px;
+  transition: opacity 0.15s ease;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+.header-domain:hover { opacity: 0.78; }
+.header-top { position: relative; }
+
+@media (max-width: 720px) {
+  /* On mobile, switch from absolute centering to a clean centered block
+     between the brand and the clock row to avoid overlap. */
+  .header-domain {
+    position: static;
+    transform: none;
+    display: block;
+    text-align: center;
+    margin: 6px auto 0;
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+}

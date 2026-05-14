@@ -33,6 +33,7 @@ export default function MyPredictionsTab() {
   const currentGroupId = useStore(s => s.currentGroupId);
   const setCurrentGroup = useStore(s => s.setCurrentGroup);
   const refreshGroups = useStore(s => s.refreshGroups);
+  const clearStagePredictions = useStore(s => s.clearStagePredictions);
 
   const [stage, setStage] = useState<StageId>("GROUP");
   const [groupLetter, setGroupLetter] = useState<string | null>(null);
@@ -355,6 +356,43 @@ export default function MyPredictionsTab() {
         </div>
       )}
 
+      {/* ============ STAGE-LEVEL CLEAR BUTTON ============ */}
+      {(() => {
+        /* Count this stage's matches where the user has an active prediction
+         * AND the match isn't locked yet (>3 min before kickoff). */
+        const LOCK_MS = 3 * 60 * 1000;
+        const unlockedPredCount = visibleMatches.filter(m => {
+          const p = predictions[m.id];
+          if (!p) return false;
+          const startMs = new Date(m.utc).getTime();
+          return now < startMs - LOCK_MS;
+        }).length;
+        if (unlockedPredCount === 0) return null;
+        return (
+          <div className="mypred-stage-clear">
+            <span className="muted" style={{ fontSize: 12 }}>
+              🗑 ניתן לנקות ניחושים שטרם נעלו (3 דק׳ לפני שריקת הפתיחה)
+            </span>
+            <button
+              className="btn btn-small"
+              style={{ background: "rgba(239,68,68,0.12)", borderColor: "var(--red)", color: "var(--red)", fontWeight: 700 }}
+              onClick={async () => {
+                if (!confirm(`למחוק ${unlockedPredCount} ניחושים פתוחים בשלב "${STAGES[stage].name}"?\n\nרק ניחושים שטרם נעלו יימחקו.`)) return;
+                try {
+                  const { deleted, locked } = await clearStagePredictions(stage);
+                  alert(`✓ נמחקו ${deleted} ניחושים${locked > 0 ? `\n(${locked} ניחושים נעולים — לא נמחקו)` : ""}`);
+                  load();
+                } catch (e: any) {
+                  alert(`שגיאה: ${e?.message || "לא ניתן למחוק"}`);
+                }
+              }}
+            >
+              🗑 נקה ניחושי שלב ({unlockedPredCount})
+            </button>
+          </div>
+        );
+      })()}
+
       {/* ============ MATCHES ============ */}
       <div className="mypred-list">
         {visibleMatches.length === 0 ? (
@@ -553,6 +591,7 @@ function PredictionRow({
   onSaved: () => void;
 }) {
   const setPrediction = useStore(s => s.setPrediction);
+  const clearPrediction = useStore(s => s.clearPrediction);
   const home = TEAMS[match.home] || { code: match.home, name: match.home, flag: "❓" };
   const away = TEAMS[match.away] || { code: match.away, name: match.away, flag: "❓" };
   const venue = VENUES[match.venue] || { name: "" };
@@ -739,6 +778,26 @@ function PredictionRow({
             )}
             {saveState === "idle"   && !prediction && (h === "" || a === "") && (
               <span className="muted mypred-save-state">הזן ניחוש — נשמר אוטומטית</span>
+            )}
+            {prediction && (
+              <button
+                className="btn btn-small"
+                style={{ background: "rgba(239,68,68,0.10)", borderColor: "var(--red)", color: "var(--red)", fontSize: 12 }}
+                onClick={async () => {
+                  if (!confirm("למחוק את הניחוש למשחק זה?")) return;
+                  try {
+                    await clearPrediction(match.id);
+                    setH(""); setA("");
+                    onSaved();
+                  } catch (e: any) {
+                    setSaveState("error");
+                    setErrMsg(e?.message || "שגיאה במחיקה");
+                  }
+                }}
+                title="מחק את הניחוש"
+              >
+                🗑 נקה
+              </button>
             )}
           </>
         )}

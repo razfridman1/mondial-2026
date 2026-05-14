@@ -44,6 +44,8 @@ interface MondialState {
   setUser: (u: AppUser | null) => void;
   setLoadingAuth: (b: boolean) => void;
   setPrediction: (matchId: string, home: number, away: number, joker?: boolean, predictedWinner?: string) => Promise<void>;
+  clearPrediction: (matchId: string) => Promise<void>;
+  clearStagePredictions: (stage: string) => Promise<{ deleted: number; locked: number }>;
   setProfileAvatar: (avatarId: string) => Promise<void>;
   setCurrentGroup: (gid: string | null) => void;
   refreshGroups: () => Promise<void>;
@@ -114,6 +116,53 @@ export const useStore = create<MondialState>()(
           ...(predictedWinner ? { predictedWinner } : {}),
         };
         set({ predictions: p });
+      },
+      clearPrediction: async (matchId: string) => {
+        const u = get().user;
+        if (!u) {
+          /* anon — just remove locally */
+          const p = { ...get().predictions };
+          delete p[matchId];
+          set({ predictions: p });
+          return;
+        }
+        const token = await getFirebase().auth!.currentUser!.getIdToken();
+        const r = await fetch(`/api/predictions?matchId=${encodeURIComponent(matchId)}`, {
+          method: "DELETE",
+          headers: { authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.message || err.error || "delete failed");
+        }
+        const p = { ...get().predictions };
+        delete p[matchId];
+        set({ predictions: p });
+      },
+      clearStagePredictions: async (stage: string) => {
+        const u = get().user;
+        if (!u) return { deleted: 0, locked: 0 };
+        const token = await getFirebase().auth!.currentUser!.getIdToken();
+        const r = await fetch(`/api/predictions?stage=${encodeURIComponent(stage)}`, {
+          method: "DELETE",
+          headers: { authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.message || err.error || "stage delete failed");
+        }
+        const data = await r.json();
+        /* refetch all predictions to stay in sync */
+        try {
+          const pr = await fetch(`/api/predictions?uid=${u.uid}`);
+          if (pr.ok) {
+            const arr = await pr.json();
+            const map: any = {};
+            for (const p of arr) map[p.matchId] = p;
+            set({ predictions: map });
+          }
+        } catch {}
+        return { deleted: data.deleted || 0, locked: data.locked || 0 };
       },
       setProfileAvatar: async (avatarId: string) => {
         const u = get().user;

@@ -69,6 +69,9 @@ export default function Header() {
             <div className="brand-sub">לוח משחקים · ניחושים · דירוג חברים · קנדה · מקסיקו · ארה״ב</div>
           </div>
         </div>
+        <a className="header-domain" href="https://www.fc26.co.il" target="_blank" rel="noopener">
+          WWW.FC26.CO.IL
+        </a>
         <div id="header-clock">
           <span>🕒 {formatIsraelTime(now)}</span>
           <span className="muted">{formatIsraelDate(now, { short: true })}</span>
