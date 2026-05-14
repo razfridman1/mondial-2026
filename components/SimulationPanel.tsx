@@ -116,6 +116,29 @@ export default function SimulationPanel() {
     } finally { setBusy(false); }
   }
 
+  /* One-click: clear simulation results for a specific stage only.
+   * Preserves real admin-entered results (only deletes sim:true). */
+  async function clearStageResults(stageId: string, stageLabel: string) {
+    if (!confirm(
+      `🧹 לאפס את תוצאות הסימולציה ל"${stageLabel}"?\n\n` +
+      "• יימחקו רק תוצאות סימולציה (sim:true)\n" +
+      "• תוצאות אמיתיות שהוזנו ידנית — יישמרו\n" +
+      "• השלב הבא יחזור להיות נעול עד שתמלא מחדש\n\n" +
+      "להמשיך?"
+    )) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/sim/instant-results", {
+        method: "DELETE",
+        headers: await authHeaders(),
+        body: JSON.stringify({ stage: stageId }),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      alert(`✓ נמחקו ${data.deleted} תוצאות מ"${stageLabel}"`);
+    } finally { setBusy(false); }
+  }
+
   /* One-click: generate FIFA-rule-based results for a specific stage.
    * For knockouts: requires the previous stage to be completed first. */
   async function instantResultsForStage(stageId: string, stageLabel: string, matchCount: number) {
@@ -512,6 +535,41 @@ export default function SimulationPanel() {
           })()}
         </div>
 
+        {/* Per-stage reset buttons — second row */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, opacity: 0.85 }}>
+          🧹 אפס תוצאות לפי שלב:
+        </div>
+        <div className="mc-actions" style={{ flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+          {(() => {
+            const STAGE_BTNS: Array<{ id: string; label: string }> = [
+              { id: "GROUP", label: "שלב הבתים" },
+              { id: "R32",   label: "שלב 32" },
+              { id: "R16",   label: "שלב 16" },
+              { id: "QF",    label: "רבע גמר" },
+              { id: "SF",    label: "חצי גמר" },
+              { id: "THIRD", label: "3-4" },
+              { id: "FINAL", label: "הגמר" },
+            ];
+            return STAGE_BTNS.map(s => (
+              <button
+                key={s.id}
+                className="btn"
+                style={{
+                  background: "rgba(245,158,11,0.15)",
+                  borderColor: "var(--orange)",
+                  color: "var(--orange)",
+                  fontWeight: 700,
+                }}
+                onClick={() => clearStageResults(s.id, s.label)}
+                disabled={busy}
+                title={`מחק תוצאות סימולציה ב"${s.label}" (תוצאות אמיתיות יישמרו)`}
+              >
+                🧹 {s.label}
+              </button>
+            ));
+          })()}
+        </div>
+
         <div className="mc-actions" style={{ flexWrap: "wrap", gap: 10 }}>
           <button className="btn btn-primary"
                   style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", borderColor: "#16a34a", fontWeight: 700 }}
@@ -530,10 +588,11 @@ export default function SimulationPanel() {
           </button>
         </div>
         <p className="muted" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
-          ⚽ <strong>כפתור לכל שלב (לפי חוקי FIFA):</strong> צור תוצאות שלב‑אחר‑שלב. נוקאאוט דורש שהשלב הקודם הסתיים — המערכת תזהה אוטומטית מי עולה (2 ראשונים בכל בית + 8 שלישיים) ותבנה את משחקי השלב הבא בהתאם.<br/>
-          ⚽⚽ <strong>תוצאות רנדומליות:</strong> אקראי לחלוטין לכל 104 המשחקים (פחות ריאליסטי, מהיר).<br/>
+          ⚽ <strong>צור תוצאות לפי שלב:</strong> בונה תוצאות שלב‑אחר‑שלב (נוקאאוט דורש שהשלב הקודם הסתיים).<br/>
+          🧹 <strong>אפס לפי שלב:</strong> מוחק רק תוצאות סימולציה (sim:true) של אותו שלב. תוצאות אמיתיות שהוזנו ידנית — יישמרו. שלבים הבאים יחזרו להיות נעולים.<br/>
+          ⚽⚽ <strong>תוצאות רנדומליות:</strong> אקראי לחלוטין לכל 104 המשחקים.<br/>
           🎲 <strong>משוקללת לפי odds:</strong> מועדפות מנצחות לפי הסיכוי. בנוקאאוט אין תיקו.<br/>
-          🔄 <strong>אפס סימולציה:</strong> מוחק תוצאות + overrides + מכבה סימולציה. <strong>הניחושים נשמרים!</strong>
+          🔄 <strong>אפס סימולציה (גלובלי):</strong> מוחק את כל תוצאות הסימולציה + overrides + מכבה סימולציה. <strong>הניחושים נשמרים!</strong>
         </p>
       </div>
 
