@@ -46,7 +46,7 @@ export default function Filters() {
     prefs.statusFilter !== "all";
 
   return (
-    <div className="filters filters-compact">
+    <div className="filters filters-compact hide-on-mobile">
       <div className="filter-row filter-quick">
         <button
           className={`seg seg-today ${dayIsToday ? "on" : ""}`}
