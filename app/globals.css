@@ -4238,8 +4238,11 @@ html[data-theme="light"] .chat-panel {
   flex-wrap: wrap;
 }
 
-/* ---- Header center domain link — bold & flashy ---- */
+/* ---- Header center domain button — bold & flashy ---- */
 .header-domain {
+  /* Button reset so it looks identical to the prior <a> styling */
+  appearance: none;
+  cursor: pointer;
   position: absolute;
   left: 50%;
   top: 50%;

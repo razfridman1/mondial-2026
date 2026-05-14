@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
+import { shareToWhatsApp } from "@/lib/share";
 import { AvatarDisplay } from "./AvatarPicker";
 import AvatarPicker from "./AvatarPicker";
 
@@ -68,9 +69,18 @@ export default function Header() {
             <div className="brand-sub">לוח משחקים · ניחושים · דירוג חברים · קנדה · מקסיקו · ארה״ב</div>
           </div>
         </div>
-        <a className="header-domain" href="https://www.fc26.co.il" target="_blank" rel="noopener">
+        <button
+          type="button"
+          className="header-domain"
+          title="שתף את האתר בווטסאפ"
+          onClick={() => shareToWhatsApp(
+            "🏆 הצטרף לאפליקציית מונדיאל 2026!\n" +
+            "ניחושים, דירוג חברים, ולוח תוצאות חי ⚽\n\n" +
+            "https://www.fc26.co.il"
+          )}
+        >
           WWW.FC26.CO.IL
-        </a>
+        </button>
         <div id="header-clock">
           <span>🕒 {formatIsraelTime(now)}</span>
           <span className="muted">{formatIsraelDate(now, { short: true })}</span>
