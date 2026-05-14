@@ -3950,3 +3950,50 @@ html[data-theme="light"] .chat-panel {
   .mt-stage-title { font-size: 15px; padding: 12px 14px; top: 54px; }
   .mt-stage-title-count { font-size: 11px; padding: 3px 8px; }
 }
+
+/* ---- MatchCard: prediction-vs-result stack (finished / locked match) ---- */
+.pred-result-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+}
+.pred-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.pred-result-row.muted { color: var(--text-muted, #9aa3c7); font-size: 12px; }
+.pred-result-key {
+  color: var(--text-muted, #9aa3c7);
+  font-weight: 600;
+}
+.pred-result-val {
+  font-weight: 800;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text, #e7ecff);
+}
+.pred-result-points {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-weight: 700;
+}
+.pred-result-points.pos .pred-result-key { color: #6ee7b7; }
+.pred-result-points.pos .pred-result-tag { color: #6ee7b7; }
+.pred-result-points.zero .pred-result-key { color: #ff8a8a; }
+.pred-result-points.zero .pred-result-tag { color: #ff8a8a; }
+.pred-result-tag { font-weight: 700; font-size: 13px; }
+
+@media (max-width: 720px) {
+  .pred-result-row { font-size: 14px; }
+  .pred-result-val { font-size: 16px; }
+  .pred-result-tag { font-size: 14px; }
+}

@@ -36,6 +36,16 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   // 2. Kick off auth/firestore bootstrapping.
   useEffect(() => { bootstrap(); }, []);
 
+  // 2.4. Fetch match results once on app load + every 60s so MatchCard
+  // can show prediction-vs-result for finished matches without refetching
+  // per-card.
+  useEffect(() => {
+    const refresh = useStore.getState().refreshMatchResults;
+    refresh?.();
+    const id = setInterval(() => { refresh?.(); }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   // 2.5. On every fresh app load: once the user is identified (logged in),
   // land on the Friends Ranking tab as the default landing screen.
   // Fires only once per mount; subsequent in-app tab clicks are respected.

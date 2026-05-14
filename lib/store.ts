@@ -25,11 +25,14 @@ interface Prefs {
   tab: "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "bracket" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 }
 
+export type MatchResult = { home: number; away: number; finishedAt: number };
+
 interface MondialState {
   user: AppUser | null;
   loadingAuth: boolean;
   profile: UserProfile | null;
   predictions: Record<string, Prediction>;  // by matchId
+  matchResults: Record<string, MatchResult>; // by matchId
   overrides: Record<string, BroadcastOverrideDoc>;
   groups: Group[];           // groups the user belongs to
   currentGroupId: string | null;
@@ -43,6 +46,7 @@ interface MondialState {
   setProfileAvatar: (avatarId: string) => Promise<void>;
   setCurrentGroup: (gid: string | null) => void;
   refreshGroups: () => Promise<void>;
+  refreshMatchResults: () => Promise<void>;
   setPref: <K extends keyof Prefs>(key: K, val: Prefs[K]) => void;
   hydrateFromFirestore: (uid: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -57,6 +61,7 @@ export const useStore = create<MondialState>()(
       loadingAuth: true,
       profile: null,
       predictions: {},
+      matchResults: {},
       overrides: {},
       groups: [],
       currentGroupId: null,
@@ -118,6 +123,15 @@ export const useStore = create<MondialState>()(
         await setUserDoc(`profiles/${u.uid}`, next);
       },
       setCurrentGroup: (gid) => set({ currentGroupId: gid }),
+      refreshMatchResults: async () => {
+        try {
+          const r = await fetch("/api/match-results");
+          if (r.ok) {
+            const data = await r.json();
+            set({ matchResults: data });
+          }
+        } catch {}
+      },
       refreshGroups: async () => {
         const u = get().user;
         if (!u) { set({ groups: [] }); return; }

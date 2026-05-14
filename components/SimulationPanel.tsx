@@ -408,6 +408,35 @@ export default function SimulationPanel() {
           : <span className="status-pill pill-open">💤 כבוי</span>}
       </div>
 
+      {/* ============= סיים סימולציות וניקוי מלא ============= */}
+      <div style={{
+        marginTop: 14, padding: 14,
+        background: "linear-gradient(135deg, rgba(239,68,68,0.10) 0%, rgba(255,122,69,0.06) 100%)",
+        border: "1px solid rgba(239,68,68,0.45)",
+        borderRadius: 14,
+      }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, justifyContent: "space-between" }}>
+          <div>
+            <h4 style={{ margin: 0, color: "var(--red)" }}>🏁 סיימתי סימולציות — נקה הכל</h4>
+            <p className="muted" style={{ fontSize: 12, margin: "4px 0 0", lineHeight: 1.55 }}>
+              מנקה את <strong>כל</strong> תוצאות הדמי, הניחושים האוטומטיים, ה‑broadcast overrides, ופיד הפעילות שנוצרו במהלך הסימולציות.
+              <br />משתמשים, קבוצות, חברויות ופרופילים נשמרים. תוצאות אמת ידניות נשמרות.
+            </p>
+          </div>
+          <button className="btn"
+                  style={{
+                    background: "linear-gradient(135deg, #ef4444 0%, #ff7a45 100%)",
+                    border: "none", color: "#fff",
+                    fontWeight: 800, fontSize: 14,
+                    padding: "12px 22px",
+                    boxShadow: "0 4px 14px rgba(239,68,68,0.35)",
+                  }}
+                  onClick={fullReset} disabled={busy}>
+            🏁 סיים סימולציות וניקוי מלא
+          </button>
+        </div>
+      </div>
+
       <div className="sim-help">
         <p className="muted">
           הסימולציה מזיזה את כל לוח המשחקים זמנית — אתה וחברים יכולים לבדוק את כל הזרימה:

@@ -6,6 +6,7 @@ import {
   formatIsraelDate, formatIsraelTime, matchLiveStatus, relativeLabel, oddsToProbabilities,
 } from "@/lib/utils";
 import { shareToWhatsApp, matchShareText } from "@/lib/share";
+import { scorePrediction } from "@/lib/scoring";
 import type { Match } from "@/lib/types";
 import Countdown from "./Countdown";
 
@@ -18,11 +19,34 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
   const status = matchLiveStatus(match);
   const rel = relativeLabel(match.utc);
 
+  /* Pull user's prediction + actual result for this match (if any) */
+  const myPrediction = useStore(s => s.predictions[match.id]);
+  const matchResult  = useStore(s => s.matchResults[match.id]);
+
   const minutesToKick = useMemo(
     () => Math.round((new Date(match.utc).getTime() - Date.now()) / 60000),
     [match.utc]
   );
   const predictionLocked = minutesToKick <= 3;
+  const isFinished = status === "finished" && !!matchResult;
+
+  /* Compute score if both prediction and result available */
+  const myScore = useMemo(() => {
+    if (!myPrediction || !matchResult) return null;
+    return scorePrediction({
+      predictedHome: myPrediction.homeScore,
+      predictedAway: myPrediction.awayScore,
+      actualHome: matchResult.home,
+      actualAway: matchResult.away,
+    });
+  }, [myPrediction, matchResult]);
+
+  function scoreLabel(): string {
+    if (!myScore) return "";
+    if (myScore.exact)          return "🎯 פגיעה + תוצאה";
+    if (myScore.resultCorrect)  return myScore.diffCorrect ? "✅ פגיעה + הפרש שערים" : "✅ פגיעה";
+    return "❌ פספוס";
+  }
 
   // Whole-card click handler. Inner interactive controls call stopPropagation
   // (or are wrapped in <a>) so they don't trigger the modal.
@@ -81,9 +105,48 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
       </div>
 
       <div className="status-chips">
-        <span className={`status-pill ${predictionLocked ? "pill-locked" : "pill-open"}`}>
-          {predictionLocked ? "🔒 תם הזמן לסמן ניחוש" : "🔮 לחץ כדי למלא"}
-        </span>
+        {isFinished && myPrediction ? (
+          /* Match finished: show prediction + actual + score earned */
+          <div className="pred-result-stack">
+            <div className="pred-result-row">
+              <span className="pred-result-key">🔮 ההימור שלך:</span>
+              <span className="pred-result-val">{myPrediction.homeScore} : {myPrediction.awayScore}</span>
+            </div>
+            <div className="pred-result-row">
+              <span className="pred-result-key">🏁 תוצאה:</span>
+              <span className="pred-result-val">{matchResult.home} : {matchResult.away}</span>
+            </div>
+            <div className={`pred-result-row pred-result-points ${myScore && myScore.points > 0 ? "pos" : "zero"}`}>
+              <span className="pred-result-tag">{scoreLabel()}</span>
+              <span className="pred-result-key">ניקוד: {myScore?.points ?? 0}</span>
+            </div>
+          </div>
+        ) : isFinished && !myPrediction ? (
+          /* Match finished but no prediction */
+          <div className="pred-result-stack">
+            <div className="pred-result-row">
+              <span className="pred-result-key">🏁 תוצאה:</span>
+              <span className="pred-result-val">{matchResult.home} : {matchResult.away}</span>
+            </div>
+            <div className="pred-result-row muted">
+              <span>לא הוזן ניחוש למשחק זה</span>
+            </div>
+          </div>
+        ) : predictionLocked && myPrediction ? (
+          /* Locked (≤3 min to kickoff) WITH prediction → show user's pick */
+          <div className="pred-result-stack">
+            <div className="pred-result-row">
+              <span className="pred-result-key">🔮 ההימור שלך:</span>
+              <span className="pred-result-val">{myPrediction.homeScore} : {myPrediction.awayScore}</span>
+            </div>
+            <span className="status-pill pill-locked" style={{ marginTop: 4 }}>🔒 תם הזמן לסמן ניחוש</span>
+          </div>
+        ) : (
+          /* Open (>3 min) or locked w/o prediction */
+          <span className={`status-pill ${predictionLocked ? "pill-locked" : "pill-open"}`}>
+            {predictionLocked ? "🔒 תם הזמן לסמן ניחוש" : "🔮 לחץ כדי למלא"}
+          </span>
+        )}
       </div>
 
       {(() => {
