@@ -10,7 +10,7 @@
  *
  * Designed mobile-first; dark glassmorphism aesthetic.
  * ===================================================================*/
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MATCHES, TEAMS, VENUES, STAGES, CHANNELS } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import {
@@ -18,6 +18,7 @@ import {
   matchLiveStatus, relativeLabel,
 } from "@/lib/utils";
 import { effMatch } from "@/lib/sim";
+import { resolveAllStages } from "@/lib/bracket";
 import type { Match, StageId } from "@/lib/types";
 import MatchModal from "./MatchModal";
 import MatchCard from "./MatchCard";
@@ -37,39 +38,79 @@ const STAGE_TITLES: Record<StageId, string> = {
 };
 
 export default function MatchesTab() {
-  const overrides = useStore(s => s.overrides);
-  const simConfig = useStore(s => s.simConfig);
+  const overrides    = useStore(s => s.overrides);
+  const simConfig    = useStore(s => s.simConfig);
+  const matchResults = useStore(s => s.matchResults);
+  const refreshMatchResults = useStore(s => s.refreshMatchResults);
 
   const [section, setSection] = useState<Section>("stages");
   const [openId, setOpenId]   = useState<string | null>(null);
-  const [results, setResults] = useState<Record<string, { home: number; away: number; finishedAt: number }>>({});
   const [now, setNow]         = useState(() => Date.now());
 
-  /* Live tick every 15s so live state updates */
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 15000);
-    return () => clearInterval(id);
-  }, []);
+  /* Scroll-to-today plumbing. We render an invisible anchor at the current
+   * Israel-date inside the stage view; on first mount (and whenever the user
+   * presses the floating button) we scroll it into view. */
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const didInitialScroll = useRef(false);
+  const [todayVisible, setTodayVisible] = useState(true);
+  const [hasTodayInView, setHasTodayInView] = useState(false);
 
-  /* Fetch results */
-  useEffect(() => {
-    let on = true;
-    async function load() {
-      try {
-        const r = await fetch("/api/match-results");
-        if (r.ok && on) setResults(await r.json());
-      } catch {}
+  function scrollToToday(behavior: ScrollBehavior = "smooth") {
+    const root = bodyRef.current;
+    if (!root) return;
+    const t = todayKey();
+    const el = root.querySelector<HTMLElement>(`[data-date="${t}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior, block: "start" });
+      return true;
     }
-    load();
-    const id = setInterval(load, 60_000);
-    return () => { on = false; clearInterval(id); };
-  }, []);
+    /* If today has no matches, jump to the closest upcoming day. */
+    const future = root.querySelectorAll<HTMLElement>("[data-date]");
+    for (const node of Array.from(future)) {
+      const d = node.getAttribute("data-date") || "";
+      if (d >= t) { node.scrollIntoView({ behavior, block: "start" }); return true; }
+    }
+    return false;
+  }
 
-  /* All effective matches */
+  /* Live tick — faster during active simulation so that match cards
+   * transition through scheduled→pregame→live→finished as sim time
+   * advances. 1s during sim, 10s otherwise. */
+  useEffect(() => {
+    const fast = !!simConfig?.enabled;
+    const interval = fast ? 1000 : 10_000;
+    const id = setInterval(() => setNow(Date.now()), interval);
+    return () => clearInterval(id);
+  }, [simConfig?.enabled]);
+
+  /* Fetch results — faster during simulation since results land rapidly. */
+  useEffect(() => {
+    refreshMatchResults?.();
+    const fast = !!simConfig?.enabled;
+    const interval = fast ? 5_000 : 30_000;
+    const id = setInterval(() => refreshMatchResults?.(), interval);
+    return () => clearInterval(id);
+  }, [simConfig?.enabled, refreshMatchResults]);
+
+  /* Resolve knockout placeholders to real team codes once previous stages finish. */
+  const resolved = useMemo(() => resolveAllStages(matchResults), [matchResults]);
+
+  /* All effective matches — with knockout placeholders swapped for real codes when known. */
   const matches = useMemo(
-    () => MATCHES.map(m => effMatch(m, overrides[m.id], simConfig))
-      .sort((a, b) => +new Date(a.utc) - +new Date(b.utc)),
-    [overrides, simConfig]
+    () => MATCHES.map(m => {
+      const eff = effMatch(m, overrides[m.id], simConfig);
+      if (m.stage === "GROUP") return eff;
+      const r = resolved[m.id];
+      if (!r) return eff;
+      return {
+        ...eff,
+        home: r.home || eff.home,
+        away: r.away || eff.away,
+        homeIsPlaceholder: !r.home,
+        awayIsPlaceholder: !r.away,
+      };
+    }).sort((a, b) => +new Date(a.utc) - +new Date(b.utc)),
+    [overrides, simConfig, resolved]
   );
 
   /* Bucketed lists */
@@ -118,7 +159,7 @@ export default function MatchesTab() {
         ) : visible.length === 0 ? (
           <EmptyState section={section} />
         ) : (
-          <GroupedList list={visible} section={section} results={results}
+          <GroupedList list={visible} section={section} results={matchResults}
                        onOpen={setOpenId} />
         )}
       </div>
@@ -185,7 +226,7 @@ function AllStagesSchedule({ matches, onOpen }: {
             <span className="mt-stage-title-count">{block.count} משחקים</span>
           </h2>
           {block.byDay.map(([day, ms]) => (
-            <section key={day} className="day-section">
+            <section key={day} className="day-section" data-date={day}>
               <h3 className="day-heading hide-on-mobile">
                 <span>{formatIsraelDate(ms[0].utc)}</span>
                 {relativeLabel(ms[0].utc) && (
