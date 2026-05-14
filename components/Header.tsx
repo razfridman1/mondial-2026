@@ -8,14 +8,14 @@ import AvatarPicker from "./AvatarPicker";
 
 type Tab = "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "bracket" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 
-const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean }[] = [
+const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: boolean }[] = [
   { id: "schedule",      label: "📋 לוח משחקים" },
   { id: "mypredictions", label: "🔮 הניחושים שלי" },
-  { id: "standings",     label: "📊 טבלאות" },
+  { id: "standings",     label: "📊 טבלאות",         hideOnMobile: true },
   { id: "ranking",       label: "🏆 דירוג חברים" },
-  { id: "teams",         label: "🌍 קבוצות ושחקנים" },
+  { id: "teams",         label: "🌍 קבוצות ושחקנים", hideOnMobile: true },
   { id: "bracket",       label: "🏆 שלב הנוקאאוט" },
-  { id: "profile",       label: "👤 פרופיל" },
+  /* Profile tab removed from nav — accessed via username click in header */
   { id: "admin",         label: "👥 ניהול משתמשים", adminOnly: true },
   { id: "simulation",    label: "🧪 ניהול סימולציה", adminOnly: true },
   { id: "superadmin",    label: "🛡️ שליטה מלאה",    adminOnly: true },
@@ -42,6 +42,22 @@ export default function Header() {
     }
   }, [tab, setPref]);
 
+  /* If user is on a mobile-hidden tab while on mobile, redirect to schedule.
+   * Also re-check when the window resizes (e.g. rotating phone). */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const MOBILE_HIDDEN_TABS: Tab[] = ["standings", "teams"];
+    const mq = window.matchMedia("(max-width: 720px)");
+    const check = () => {
+      if (mq.matches && MOBILE_HIDDEN_TABS.includes(tab as Tab)) {
+        setPref("tab", "schedule");
+      }
+    };
+    check();
+    mq.addEventListener("change", check);
+    return () => mq.removeEventListener("change", check);
+  }, [tab, setPref]);
+
   return (
     <header className="header">
       <div className="header-top">
@@ -66,7 +82,14 @@ export default function Header() {
               >
                 <AvatarDisplay avatarId={profile?.avatarId || "messi"} size={36} />
               </button>
-              <span className="chip">{profile?.displayName || user.email}</span>
+              <button
+                className="chip header-name-btn"
+                onClick={() => setPref("tab", "profile")}
+                title="פתח פרופיל"
+                aria-label="פתח פרופיל"
+              >
+                {profile?.displayName || user.email}
+              </button>
               <button className="btn btn-small" onClick={signOut}>יציאה</button>
             </>
           ) : (
@@ -79,7 +102,7 @@ export default function Header() {
         {ALL_TABS.filter(t => !t.adminOnly || user?.isAdmin).map(t => (
           <button
             key={t.id}
-            className={`tab-btn ${tab === t.id ? "on" : ""}`}
+            className={`tab-btn ${tab === t.id ? "on" : ""} ${t.hideOnMobile ? "tab-hide-mobile" : ""}`}
             onClick={() => setPref("tab", t.id)}
           >
             {t.label}

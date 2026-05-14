@@ -1492,6 +1492,30 @@ button { font-family: inherit; cursor: pointer; }
   .chat-fab { bottom: 14px; left: 14px; width: 54px; height: 54px; }
 }
 
+/* ====================================================================
+   MOBILE-ONLY HIDDEN TABS / CHAT FAB / GENERIC HIDE
+   ==================================================================== */
+@media (max-width: 720px) {
+  .tab-hide-mobile { display: none !important; }
+  .chat-fab { display: none !important; }
+  .hide-on-mobile { display: none !important; }
+}
+
+/* Header name button — looks like a chip but acts as a button */
+.header-name-btn {
+  cursor: pointer;
+  transition: transform .12s, border-color .12s, box-shadow .12s;
+}
+.header-name-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0,212,255,0.15);
+}
+.header-name-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ---------- EMAIL REMINDERS TOGGLE ---------- */
 .email-pref {
   display: flex; align-items: center; gap: 10px;
