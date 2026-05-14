@@ -91,6 +91,7 @@ export async function GET(req: Request) {
             avatarId: profByUid[p.uid]?.avatarId || "messi",
             homeScore: reveal ? p.homeScore : null,
             awayScore: reveal ? p.awayScore : null,
+            predictedWinner: reveal ? (p.predictedWinner ?? null) : null,
             joker: reveal ? !!p.joker : false,
             auto: reveal ? !!p.auto : false,
             hidden: !reveal,

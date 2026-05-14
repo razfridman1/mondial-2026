@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
-import { TEAMS } from "@/lib/data";
+import { TEAMS, STAGES } from "@/lib/data";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { shareToWhatsApp, leaderboardShareText } from "@/lib/share";
 import { getUserDoc } from "@/lib/firebase";
@@ -17,6 +17,7 @@ interface PredictionCell {
   avatarId: string;
   homeScore: number | null;
   awayScore: number | null;
+  predictedWinner?: string | null;
   joker: boolean;
   auto: boolean;
   hidden: boolean;
@@ -712,10 +713,16 @@ function MatchBlock({ row, onOpen }: { row: MatchRow; onOpen: () => void }) {
     return `${m}ד׳ ${String(s).padStart(2, "0")}ש׳`;
   };
 
+  const isKnockout = row.stage !== "GROUP";
+  const stageLabel = (STAGES as any)[row.stage]?.name || row.stage;
+
   return (
     <div className="fr-match-block">
       <header className="fr-match-header" onClick={onOpen} style={{ cursor: "pointer" }}>
         <div className="fr-teams">
+          <span className="chip chip-stage" style={{ marginInlineEnd: 8 }}>
+            {stageLabel}{row.group ? ` · בית ${row.group}` : ""}
+          </span>
           <span className="flag">{home.flag}</span>
           <strong>{home.name}</strong>
           <span className="muted">נגד</span>
@@ -734,25 +741,34 @@ function MatchBlock({ row, onOpen }: { row: MatchRow; onOpen: () => void }) {
       </div>
 
       <div className="fr-preds-grid">
-        {row.predictions.map(p => (
-          <div key={p.uid} className={`fr-pred ${p.isSelf ? "is-self" : ""} ${p.hidden ? "is-hidden" : ""}`}>
-            <AvatarDisplay avatarId={p.avatarId} size={32} />
-            <div className="fr-pred-name">
-              <div>{p.displayName}</div>
-              {p.isSelf && <span className="chip" style={{ fontSize: 9 }}>אתה</span>}
+        {row.predictions.map(p => {
+          /* Render the predicted winner for KO matches (real team code → flag+name). */
+          const winnerTeam = p.predictedWinner ? (TEAMS as any)[p.predictedWinner] : null;
+          return (
+            <div key={p.uid} className={`fr-pred ${p.isSelf ? "is-self" : ""} ${p.hidden ? "is-hidden" : ""}`}>
+              <AvatarDisplay avatarId={p.avatarId} size={32} />
+              <div className="fr-pred-name">
+                <div>{p.displayName}</div>
+                {p.isSelf && <span className="chip" style={{ fontSize: 9 }}>אתה</span>}
+              </div>
+              <div className="fr-pred-score">
+                {p.hidden ? (
+                  <span title="ניחוש מוסתר עד 2 דקות לפני המשחק">🔒</span>
+                ) : (
+                  <>
+                    <strong>{p.homeScore} : {p.awayScore}</strong>
+                    {p.auto && <span title="ניחוש אוטומטי" className="fr-tag">🤖</span>}
+                    {isKnockout && p.predictedWinner && (
+                      <span className="fr-pred-winner" title="הקבוצה שעולה לדעתו">
+                        ⚽ {winnerTeam?.flag || ""} {winnerTeam?.name || p.predictedWinner}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-            <div className="fr-pred-score">
-              {p.hidden ? (
-                <span title="ניחוש מוסתר עד 2 דקות לפני המשחק">🔒</span>
-              ) : (
-                <>
-                  <strong>{p.homeScore} : {p.awayScore}</strong>
-                  {p.auto && <span title="ניחוש אוטומטי" className="fr-tag">🤖</span>}
-                </>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
         {!row.predictions.length && (
           <div className="muted" style={{ padding: 8 }}>טרם נחתמו ניחושים.</div>
         )}
