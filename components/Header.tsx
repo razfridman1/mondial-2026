@@ -9,7 +9,7 @@ import AvatarPicker from "./AvatarPicker";
 type Tab = "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "bracket" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 
 const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: boolean }[] = [
-  { id: "schedule",      label: "📋 לוח משחקים" },
+  { id: "schedule",      label: "⚽ משחקים" },
   { id: "mypredictions", label: "🔮 הניחושים שלי" },
   { id: "standings",     label: "📊 טבלאות",         hideOnMobile: true },
   { id: "ranking",       label: "🏆 דירוג חברים" },

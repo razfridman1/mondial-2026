@@ -2,7 +2,7 @@
 import { useStore } from "@/lib/store";
 import AuthProvider from "@/components/AuthProvider";
 import Header from "@/components/Header";
-import Schedule from "@/components/Schedule";
+import MatchesTab from "@/components/MatchesTab";
 import MyPredictionsTab from "@/components/MyPredictionsTab";
 import StandingsTab from "@/components/StandingsTab";
 import Bracket from "@/components/Bracket";
@@ -23,7 +23,7 @@ function HomeInner() {
       <Header />
       <SimulationBanner />
       <main className="container">
-        {tab === "schedule"      && <Schedule />}
+        {tab === "schedule"      && <MatchesTab />}
         {tab === "mypredictions" && <MyPredictionsTab />}
         {tab === "standings"     && <StandingsTab />}
         {tab === "ranking"       && <FriendsRanking />}
