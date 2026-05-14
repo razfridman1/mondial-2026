@@ -41,10 +41,12 @@ export async function POST(req: Request) {
 
   const { db } = getAdmin();
 
-  /* Resolve group members */
+  /* Resolve ACTIVE group members (skip soft-left) */
   const memSnap = await db.collection("group_memberships").where("groupId", "==", groupId).get();
-  const uids = memSnap.docs.map(d => (d.data() as any).uid as string);
-  if (!uids.length) return NextResponse.json({ ok: true, filled: 0, reason: "no members in group" });
+  const uids = memSnap.docs
+    .filter(d => !(d.data() as any).left)
+    .map(d => (d.data() as any).uid as string);
+  if (!uids.length) return NextResponse.json({ ok: true, filled: 0, reason: "אין חברים פעילים בקבוצה" });
 
   /* Load current match results to know which knockout matches are "open"
    * (i.e. the previous stage has finished and the teams are known). */
@@ -89,7 +91,9 @@ export async function POST(req: Request) {
     });
   }
 
-  /* Bulk-fill — random 0-3 scores. Use batched writes for speed. */
+  /* Bulk-fill — random 0-3 scores. Use batched writes for speed.
+   * For KO matches, also include a random `predictedWinner` (so tied
+   * 90-min predictions still have a "who advances" pick). */
   const now = Date.now();
   let filled = 0;
   let batch = db.batch();
@@ -98,8 +102,8 @@ export async function POST(req: Request) {
     for (const m of matches) {
       const h = Math.floor(Math.random() * 4);
       const a = Math.floor(Math.random() * 4);
-      const ref = db.collection("predictions").doc(`${uid}_${m.id}`);
-      batch.set(ref, {
+      const isKO = m.stage !== "GROUP";
+      const payload: any = {
         uid,
         matchId: m.id,
         homeScore: h,
@@ -107,7 +111,15 @@ export async function POST(req: Request) {
         joker: false,
         updatedAt: now,
         auto: true,
-      }, { merge: true });
+      };
+      if (isKO) {
+        /* If score not tied → winner is implied; otherwise random pick. */
+        if (h > a)      payload.predictedWinner = m.home;
+        else if (a > h) payload.predictedWinner = m.away;
+        else            payload.predictedWinner = Math.random() < 0.5 ? m.home : m.away;
+      }
+      const ref = db.collection("predictions").doc(`${uid}_${m.id}`);
+      batch.set(ref, payload, { merge: true });
       opsInBatch++;
       filled++;
       /* Firestore batch limit is 500 ops — commit and start a new one */

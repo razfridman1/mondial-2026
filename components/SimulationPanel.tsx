@@ -105,7 +105,11 @@ export default function SimulationPanel() {
     for (const s of STAGE_ORDER) {
       const st = statuses.find(x => x.stage === s);
       const matchesTotal = STAGE_MATCH_COUNT[s];
-      const predictionsDone = !!st && st.predictionsFilled >= st.predictionsTotal && st.predictionsTotal > 0;
+      /* "Done" thresholds:
+       *   predictionsDone = at least 1 prediction exists OR total expected is 0
+       *     (allows results-fill even if random-fill didn't reach 100%)
+       *   resultsDone     = all stage matches have a result */
+      const predictionsDone = !!st && st.predictionsFilled > 0;
       const resultsDone     = !!st && st.resultsFilled >= matchesTotal && matchesTotal > 0;
       map[s] = {
         predictionsDone, resultsDone,
@@ -114,12 +118,15 @@ export default function SimulationPanel() {
         stageStatus: st,
       };
     }
-    /* gating: depends on previous stage */
+    /* Gating: each stage opens once the previous stage's RESULTS are done.
+     * Within a stage, BOTH predictions and results are clickable (also for
+     * re-runs). Predictions before results is recommended but not enforced
+     * — admin tools should be flexible. */
     for (const s of STAGE_ORDER) {
       const prev = prevStage(s);
       const prevResultsDone = prev ? map[prev].resultsDone : true; // GROUP has no prev
-      map[s].canFillPredictions = prevResultsDone && !map[s].resultsDone;
-      map[s].canFillResults     = prevResultsDone && map[s].predictionsDone && !map[s].resultsDone;
+      map[s].canFillPredictions = prevResultsDone;
+      map[s].canFillResults     = prevResultsDone;
     }
     return map;
   }, [statuses]);
@@ -134,7 +141,21 @@ export default function SimulationPanel() {
         body: JSON.stringify({ groupId, stage, includePlaceholders: stage !== "GROUP" }),
       });
       const data = await r.json();
-      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      if (!r.ok) {
+        alert(`שגיאה במילוי ניחושים: ${data.error || r.status}`);
+        return;
+      }
+      const filled = data.filled ?? 0;
+      const users  = data.users ?? 0;
+      const ms     = data.matches ?? 0;
+      const stageName = STAGE_NAMES[stage];
+      if (filled === 0) {
+        alert(`⚠ לא מולאו ניחושים ב-"${stageName}".\n${data.reason || "ייתכן שאין חברים בקבוצה או שאין משחקים זמינים."}`);
+      } else {
+        console.log(`[sim] predictions filled: ${filled} (${users} users × ${ms} matches) for stage ${stage}`);
+      }
+    } catch (e: any) {
+      alert(`שגיאה: ${e?.message || e}`);
     } finally {
       setBusy(false);
       await reloadStatus();
@@ -150,7 +171,20 @@ export default function SimulationPanel() {
         body: JSON.stringify({ stage, overwrite: true }),
       });
       const data = await r.json();
-      if (!r.ok) { alert(`שגיאה: ${data.message || data.error || r.status}`); return; }
+      if (!r.ok) {
+        alert(`שגיאה במילוי תוצאות: ${data.message || data.error || r.status}`);
+        return;
+      }
+      const inserted = data.inserted ?? 0;
+      const skipped  = data.skipped  ?? 0;
+      const stageName = STAGE_NAMES[stage];
+      if (inserted === 0 && skipped === 0) {
+        alert(`⚠ לא נכתבו תוצאות ב-"${stageName}". בדוק שהשלב הקודם הושלם.`);
+      } else {
+        console.log(`[sim] results inserted: ${inserted}, skipped: ${skipped} for stage ${stage}`);
+      }
+    } catch (e: any) {
+      alert(`שגיאה: ${e?.message || e}`);
     } finally {
       setBusy(false);
       await reloadStatus();
@@ -284,7 +318,7 @@ export default function SimulationPanel() {
                         className={`btn btn-small ${state.resultsDone ? "" : "btn-primary"}`}
                         disabled={busy || !state.canFillResults}
                         onClick={() => fillResultsForStage(s)}
-                        title={!state.predictionsDone ? "קודם מלא ניחושים" : ""}
+                        title={!state.predictionsDone ? "מומלץ למלא ניחושים קודם (לא חובה)" : "מילוי תוצאות מיידי"}
                       >
                         {state.resultsDone ? "🔄 מילוי מחדש" : "⚽ מלא תוצאות"}
                       </button>
