@@ -725,6 +725,69 @@ button { font-family: inherit; cursor: pointer; }
   .stnd-goals-main { font-size: 12px; }
 }
 
+/* FIFA rules panel */
+.fifa-rules {
+  background: linear-gradient(135deg, rgba(46,107,255,0.06), rgba(0,212,255,0.04));
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 4px;
+}
+.fifa-rules > summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  list-style: none;
+  display: flex; align-items: center;
+  padding: 4px 0;
+}
+.fifa-rules > summary::-webkit-details-marker { display: none; }
+.fifa-rules > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-inline-end: 8px;
+  transition: transform .2s;
+  color: var(--accent);
+}
+.fifa-rules[open] > summary::before { transform: rotate(90deg); }
+.fifa-rules-body {
+  padding-top: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.fifa-rules-body h4 {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.fifa-rules-body ul, .fifa-rules-body ol {
+  padding-inline-start: 22px;
+  margin: 4px 0;
+}
+.fifa-rules-body ul ul { padding-inline-start: 18px; margin-top: 2px; }
+.fifa-rules-body li { margin-bottom: 3px; }
+
+/* Legend rows */
+.fifa-legend {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.fifa-legend > div {
+  display: flex; align-items: center; gap: 8px;
+}
+.fifa-leg-bar {
+  display: inline-block;
+  width: 6px; height: 18px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.fifa-leg-bar.qual-q { background: #22c55e; }
+.fifa-leg-bar.qual-3 { background: #f59e0b; }
+.fifa-leg-bar.qual-e { background: #ef4444; }
+.fifa-leg-bar.qual-p { background: var(--border); }
+
 /* ---------- MATCH CARD ---------- */
 .card-grid {
   display: grid; gap: 12px;

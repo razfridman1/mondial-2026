@@ -40,6 +40,7 @@ export async function POST(req: Request) {
     matchId: body.matchId, home, away,
     finishedAt: body.finishedAt || Date.now(),
     sim: false,
+    source: "admin",
     setByAdmin: true,
   }, { merge: true });
   return NextResponse.json({ ok: true });

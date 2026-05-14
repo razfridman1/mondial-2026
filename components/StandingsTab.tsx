@@ -61,12 +61,33 @@ export default function StandingsTab() {
 
   const groupLetters = useMemo(() => listGroupLetters(), []);
 
+  /* Detect data source — sim vs admin vs live */
+  const dataSource = useMemo(() => {
+    let sim = 0, live = 0, admin = 0;
+    Object.values(results).forEach((r: any) => {
+      if (r.source === "live") live++;
+      else if (r.source === "admin" || r.setByAdmin) admin++;
+      else if (r.sim) sim++;
+      else admin++;
+    });
+    if (live > 0 && live >= sim) return "live";
+    if (sim > 0) return "sim";
+    if (admin > 0) return "admin";
+    return "empty";
+  }, [results]);
+
   return (
     <section className="standings">
       <h2 className="sec-title">📊 טבלאות</h2>
       <p className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
-        טבלאות הבתים ושלבי הנוקאאוט מתעדכנות אוטומטית מתוצאות המשחקים.
+        טבלאות הבתים ושלבי הנוקאאוט מתעדכנות אוטומטית מתוצאות המשחקים בזמן אמת.
       </p>
+
+      {/* Data source banner */}
+      <DataSourceBanner source={dataSource} resultsCount={Object.keys(results).length} />
+
+      {/* FIFA rules — collapsible info */}
+      <FifaRulesPanel />
 
       {/* Stage filter */}
       <div className="stnd-stage-nav">
@@ -317,5 +338,146 @@ function KnockoutMatchCard({
         <div className="knockout-status">⏳ ימולא אחרי השלב הקודם</div>
       )}
     </button>
+  );
+}
+
+/* ===================================================================
+ * DataSourceBanner — clarifies whether tables are showing live, sim, or admin data
+ * =================================================================== */
+function DataSourceBanner({ source, resultsCount }: { source: string; resultsCount: number }) {
+  if (source === "empty") {
+    return (
+      <div style={{
+        padding: 12,
+        background: "rgba(245,158,11,0.10)",
+        border: "1px solid rgba(245,158,11,0.4)",
+        borderRadius: 10,
+        fontSize: 13, lineHeight: 1.7, marginBottom: 12,
+      }}>
+        ⏳ <strong>אין עדיין תוצאות.</strong> הטבלאות יתעדכנו אוטומטית ברגע שיוזנו תוצאות —
+        ידנית דרך 🛡️ ניהול תוצאות, או אוטומטית מ‑API חיצוני (כשהמונדיאל יתחיל).
+      </div>
+    );
+  }
+  if (source === "live") {
+    return (
+      <div style={{
+        padding: 12,
+        background: "rgba(34,197,94,0.10)",
+        border: "1px solid rgba(34,197,94,0.5)",
+        borderRadius: 10,
+        fontSize: 13, lineHeight: 1.7, marginBottom: 12,
+        display: "flex", alignItems: "center", gap: 10,
+      }}>
+        <span style={{
+          background: "#22c55e", color: "#fff",
+          padding: "2px 8px", borderRadius: 6,
+          fontSize: 11, fontWeight: 800,
+          animation: "stnd-pulse 1.5s infinite",
+        }}>🔴 LIVE</span>
+        <span>
+          התוצאות נמשכות אוטומטית מ‑API חיצוני בזמן אמת ({resultsCount} משחקים בטבלה).
+        </span>
+      </div>
+    );
+  }
+  if (source === "sim") {
+    return (
+      <div style={{
+        padding: 12,
+        background: "rgba(167,139,250,0.10)",
+        border: "1px solid rgba(167,139,250,0.5)",
+        borderRadius: 10,
+        fontSize: 13, lineHeight: 1.7, marginBottom: 12,
+      }}>
+        🧪 <strong>מצב סימולציה</strong> — {resultsCount} תוצאות אקראיות/משוקללות נוצרו לבדיקה.
+        כשהמונדיאל יתחיל באמת (11.6.2026): לחץ "🔄 אפס סימולציה" בלשונית 🧪 ניהול סימולציה,
+        ואז התוצאות האמיתיות ימשכו אוטומטית.
+      </div>
+    );
+  }
+  /* admin / mixed */
+  return (
+    <div style={{
+      padding: 10,
+      background: "rgba(0,212,255,0.08)",
+      border: "1px solid var(--accent)",
+      borderRadius: 10,
+      fontSize: 12, lineHeight: 1.6, marginBottom: 12,
+    }}>
+      ✓ <strong>תוצאות מאומתות</strong> — {resultsCount} תוצאות הוזנו ידנית או נמשכו מ‑live API.
+      הטבלאות מתעדכנות אוטומטית.
+    </div>
+  );
+}
+
+/* ===================================================================
+ * FifaRulesPanel — collapsible explanation of FIFA 2026 advancement rules
+ * =================================================================== */
+function FifaRulesPanel() {
+  return (
+    <details className="fifa-rules">
+      <summary>
+        <span>ℹ️ חוקיות העפלה — FIFA Mondial 2026</span>
+        <span className="muted" style={{ fontSize: 11, marginInlineStart: 8 }}>
+          לחץ לפתיחה
+        </span>
+      </summary>
+
+      <div className="fifa-rules-body">
+        {/* Format */}
+        <h4>🏆 פורמט הטורניר (48 קבוצות)</h4>
+        <ul>
+          <li><strong>שלב הבתים:</strong> 12 בתים של 4 קבוצות. כל קבוצה משחקת 3 משחקים.</li>
+          <li><strong>32 האחרונות:</strong> 32 קבוצות עולות בסך הכל —
+            <ul>
+              <li>🥇 <strong>המקום הראשון</strong> בכל בית (×12 = 12 קבוצות)</li>
+              <li>🥈 <strong>המקום השני</strong> בכל בית (×12 = 12 קבוצות)</li>
+              <li>🥉 <strong>8 המקומות השלישיים הטובים ביותר</strong> מבין 12 הבתים (×8 = 8 קבוצות)</li>
+            </ul>
+          </li>
+          <li><strong>נוקאאוט:</strong> 32 → 16 → 8 (רבע) → 4 (חצי) → גמר. בנוסף משחק על המקום ה‑3.</li>
+        </ul>
+
+        {/* Tiebreakers */}
+        <h4>⚖️ סדר ה‑Tiebreakers (במקרה של שוויון נקודות)</h4>
+        <ol>
+          <li><strong>נקודות</strong> — 3 לניצחון, 1 לתיקו, 0 להפסד.</li>
+          <li><strong>הפרש שערים</strong> — שערי זכות פחות שערי חובה.</li>
+          <li><strong>שערי זכות</strong> — סך השערים שהקבוצה הבקיעה.</li>
+          <li><strong>תוצאות פנים‑מול‑פנים</strong> בין הקבוצות השוות — נקודות, ואז הפרש שערים בהתמודדויות הישירות, ואז שערים בהתמודדויות.</li>
+          <li><strong>Fair Play</strong> — קבוצה עם פחות צהובים/אדומים. (לא מנוטר באפליקציה כעת.)</li>
+          <li><strong>הגרלה</strong> — אם כל השאר זהה, הפיפ"א מגרילה. (אנו משתמשים בסדר אלפבית כברירת מחדל לתצוגה.)</li>
+        </ol>
+
+        {/* 3rd-place mechanics */}
+        <h4>🥉 איך בוחרים את 8 המקומות השלישיים הטובים?</h4>
+        <p style={{ margin: "4px 0 6px" }}>
+          לאחר סיום שלב הבתים, כל 12 השלישיים מסודרים יחד באותו סדר tiebreakers (נקודות → הפרש → זכות → ...).
+          8 המובילים מהם עולים לשלב 32 האחרונות. 4 השלישיים האחרונים מסיימים את הטורניר.
+        </p>
+
+        {/* Color legend */}
+        <h4>🎨 מקרא צבעי עמודת המקום</h4>
+        <div className="fifa-legend">
+          <div><span className="fifa-leg-bar qual-q" /> <strong>ירוק</strong> — עולה ישירות (מקום 1-2)</div>
+          <div><span className="fifa-leg-bar qual-3" /> <strong>כתום</strong> — שלישית, מועמדת ל‑8 שלישיים הטובים</div>
+          <div><span className="fifa-leg-bar qual-e" /> <strong>אדום</strong> — מסיימת את הטורניר (מקום 4)</div>
+          <div><span className="fifa-leg-bar qual-p" /> <strong>אפור</strong> — עוד לא הסתיים (הבית בעיצומו)</div>
+        </div>
+
+        {/* Knockout */}
+        <h4>⚽ נוקאאוט — כללים בקצרה</h4>
+        <ul>
+          <li>אם תיקו אחרי 90 דקות — <strong>הארכה</strong> של 2×15 דקות.</li>
+          <li>אם עדיין תיקו — <strong>פנדלים</strong>. הזוכה בדו‑קרב מעפיל.</li>
+          <li>אין שלב נוסף — מהפסד = יציאה מהטורניר.</li>
+        </ul>
+
+        <p className="muted" style={{ fontSize: 11, marginTop: 10 }}>
+          📚 בהתאם לתקנון פיפ"א הרשמי למונדיאל 2026.
+        </p>
+      </div>
+    </details>
   );
 }

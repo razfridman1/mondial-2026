@@ -112,6 +112,11 @@ export default function SuperAdminPanel() {
         <summary>📅 גיבוי תוצאות יומי</summary>
         <LeaderboardSnapshots />
       </details>
+
+      <details className="adm-section">
+        <summary>🔴 סנכרון תוצאות חי (Live Sync)</summary>
+        <LiveSyncPanel />
+      </details>
     </section>
   );
 }
@@ -1039,6 +1044,126 @@ function LeaderboardSnapshots() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================ 9. LIVE SYNC ============================ */
+function LiveSyncPanel() {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [counts, setCounts] = useState<{ sim: number; admin: number; live: number; total: number } | null>(null);
+
+  async function loadCounts() {
+    try {
+      const r = await fetch("/api/match-results");
+      if (!r.ok) return;
+      const data = await r.json();
+      let sim = 0, admin = 0, live = 0;
+      Object.values(data).forEach((x: any) => {
+        if (x.source === "live") live++;
+        else if (x.source === "admin" || x.setByAdmin) admin++;
+        else if (x.sim) sim++;
+        else admin++;
+      });
+      setCounts({ sim, admin, live, total: Object.keys(data).length });
+    } catch {}
+  }
+  useEffect(() => { loadCounts(); }, []);
+
+  async function syncNow() {
+    setBusy(true); setResult(null);
+    try {
+      const r = await fetch("/api/cron/sync-results");
+      const data = await r.json();
+      setResult(data);
+      loadCounts();
+    } catch (e: any) {
+      setResult({ error: e?.message || String(e) });
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="adm-body">
+      <p className="muted" style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 10 }}>
+        🌐 <strong>סנכרון תוצאות חי מ‑API חיצוני.</strong> כשהמונדיאל יתחיל,
+        תוצאות אמיתיות יישלפו אוטומטית כל חצי שעה ויעדכנו את הטבלאות והדירוגים.
+      </p>
+
+      {counts && (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gap: 8, marginBottom: 14,
+        }}>
+          <div style={{ padding: 10, background: "rgba(34,197,94,0.10)", borderRadius: 8, textAlign: "center", border: "1px solid rgba(34,197,94,0.4)" }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#22c55e" }}>{counts.live}</div>
+            <div className="muted" style={{ fontSize: 11 }}>🔴 LIVE (אוטומטי)</div>
+          </div>
+          <div style={{ padding: 10, background: "rgba(0,212,255,0.08)", borderRadius: 8, textAlign: "center", border: "1px solid var(--accent)" }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "var(--accent)" }}>{counts.admin}</div>
+            <div className="muted" style={{ fontSize: 11 }}>✓ Admin (ידני)</div>
+          </div>
+          <div style={{ padding: 10, background: "rgba(167,139,250,0.10)", borderRadius: 8, textAlign: "center", border: "1px solid rgba(167,139,250,0.4)" }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "var(--purple)" }}>{counts.sim}</div>
+            <div className="muted" style={{ fontSize: 11 }}>🧪 Sim</div>
+          </div>
+          <div style={{ padding: 10, background: "var(--bg-elev)", borderRadius: 8, textAlign: "center" }}>
+            <div style={{ fontSize: 20, fontWeight: 800 }}>{counts.total}</div>
+            <div className="muted" style={{ fontSize: 11 }}>סה"כ</div>
+          </div>
+        </div>
+      )}
+
+      <div className="mc-actions">
+        <button className="btn btn-primary" onClick={syncNow} disabled={busy}>
+          {busy ? "…מסנכרן" : "🔄 סנכרן עכשיו"}
+        </button>
+        <button className="btn" onClick={loadCounts} disabled={busy}>↻ רענן ספירה</button>
+      </div>
+
+      {result && (
+        <div style={{
+          marginTop: 12, padding: 10,
+          background: result.error ? "rgba(239,68,68,0.10)" : result.skipped ? "rgba(245,158,11,0.10)" : "rgba(34,197,94,0.10)",
+          border: `1px solid ${result.error ? "rgba(239,68,68,0.4)" : result.skipped ? "rgba(245,158,11,0.4)" : "rgba(34,197,94,0.4)"}`,
+          borderRadius: 8, fontSize: 12, lineHeight: 1.6,
+        }}>
+          {result.error
+            ? <div>❌ <strong>שגיאה:</strong> {result.error} {result.message ? `· ${result.message}` : ""}</div>
+            : result.skipped
+              ? <div>⏸ <strong>דולג:</strong> {result.skipped}<br/>{result.docs && <em style={{ fontSize: 11 }}>{result.docs}</em>}</div>
+              : <div>
+                  ✓ <strong>סנכרון הושלם:</strong>
+                  <div style={{ marginTop: 4 }}>חדשים: {result.inserted || 0} · עודכנו: {result.updated || 0} · דולגו: {result.skipped || 0}</div>
+                </div>}
+        </div>
+      )}
+
+      <details style={{ marginTop: 14 }}>
+        <summary style={{ cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+          🔧 איך מפעילים סנכרון חי?
+        </summary>
+        <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.8, padding: 10, background: "var(--bg-elev)", borderRadius: 8 }}>
+          <p style={{ margin: "0 0 8px" }}>
+            <strong>1.</strong> הירשם לחשבון חינמי ב‑<a href="https://www.football-data.org" target="_blank" rel="noopener" style={{ color: "var(--accent)" }}>football-data.org</a> (או ספק דומה).
+          </p>
+          <p style={{ margin: "0 0 8px" }}>
+            <strong>2.</strong> ב‑Vercel Dashboard → Settings → Environment Variables, הוסף:
+            <br/><code style={{ background: "var(--bg-card)", padding: "2px 6px", borderRadius: 4 }}>FOOTBALL_API_KEY=<em>your_key</em></code>
+          </p>
+          <p style={{ margin: "0 0 8px" }}>
+            <strong>3.</strong> Redeploy. מעכשיו ה‑cron ירוץ אוטומטית כל 30 דקות וימשוך תוצאות אמיתיות.
+          </p>
+          <p style={{ margin: "0 0 8px" }}>
+            <strong>4.</strong> תוצאות חיות נשמרות עם <code>source: "live"</code> ולא ידרסו על‑ידי איפוס סימולציה.
+          </p>
+          <p style={{ margin: 0 }}>
+            <strong>📌 לפני המונדיאל:</strong> לחץ "🔄 אפס סימולציה" בלשונית 🧪 ניהול סימולציה
+            כדי לנקות תוצאות בדיקה (sim:true). תוצאות חיות חדשות יחליפו אותן אוטומטית.
+          </p>
+        </div>
+      </details>
     </div>
   );
 }

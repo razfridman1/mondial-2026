@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/snapshot-leaderboard",
       "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/cron/sync-results",
+      "schedule": "*/30 * * * *"
     }
   ],
   "headers": [
