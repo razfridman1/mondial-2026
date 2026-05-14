@@ -305,13 +305,26 @@ export default function MyPredictionsTab() {
         {STAGE_ORDER.map(s => {
           const info = stageAvail[s];
           const isLocked = info.locked;
+          /* Diagnostic: count how many previous-stage results are still missing */
+          const PREV: Record<string, StageId | null> = {
+            GROUP: null, R32: "GROUP", R16: "R32", QF: "R16", SF: "QF", THIRD: "SF", FINAL: "SF",
+          };
+          const prev = PREV[s];
+          let lockReason = "";
+          if (isLocked && prev) {
+            const prevMatches = MATCHES.filter(m => m.stage === prev);
+            const missing = prevMatches.filter(m => !results[m.id]).length;
+            lockReason = missing > 0
+              ? `חסרות ${missing}/${prevMatches.length} תוצאות ב‑${STAGES[prev].name}`
+              : "ממתין לחישוב — נסה לרענן";
+          }
           return (
             <button
               key={s}
               className={`mypred-stage-btn ${stage === s ? "on" : ""} ${isLocked ? "locked" : ""}`}
               onClick={() => !isLocked && setStage(s)}
               disabled={isLocked}
-              title={isLocked ? "השלב ייפתח כשהקבוצות ייקבעו" : ""}
+              title={isLocked ? `🔒 ${lockReason}` : ""}
             >
               <span className="mypred-stage-name">{STAGES[s].name}</span>
               <span className="mypred-stage-count">
