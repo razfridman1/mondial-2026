@@ -3899,3 +3899,54 @@ html[data-theme="light"] .chat-panel {
   .mt-card { padding: 12px; }
   .mt-day-header { padding: 4px 4px 2px; }
 }
+
+/* ---- Stage blocks in "by stage" view ---- */
+.mt-stage-block {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 32px;
+}
+.mt-stage-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 16px;
+  background: linear-gradient(135deg,
+    rgba(79, 125, 255, 0.14) 0%,
+    rgba(124, 77, 255, 0.10) 100%);
+  border: 1px solid rgba(79, 125, 255, 0.28);
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text, #e7ecff);
+  position: sticky;
+  top: 58px;            /* sit just below the section pill row */
+  z-index: 5;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+.mt-stage-title-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.mt-stage-title-text::before {
+  content: "🏆";
+  font-size: 18px;
+}
+.mt-stage-title-count {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.7;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+@media (max-width: 720px) {
+  .mt-stage-title { font-size: 15px; padding: 12px 14px; top: 54px; }
+  .mt-stage-title-count { font-size: 11px; padding: 3px 8px; }
+}

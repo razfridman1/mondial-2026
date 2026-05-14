@@ -4,12 +4,9 @@
  * Inspired by Sofascore / Flashscore / OneFootball.
  *
  * Sections (top pills):
+ *   על פי שלב — all matches grouped by tournament stage (default)
  *   חי   — currently live matches (pregame + live)
  *   היום — all matches today (regardless of status)
- *   הסתיימו — finished matches (most recent first)
- *   היסטוריה — full archive with filters
- *
- * Plus filters (date / stage / team) and a Favorites star toggle to focus
  *
  * Designed mobile-first; dark glassmorphism aesthetic.
  * ===================================================================*/
@@ -21,25 +18,32 @@ import {
   matchLiveStatus, relativeLabel,
 } from "@/lib/utils";
 import { effMatch } from "@/lib/sim";
-import type { Match } from "@/lib/types";
+import type { Match, StageId } from "@/lib/types";
 import MatchModal from "./MatchModal";
 import MatchCard from "./MatchCard";
 
-type Section = "groups" | "live" | "today" | "finished" | "history";
+type Section = "stages" | "live" | "today";
+
+/* Stage display order + Hebrew titles used in the "by stage" view. */
+const STAGE_ORDER: StageId[] = ["GROUP", "R32", "R16", "QF", "SF", "THIRD", "FINAL"];
+const STAGE_TITLES: Record<StageId, string> = {
+  GROUP: "שלב הבתים",
+  R32:   "32 אחרונות",
+  R16:   "שמינית גמר",
+  QF:    "רבע גמר",
+  SF:    "חצי גמר",
+  THIRD: "משחק על המקום השלישי",
+  FINAL: "הגמר",
+};
 
 export default function MatchesTab() {
   const overrides = useStore(s => s.overrides);
   const simConfig = useStore(s => s.simConfig);
 
-  const [section, setSection]   = useState<Section>("groups");
-  const [openId, setOpenId]     = useState<string | null>(null);
-  const [results, setResults]   = useState<Record<string, { home: number; away: number; finishedAt: number }>>({});
-  const [now, setNow]           = useState(() => Date.now());
-
-  /* Filters (used in history section) */
-  const [fltStage, setFltStage]  = useState<string>("");
-  const [fltTeam, setFltTeam]    = useState<string>("");
-  const [fltDay, setFltDay]      = useState<string>("");
+  const [section, setSection] = useState<Section>("stages");
+  const [openId, setOpenId]   = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, { home: number; away: number; finishedAt: number }>>({});
+  const [now, setNow]         = useState(() => Date.now());
 
   /* Live tick every 15s so live state updates */
   useEffect(() => {
@@ -73,75 +77,44 @@ export default function MatchesTab() {
     const today = todayKey();
     const live: Match[] = [];
     const todays: Match[] = [];
-    const finished: Match[] = [];
-
     for (const m of matches) {
       const st = matchLiveStatus(m);
       const key = israelDateKey(m.utc);
-
       if (st === "live" || st === "pregame") live.push(m);
       if (key === today) todays.push(m);
-      if (st === "finished") finished.push(m);
     }
-    /* Finished: newest first */
-    finished.sort((a, b) => +new Date(b.utc) - +new Date(a.utc));
-    return { live, today: todays, finished };
+    return { live, today: todays };
   }, [matches, now]);
 
-  /* History list with filters */
-  const historyList = useMemo(() => {
-    let list = matches.slice();
-    if (fltStage) list = list.filter(m => m.stage === fltStage);
-    if (fltTeam)  list = list.filter(m => m.home === fltTeam || m.away === fltTeam);
-    if (fltDay)   list = list.filter(m => israelDateKey(m.utc) === fltDay);
-    return list;
-  }, [matches, fltStage, fltTeam, fltDay]);
-
-  /* Visible list based on section */
   const visible: Match[] = useMemo(() => {
     switch (section) {
-      case "live":     return buckets.live;
-      case "today":    return buckets.today;
-      case "finished": return buckets.finished;
-      case "history":  return historyList;
-      default:         return buckets.today;
+      case "live":  return buckets.live;
+      case "today": return buckets.today;
+      default:      return buckets.today;
     }
-  }, [section, buckets, historyList]);
+  }, [section, buckets]);
 
   const counts = {
     live: buckets.live.length,
     today: buckets.today.length,
-    finished: buckets.finished.length,
   };
 
   return (
     <section className="matches-tab">
       {/* Section pills */}
       <nav className="mt-sections" role="tablist" aria-label="קטגוריות">
-        <PillBtn active={section === "groups"}   onClick={() => setSection("groups")}
-                 icon="📋" label="שלב הבתים" />
-        <PillBtn active={section === "live"}     onClick={() => setSection("live")}
-                 icon={<LiveDot />} label="חי"      badge={counts.live} highlight />
-        <PillBtn active={section === "today"}    onClick={() => setSection("today")}
-                 icon="📅" label="היום"   badge={counts.today} />
-        <PillBtn active={section === "finished"} onClick={() => setSection("finished")}
-                 icon="🏁" label="הסתיימו" badge={counts.finished} />
-        <PillBtn active={section === "history"}  onClick={() => setSection("history")}
-                 icon="🗂" label="היסטוריה" />
+        <PillBtn active={section === "stages"} onClick={() => setSection("stages")}
+                 icon="📋" label="משחקים על פי שלב" />
+        <PillBtn active={section === "live"}   onClick={() => setSection("live")}
+                 icon={<LiveDot />} label="חי" badge={counts.live} highlight />
+        <PillBtn active={section === "today"}  onClick={() => setSection("today")}
+                 icon="📅" label="היום"        badge={counts.today} />
       </nav>
-
-      {/* History filters */}
-      {section === "history" && <HistoryFilters
-        stage={fltStage} setStage={setFltStage}
-        team={fltTeam}   setTeam={setFltTeam}
-        day={fltDay}     setDay={setFltDay}
-        matches={matches}
-      />}
 
       {/* List body */}
       <div className="mt-body">
-        {section === "groups" ? (
-          <GroupStageSchedule matches={matches} onOpen={setOpenId} />
+        {section === "stages" ? (
+          <AllStagesSchedule matches={matches} onOpen={setOpenId} />
         ) : visible.length === 0 ? (
           <EmptyState section={section} />
         ) : (
@@ -174,82 +147,57 @@ function PillBtn({ active, onClick, icon, label, badge, highlight }: {
 
 function LiveDot() { return <span className="mt-live-dot" aria-hidden /> ; }
 
-function HistoryFilters({ stage, setStage, team, setTeam, day, setDay, matches }: {
-  stage: string; setStage: (v: string) => void;
-  team: string; setTeam: (v: string) => void;
-  day: string; setDay: (v: string) => void;
-  matches: Match[];
-}) {
-  const days = useMemo(
-    () => [...new Set(matches.map(m => israelDateKey(m.utc)))].sort(),
-    [matches]
-  );
-  function clear() { setStage(""); setTeam(""); setDay(""); }
-  const any = stage || team || day;
-  return (
-    <div className="mt-filters">
-      <select value={stage} onChange={e => setStage(e.target.value)} aria-label="שלב">
-        <option value="">כל השלבים</option>
-        {Object.values(STAGES).sort((a, b) => a.order - b.order)
-          .map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
-      <select value={team} onChange={e => setTeam(e.target.value)} aria-label="קבוצה">
-        <option value="">כל הקבוצות</option>
-        {Object.values(TEAMS).sort((a, b) => a.name.localeCompare(b.name, "he"))
-          .map(t => <option key={t.code} value={t.code}>{t.flag} {t.name}</option>)}
-      </select>
-      <select value={day} onChange={e => setDay(e.target.value)} aria-label="תאריך">
-        <option value="">כל הימים</option>
-        {days.map(d => (
-          <option key={d} value={d}>{formatIsraelDate(`${d}T12:00:00Z`, { short: true })}</option>
-        ))}
-      </select>
-      {any && <button className="mt-filter-clear" onClick={clear}>נקה</button>}
-    </div>
-  );
-}
-
-/* ----------- Group-stage classic schedule (old MatchCard view) ----- */
-function GroupStageSchedule({ matches, onOpen }: {
+/* ----------- All-stages schedule (classic MatchCard view) ----------- */
+function AllStagesSchedule({ matches, onOpen }: {
   matches: Match[];
   onOpen: (id: string) => void;
 }) {
-  /* All group-stage matches grouped by day, sorted chronologically. */
-  const groupMatches = useMemo(() => {
-    const list = matches.filter(m => m.stage === "GROUP")
-      .sort((a, b) => +new Date(a.utc) - +new Date(b.utc));
-    const byDay = new Map<string, Match[]>();
-    for (const m of list) {
-      const k = israelDateKey(m.utc);
-      if (!byDay.has(k)) byDay.set(k, []);
-      byDay.get(k)!.push(m);
-    }
-    return [...byDay.entries()];
+  /* Group matches by stage, then by day (within each stage). */
+  const stageBlocks = useMemo(() => {
+    return STAGE_ORDER.map(sid => {
+      const list = matches.filter(m => m.stage === sid)
+        .sort((a, b) => +new Date(a.utc) - +new Date(b.utc));
+      const byDay = new Map<string, Match[]>();
+      for (const m of list) {
+        const k = israelDateKey(m.utc);
+        if (!byDay.has(k)) byDay.set(k, []);
+        byDay.get(k)!.push(m);
+      }
+      return { stage: sid, byDay: [...byDay.entries()], count: list.length };
+    }).filter(b => b.count > 0);
   }, [matches]);
 
-  if (groupMatches.length === 0) {
+  if (stageBlocks.length === 0) {
     return (
       <div className="mt-empty">
         <div className="mt-empty-icon" aria-hidden>⚽</div>
-        <div>אין משחקי שלב הבתים בסינון הנוכחי</div>
+        <div>אין משחקים</div>
       </div>
     );
   }
 
   return (
     <>
-      {groupMatches.map(([day, ms]) => (
-        <section key={day} className="day-section">
-          <h3 className="day-heading hide-on-mobile">
-            <span>{formatIsraelDate(ms[0].utc)}</span>
-            {relativeLabel(ms[0].utc) && (
-              <span className="chip chip-strong">{relativeLabel(ms[0].utc)}</span>
-            )}
-            <span className="muted">{ms.length} משחקים</span>
-          </h3>
-          <div className="card-grid">
-            {ms.map(m => <MatchCard key={m.id} match={m} onOpen={onOpen} />)}
-          </div>
+      {stageBlocks.map(block => (
+        <section key={block.stage} className="mt-stage-block">
+          <h2 className="mt-stage-title">
+            <span className="mt-stage-title-text">{STAGE_TITLES[block.stage]}</span>
+            <span className="mt-stage-title-count">{block.count} משחקים</span>
+          </h2>
+          {block.byDay.map(([day, ms]) => (
+            <section key={day} className="day-section">
+              <h3 className="day-heading hide-on-mobile">
+                <span>{formatIsraelDate(ms[0].utc)}</span>
+                {relativeLabel(ms[0].utc) && (
+                  <span className="chip chip-strong">{relativeLabel(ms[0].utc)}</span>
+                )}
+                <span className="muted">{ms.length} משחקים</span>
+              </h3>
+              <div className="card-grid">
+                {ms.map(m => <MatchCard key={m.id} match={m} onOpen={onOpen} />)}
+              </div>
+            </section>
+          ))}
         </section>
       ))}
     </>
@@ -257,11 +205,9 @@ function GroupStageSchedule({ matches, onOpen }: {
 }
 
 function EmptyState({ section }: { section: Section }) {
-  const msg = section === "live"     ? "אין משחקים חיים כרגע"
-            : section === "today"    ? "אין משחקים היום"
-            : section === "groups"   ? "אין משחקי שלב הבתים"
-            : section === "finished" ? "עוד אין משחקים שהסתיימו"
-            :                          "לא נמצאו משחקים לפי הסינון";
+  const msg = section === "live"  ? "אין משחקים חיים כרגע"
+            : section === "today" ? "אין משחקים היום"
+            :                       "אין משחקים";
   return (
     <div className="mt-empty">
       <div className="mt-empty-icon" aria-hidden>⚽</div>
