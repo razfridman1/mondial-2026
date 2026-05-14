@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
 import { MATCHES, TEAMS } from "@/lib/data";
+import { resolveAllStages } from "@/lib/bracket";
+import type { MatchResult } from "@/lib/standings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,6 +65,19 @@ export async function GET(req: Request) {
     const externalMatches: any[] = data.matches || [];
 
     const { db } = getAdmin();
+
+    /* Build the bracket resolver from EXISTING results so we know which
+     * real team is playing each knockout match. This lets us match
+     * external knockout fixtures (which have real team names) to our
+     * placeholder-driven matches (1A, W R32-1, etc). */
+    const existingResSnap = await db.collection("match_results").get();
+    const existingResults: Record<string, MatchResult> = {};
+    existingResSnap.forEach(d => {
+      const data = d.data() as any;
+      existingResults[d.id] = { home: data.home, away: data.away, finishedAt: data.finishedAt || 0 };
+    });
+    const resolved = resolveAllStages(existingResults);
+
     let inserted = 0, updated = 0, skipped = 0;
     let batch = db.batch();
     let ops = 0;
@@ -71,7 +86,7 @@ export async function GET(req: Request) {
       if (ext.status !== "FINISHED" && ext.status !== "LIVE" && ext.status !== "IN_PLAY") continue;
       if (!ext.score || ext.score.fullTime?.home == null || ext.score.fullTime?.away == null) continue;
 
-      const ourMatch = findOurMatch(ext);
+      const ourMatch = findOurMatch(ext, resolved);
       if (!ourMatch) { skipped++; continue; }
 
       const ref = db.collection("match_results").doc(ourMatch.id);
@@ -105,22 +120,50 @@ export async function GET(req: Request) {
 }
 
 /* Map an external match (football-data.org schema) to our MATCHES entry.
- * Strategy: match by UTC date (Israel-aware) + both teams by name. */
-function findOurMatch(ext: any): { id: string } | null {
+ * Strategy:
+ *   - Group stage: match by date + both teams by name (teams are real codes).
+ *   - Knockouts: use the bracket resolver to know which real teams ARE in
+ *     each placeholder slot, then match by date + both teams.
+ *
+ * Direction-agnostic: external feed may have home/away swapped relative
+ * to our scheduled order, so we accept either order.
+ */
+function findOurMatch(
+  ext: any,
+  resolved: Record<string, { home: string; away: string; winner: string; loser: string }>,
+): { id: string } | null {
   const extDate = ext.utcDate ? new Date(ext.utcDate).toISOString().slice(0, 10) : null;
   const extHome = (ext.homeTeam?.name || "").toLowerCase();
   const extAway = (ext.awayTeam?.name || "").toLowerCase();
   if (!extDate || !extHome || !extAway) return null;
 
+  function nameMatches(code: string | undefined, ext: string): boolean {
+    if (!code) return false;
+    const t = TEAMS[code];
+    if (!t) return false;
+    const en = t.nameEn.toLowerCase();
+    return en === ext || ext.includes(en) || en.includes(ext);
+  }
+
   for (const m of MATCHES) {
-    if (m.stage !== "GROUP") continue; /* knockouts have placeholders; skip auto-mapping */
     const ourDate = new Date(m.utc).toISOString().slice(0, 10);
     if (ourDate !== extDate) continue;
-    const home = TEAMS[m.home];
-    const away = TEAMS[m.away];
-    const homeMatch = home && (home.nameEn.toLowerCase() === extHome || extHome.includes(home.nameEn.toLowerCase()));
-    const awayMatch = away && (away.nameEn.toLowerCase() === extAway || extAway.includes(away.nameEn.toLowerCase()));
-    if (homeMatch && awayMatch) return { id: m.id };
+
+    /* For group stage, m.home/m.away are real team codes. For knockouts,
+     * pull the resolved codes from the bracket resolver. */
+    let homeCode = m.home;
+    let awayCode = m.away;
+    if (m.stage !== "GROUP") {
+      const r = resolved[m.id];
+      if (!r || !r.home || !r.away) continue; /* not yet resolved → skip */
+      homeCode = r.home;
+      awayCode = r.away;
+    }
+
+    /* Try both orderings — football-data may swap home/away. */
+    const matchDirect = nameMatches(homeCode, extHome) && nameMatches(awayCode, extAway);
+    const matchSwap   = nameMatches(homeCode, extAway) && nameMatches(awayCode, extHome);
+    if (matchDirect || matchSwap) return { id: m.id };
   }
   return null;
 }
