@@ -321,6 +321,13 @@ function GroupLeaderboardCard({
     } finally { setLoading(false); }
   }
   useEffect(() => { if (open) load(); }, [groupId, open]);
+  /* Auto-refresh every 20s when card is open so leaderboards reflect
+   * recent prediction / result updates (e.g. from the sim panel). */
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(load, 20_000);
+    return () => clearInterval(id);
+  }, [groupId, open]);
 
   return (
     <div style={{

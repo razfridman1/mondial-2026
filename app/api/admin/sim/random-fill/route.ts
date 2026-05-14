@@ -92,8 +92,11 @@ export async function POST(req: Request) {
   }
 
   /* Bulk-fill — random 0-3 scores. Use batched writes for speed.
-   * For KO matches, also include a random `predictedWinner` (so tied
-   * 90-min predictions still have a "who advances" pick). */
+   * For KO matches, also include a `predictedWinner`. The team CODE
+   * stored must be a REAL team code (e.g. "BRA"), NOT the bracket
+   * placeholder string ("1A", "W R32-1"). We resolve via the bracket
+   * resolver so the winner matches the actualWinner that will be stored
+   * when results are simulated. */
   const now = Date.now();
   let filled = 0;
   let batch = db.batch();
@@ -113,10 +116,14 @@ export async function POST(req: Request) {
         auto: true,
       };
       if (isKO) {
-        /* If score not tied → winner is implied; otherwise random pick. */
-        if (h > a)      payload.predictedWinner = m.home;
-        else if (a > h) payload.predictedWinner = m.away;
-        else            payload.predictedWinner = Math.random() < 0.5 ? m.home : m.away;
+        /* Use resolved (real) team codes when the bracket has been resolved
+         * for this match; fall back to placeholders only if unresolvable. */
+        const r = resolved[m.id];
+        const homeCode = (r && TEAMS[r.home]) ? r.home : m.home;
+        const awayCode = (r && TEAMS[r.away]) ? r.away : m.away;
+        if (h > a)      payload.predictedWinner = homeCode;
+        else if (a > h) payload.predictedWinner = awayCode;
+        else            payload.predictedWinner = Math.random() < 0.5 ? homeCode : awayCode;
       }
       const ref = db.collection("predictions").doc(`${uid}_${m.id}`);
       batch.set(ref, payload, { merge: true });
