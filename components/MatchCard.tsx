@@ -54,6 +54,11 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
         </div>
       </header>
 
+      {/* Mobile-only: prominent day + date banner inside the card */}
+      <div className="mc-date-mobile">
+        📅 {formatIsraelDate(match.utc)}
+      </div>
+
       <div className="mc-body">
         <div className="team team-home">
           <span className="flag">{home.flag}</span>
@@ -85,7 +90,7 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
         const p = oddsToProbabilities(match.odds);
         if (!p) return null;
         return (
-          <div className="odds">
+          <div className="odds hide-on-mobile">
             <div className="odd"><span className="odd-k">1</span><span className="odd-v">{p.home}%</span></div>
             <div className="odd"><span className="odd-k">X</span><span className="odd-v">{p.draw}%</span></div>
             <div className="odd"><span className="odd-k">2</span><span className="odd-v">{p.away}%</span></div>

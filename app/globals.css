@@ -1493,12 +1493,55 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 /* ====================================================================
-   MOBILE-ONLY HIDDEN TABS / CHAT FAB / GENERIC HIDE
+   MOBILE-ONLY HIDDEN TABS / CHAT FAB / GENERIC HIDE + LAYOUT
    ==================================================================== */
 @media (max-width: 720px) {
   .tab-hide-mobile { display: none !important; }
   .chat-fab { display: none !important; }
   .hide-on-mobile { display: none !important; }
+
+  /* Nav tabs: 2-column grid with big tap targets on mobile */
+  .tabs {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    overflow: visible !important;
+    margin-top: 12px;
+    padding: 0 12px;
+  }
+  .tab-btn {
+    padding: 16px 10px !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    border-bottom-width: 1px !important;
+    background: var(--bg-card) !important;
+    text-align: center;
+    min-height: 56px;
+  }
+  .tab-btn.on {
+    background: linear-gradient(135deg, var(--primary), var(--primary-2)) !important;
+    color: #fff !important;
+    border-color: var(--primary) !important;
+  }
+}
+
+/* Mobile-only prominent date banner inside each match card */
+.mc-date-mobile { display: none; }
+@media (max-width: 720px) {
+  .mc-date-mobile {
+    display: block;
+    text-align: center;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(0,212,255,0.12), rgba(46,107,255,0.08));
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
 }
 
 /* Header name button — looks like a chip but acts as a button */

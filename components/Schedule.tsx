@@ -66,7 +66,7 @@ function CardView({ list, onOpen }: { list: Match[]; onOpen: (id: string) => voi
     <>
       {[...byDay.entries()].map(([day, matches]) => (
         <section key={day} className="day-section">
-          <h3 className="day-heading">
+          <h3 className="day-heading hide-on-mobile">
             <span>{formatIsraelDate(matches[0].utc)}</span>
             {relativeLabel(matches[0].utc) && <span className="chip chip-strong">{relativeLabel(matches[0].utc)}</span>}
             <span className="muted">{matches.length} משחקים</span>
