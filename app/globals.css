@@ -4302,3 +4302,53 @@ html[data-theme="light"] .chat-panel {
   .header-domain:hover { transform: scale(1.05); }
   .header-top { flex-direction: column; align-items: center; }
 }
+
+/* ---- Clickable team cell in standings table ---- */
+.stnd-team-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 8px;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  text-align: right;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.stnd-team-btn:hover {
+  background: rgba(79, 125, 255, 0.12);
+}
+.stnd-team-btn:active {
+  transform: scale(0.97);
+}
+.stnd-team-btn::after {
+  content: "→";
+  opacity: 0;
+  margin-inline-start: 4px;
+  color: var(--accent, #4f7dff);
+  transition: opacity 0.15s ease;
+  font-size: 12px;
+}
+.stnd-team-btn:hover::after { opacity: 0.7; }
+
+/* ---- TeamDetail modal (opened from standings) ---- */
+.team-detail-modal {
+  max-width: 920px;
+  width: 96%;
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 20px;
+  background: var(--bg-card, #1a1f30);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.team-detail-modal .team-detail { padding: 0; }
+@media (max-width: 720px) {
+  .team-detail-modal { padding: 14px; max-height: 95vh; }
+}

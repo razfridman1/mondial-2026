@@ -14,8 +14,10 @@ import {
 import { resolveAllStages, stageComplete } from "@/lib/bracket";
 import { applyOverride, formatIsraelDate, formatIsraelTime, matchLiveStatus } from "@/lib/utils";
 import { effectiveUtc } from "@/lib/sim";
-import type { StageId } from "@/lib/types";
+import { TEAMS } from "@/lib/data";
+import type { StageId, Team } from "@/lib/types";
 import MatchModal from "./MatchModal";
+import TeamDetail from "./TeamDetail";
 
 const STAGE_ORDER: StageId[] = ["GROUP", "R32", "R16", "QF", "SF", "THIRD", "FINAL"];
 
@@ -30,6 +32,7 @@ export default function StandingsTab() {
   const [results, setResults] = useState<Record<string, MatchResult>>({});
   const [now, setNow] = useState(Date.now());
   const [openMatchId, setOpenMatchId] = useState<string | null>(null);
+  const [openTeam, setOpenTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
 
   /* Load match results from server */
@@ -138,6 +141,7 @@ export default function StandingsTab() {
               results={results}
               now={now}
               onOpenMatch={(id) => setOpenMatchId(id)}
+              onOpenTeam={(code) => { const t = TEAMS[code]; if (t) setOpenTeam(t); }}
             />
           ))}
         </div>
@@ -154,6 +158,19 @@ export default function StandingsTab() {
       {openMatchId && (
         <MatchModal matchId={openMatchId} onClose={() => setOpenMatchId(null)} />
       )}
+
+      {/* Team detail modal — same content as the Teams tab */}
+      {openTeam && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setOpenTeam(null)}>
+          <div className="modal team-detail-modal" onClick={e => e.stopPropagation()}>
+            <TeamDetail
+              team={openTeam}
+              onBack={() => setOpenTeam(null)}
+              backLabel="× סגור"
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -162,12 +179,13 @@ export default function StandingsTab() {
  * GroupCard — single group's standings table
  * =================================================================== */
 function GroupCard({
-  letter, results, now, onOpenMatch,
+  letter, results, now, onOpenMatch, onOpenTeam,
 }: {
   letter: string;
   results: Record<string, MatchResult>;
   now: number;
   onOpenMatch: (id: string) => void;
+  onOpenTeam: (teamCode: string) => void;
 }) {
   const standings = useMemo(() => computeGroupStandings(letter, results), [letter, results]);
 
@@ -197,7 +215,7 @@ function GroupCard({
           </thead>
           <tbody>
             {standings.map(s => (
-              <StandingRow key={s.teamCode} s={s} onOpenMatch={onOpenMatch} />
+              <StandingRow key={s.teamCode} s={s} onOpenMatch={onOpenMatch} onOpenTeam={onOpenTeam} />
             ))}
           </tbody>
         </table>
@@ -207,10 +225,11 @@ function GroupCard({
 }
 
 function StandingRow({
-  s, onOpenMatch,
+  s, onOpenMatch, onOpenTeam,
 }: {
   s: TeamStanding;
   onOpenMatch: (id: string) => void;
+  onOpenTeam: (teamCode: string) => void;
 }) {
   const qualClass =
     s.qualificationStatus === "qualified"   ? "qual-q"  :
@@ -231,8 +250,15 @@ function StandingRow({
         {movement === "down" && <span className="stnd-arrow down" title="ירידה במיקום">▼</span>}
       </td>
       <td className="stnd-team">
-        <span className="stnd-flag">{s.teamFlag}</span>
-        <span className="stnd-name">{s.teamName}</span>
+        <button
+          type="button"
+          className="stnd-team-btn"
+          onClick={() => onOpenTeam(s.teamCode)}
+          title="לחץ לפרטי הקבוצה: סגל, מערך, ושחקנים"
+        >
+          <span className="stnd-flag">{s.teamFlag}</span>
+          <span className="stnd-name">{s.teamName}</span>
+        </button>
       </td>
       <td className="stnd-matches">
         <div className="stnd-chips">
