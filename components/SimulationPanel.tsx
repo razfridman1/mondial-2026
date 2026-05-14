@@ -665,9 +665,13 @@ export default function SimulationPanel() {
         <div className="sim-row">
           <label>
             <input type="checkbox" checked={includePh} onChange={e => setIncludePh(e.target.checked)} disabled={busy} />
-            {" "}כלול משחקי נוקאאוט שעוד אין להם קבוצות (placeholder)
+            {" "}כלול גם משחקי נוקאאוט שעדיין לא נפתחו (הקבוצות שלהם לא ידועות)
           </label>
         </div>
+        <p className="muted" style={{ fontSize: 11, margin: "4px 0 8px", lineHeight: 1.5 }}>
+          💡 ברירת מחדל: רק שלבי נוקאאוט ש<strong>נפתחו</strong> (השלב הקודם הסתיים) נכללים.
+          סמן את הצ׳קבוקס כדי לכלול גם משחקים שעוד placeholder (1A, 2B...).
+        </p>
 
         <div style={{ marginTop: 14, padding: 12, background: "var(--bg-elev)", borderRadius: 10 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>שלב 1️⃣ — ניחושים</div>

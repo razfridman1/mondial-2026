@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
-import { MATCHES } from "@/lib/data";
+import { MATCHES, TEAMS } from "@/lib/data";
 import type { StageId } from "@/lib/types";
+import { resolveAllStages } from "@/lib/bracket";
+import type { MatchResult } from "@/lib/standings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,11 +46,21 @@ export async function POST(req: Request) {
   const uids = memSnap.docs.map(d => (d.data() as any).uid as string);
   if (!uids.length) return NextResponse.json({ ok: true, filled: 0, reason: "no members in group" });
 
-  /* Filter matches by stage */
+  /* Load current match results to know which knockout matches are "open"
+   * (i.e. the previous stage has finished and the teams are known). */
+  const resSnap = await db.collection("match_results").get();
+  const currentResults: Record<string, MatchResult> = {};
+  resSnap.forEach(d => {
+    const data = d.data() as any;
+    currentResults[d.id] = { home: data.home, away: data.away, finishedAt: data.finishedAt || 0 };
+  });
+  const resolved = resolveAllStages(currentResults);
+
+  /* Filter matches by stage. For knockouts, include the match if:
+   *   - includePlaceholders=true (admin explicitly wants all)
+   *   - OR the resolver has determined real team codes for it (previous stage done)
+   */
   let matches = MATCHES.slice();
-  if (!includePlaceholders) {
-    matches = matches.filter(m => !m.homeIsPlaceholder && !m.awayIsPlaceholder);
-  }
   if (stage && stage !== "ALL") {
     if (stage === "KNOCKOUT") {
       matches = matches.filter(m => m.stage !== "GROUP");
@@ -59,8 +71,22 @@ export async function POST(req: Request) {
     }
   }
 
+  /* Skip knockout matches whose teams aren't yet known — UNLESS user opts in */
+  if (!includePlaceholders) {
+    matches = matches.filter(m => {
+      if (m.stage === "GROUP") return true;
+      /* For knockouts: include only if the bracket resolver yielded real team codes. */
+      const r = resolved[m.id];
+      return !!r && !!TEAMS[r.home] && !!TEAMS[r.away];
+    });
+  }
+
   if (!matches.length) {
-    return NextResponse.json({ ok: true, filled: 0, reason: "no matches match the filter" });
+    return NextResponse.json({
+      ok: true,
+      filled: 0,
+      reason: "no matches match the filter — for knockouts, ensure the previous stage has all results in",
+    });
   }
 
   /* Bulk-fill — random 0-3 scores. Use batched writes for speed. */
