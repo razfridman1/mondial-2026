@@ -9,7 +9,9 @@ import {
   type TeamStanding,
   type MatchResult,
   type KnockoutMatchView,
+  type ResolvedBracket,
 } from "@/lib/standings";
+import { resolveAllStages, stageComplete, groupStageComplete } from "@/lib/bracket";
 import { applyOverride, formatIsraelDate, formatIsraelTime, matchLiveStatus } from "@/lib/utils";
 import { effectiveUtc } from "@/lib/sim";
 import type { StageId } from "@/lib/types";
@@ -60,6 +62,23 @@ export default function StandingsTab() {
   }, [results]);
 
   const groupLetters = useMemo(() => listGroupLetters(), []);
+
+  /* Resolve the full bracket once whenever results change.
+   * Used to display actual team names (instead of "1A", "2B") in knockout views. */
+  const resolved: ResolvedBracket = useMemo(() => resolveAllStages(results), [results]);
+
+  /* Has the previous stage finished? Used to display "stage is now unlocked" notices. */
+  const stagePrereqMet = useMemo(() => {
+    const PREV: Record<string, StageId | null> = {
+      GROUP: null, R32: "GROUP", R16: "R32", QF: "R16", SF: "QF", THIRD: "SF", FINAL: "SF",
+    };
+    const out: Record<string, boolean> = {};
+    STAGE_ORDER.forEach(s => {
+      const prev = PREV[s];
+      out[s] = !prev || stageComplete(prev, results);
+    });
+    return out;
+  }, [results]);
 
   /* Detect data source — sim vs admin vs live */
   const dataSource = useMemo(() => {
@@ -126,6 +145,8 @@ export default function StandingsTab() {
         <KnockoutView
           stage={stage}
           results={results}
+          resolved={resolved}
+          prereqMet={stagePrereqMet[stage]}
           onOpenMatch={(id) => setOpenMatchId(id)}
         />
       )}
@@ -269,30 +290,46 @@ function MatchChip({ c, onClick }: { c: any; onClick: () => void }) {
  * KnockoutView — bracket-style match cards for R32 / R16 / QF / SF / FINAL / THIRD
  * =================================================================== */
 function KnockoutView({
-  stage, results, onOpenMatch,
+  stage, results, resolved, prereqMet, onOpenMatch,
 }: {
   stage: StageId;
   results: Record<string, MatchResult>;
+  resolved: ResolvedBracket;
+  prereqMet: boolean;
   onOpenMatch: (id: string) => void;
 }) {
-  const matches = useMemo(() => listKnockoutMatches(stage, results), [stage, results]);
+  const matches = useMemo(
+    () => listKnockoutMatches(stage, results, resolved),
+    [stage, results, resolved]
+  );
 
   if (matches.length === 0) {
     return <div className="empty-state">אין משחקים בשלב הזה.</div>;
   }
 
   const allPlaceholder = matches.every(m => m.homeIsPlaceholder && m.awayIsPlaceholder);
+  const someResolved = matches.some(m => !m.homeIsPlaceholder || !m.awayIsPlaceholder);
 
   return (
     <div>
-      {allPlaceholder && (
+      {!prereqMet && (
         <div style={{
           padding: 12, marginBottom: 14,
           background: "rgba(245,158,11,0.08)",
           border: "1px solid rgba(245,158,11,0.3)",
           borderRadius: 10, fontSize: 13,
         }}>
-          ⏳ <strong>השלב יתעדכן</strong> אחרי שייקבעו הקבוצות מהשלב הקודם.
+          ⏳ <strong>השלב טרם נפתח</strong> — סיים את כל המשחקים בשלב הקודם וזה השלב יתעדכן אוטומטית עם הקבוצות שעלו.
+        </div>
+      )}
+      {prereqMet && someResolved && (
+        <div style={{
+          padding: 10, marginBottom: 14,
+          background: "rgba(34,197,94,0.08)",
+          border: "1px solid rgba(34,197,94,0.3)",
+          borderRadius: 10, fontSize: 12,
+        }}>
+          ✓ <strong>השלב נפתח</strong> — הקבוצות נקבעו אוטומטית לפי דירוג השלב הקודם וחוקי FIFA.
         </div>
       )}
 

@@ -269,15 +269,15 @@ export interface KnockoutMatchView {
   finished: boolean;
 }
 
+/** Type for the resolved-bracket table produced by `resolveAllStages` in lib/bracket.ts.
+ *  Defined here to avoid a circular import. */
+export type ResolvedBracket = Record<string, { home: string; away: string; winner: string; loser: string }>;
+
 export function listKnockoutMatches(
   stage: StageId,
-  results: Record<string, MatchResult & { homeTeam?: string; awayTeam?: string }>
+  results: Record<string, MatchResult & { homeTeam?: string; awayTeam?: string }>,
+  resolved: ResolvedBracket = {},
 ): KnockoutMatchView[] {
-  /* Lazy import to avoid circular dep at module load */
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { resolveAllStages } = require("./bracket");
-  const resolved = resolveAllStages(results);
-
   return MATCHES
     .filter(m => m.stage === stage)
     .sort((a, b) => +new Date(a.utc) - +new Date(b.utc))
