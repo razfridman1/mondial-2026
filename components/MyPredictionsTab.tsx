@@ -653,10 +653,14 @@ function PredictionRow({
             </span>
             <span className="mypred-result-pred">{prediction.homeScore} : {prediction.awayScore}</span>
             <span className={`mypred-result-pts ${score!.points > 0 ? "pos" : "zero"}`}>
-              {score!.points > 0 ? `+${score!.points}` : "0"} נק׳
+              ניקוד: {score!.points}
             </span>
             <span className="mypred-result-tag">
-              {score!.exact ? "🎯 מדויק!" : score!.resultCorrect ? "✅ תוצאה" : "❌ פספוס"}
+              {score!.exact
+                ? "🎯 פגיעה + תוצאה"
+                : score!.resultCorrect
+                  ? (score!.diffCorrect ? "✅ פגיעה + הפרש שערים" : "✅ פגיעה")
+                  : "❌ פספוס"}
             </span>
           </div>
         ) : (
