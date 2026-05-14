@@ -7,6 +7,7 @@ import { MATCHES, TEAMS, STAGES, VENUES } from "@/lib/data";
 import { applyOverride, formatIsraelDate, formatIsraelTime, matchLiveStatus } from "@/lib/utils";
 import { effectiveUtc } from "@/lib/sim";
 import { scorePrediction } from "@/lib/scoring";
+import { resolveAllStages, stageComplete } from "@/lib/bracket";
 import type { StageId, Match, LeaderRow } from "@/lib/types";
 import { AvatarDisplay } from "./AvatarPicker";
 
@@ -89,13 +90,36 @@ export default function MyPredictionsTab() {
     return () => clearInterval(id);
   }, [currentGroupId]);
 
-  /* Effective matches (with sim overrides) */
+  /* Effective matches (with sim overrides), then ENHANCE knockout placeholders
+   * with resolved team codes from the bracket — once the previous stage is fully
+   * complete (FIFA rule: next stage opens only when all previous-stage results are in). */
+  const resolved = useMemo(() => resolveAllStages(results), [results]);
+
   const matches = useMemo(
     () => MATCHES.map(m => {
       const eff = applyOverride(m, overrides[m.id]);
-      return { ...eff, utc: effectiveUtc(eff.utc, simConfig) };
+      const base = { ...eff, utc: effectiveUtc(eff.utc, simConfig) };
+      /* For knockouts, if the resolver returned real team codes (i.e. the
+       * previous stage has all results), swap placeholders for real codes. */
+      if (m.stage !== "GROUP") {
+        const r = resolved[m.id];
+        if (r) {
+          const homeIsReal = !!TEAMS[r.home];
+          const awayIsReal = !!TEAMS[r.away];
+          if (homeIsReal || awayIsReal) {
+            return {
+              ...base,
+              home: homeIsReal ? r.home : base.home,
+              away: awayIsReal ? r.away : base.away,
+              homeIsPlaceholder: !homeIsReal,
+              awayIsPlaceholder: !awayIsReal,
+            };
+          }
+        }
+      }
+      return base;
     }),
-    [overrides, simConfig]
+    [overrides, simConfig, resolved]
   );
 
   /* Matches grouped by stage */
@@ -108,7 +132,9 @@ export default function MyPredictionsTab() {
     return map;
   }, [matches]);
 
-  /* Available (non-placeholder) match count per stage */
+  /* Available (non-placeholder) match count per stage.
+   * Now reflects FIFA gating: a knockout stage stays "locked" until the
+   * previous stage is fully completed and the resolver has populated real teams. */
   const stageAvail = useMemo(() => {
     const out: Record<StageId, { open: number; total: number; locked: boolean }> = {} as any;
     STAGE_ORDER.forEach(s => {
