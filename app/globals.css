@@ -3997,3 +3997,49 @@ html[data-theme="light"] .chat-panel {
   .pred-result-val { font-size: 16px; }
   .pred-result-tag { font-size: 14px; }
 }
+
+/* ---- Floating "back to today" button (Matches tab, by-stage view) ---- */
+.mt-back-to-today {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 22px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #4f7dff 0%, #7c4dff 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(79, 125, 255, 0.45),
+              0 2px 6px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: mt-fab-in 0.25s ease-out;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.mt-back-to-today:hover {
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 12px 30px rgba(79, 125, 255, 0.55),
+              0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.mt-back-to-today:active {
+  transform: translateX(-50%) translateY(0);
+}
+@keyframes mt-fab-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Day-section scroll margin so sticky pills+title don't obscure the heading
+ * when scrollIntoView happens organically (e.g. via deep links). */
+.day-section { scroll-margin-top: 120px; }
+
+@media (max-width: 720px) {
+  .mt-back-to-today { bottom: 16px; padding: 11px 18px; font-size: 13px; }
+}

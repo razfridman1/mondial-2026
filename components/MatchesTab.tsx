@@ -53,23 +53,29 @@ export default function MatchesTab() {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const didInitialScroll = useRef(false);
   const [todayVisible, setTodayVisible] = useState(true);
-  const [hasTodayInView, setHasTodayInView] = useState(false);
 
   function scrollToToday(behavior: ScrollBehavior = "smooth") {
     const root = bodyRef.current;
-    if (!root) return;
+    if (!root) return false;
     const t = todayKey();
+    /* Clearance for the sticky section-pills row + sticky stage title above. */
+    const OFFSET = 120;
+    function jumpTo(el: HTMLElement) {
+      const rect = el.getBoundingClientRect();
+      const y = window.scrollY + rect.top - OFFSET;
+      window.scrollTo({ top: Math.max(0, y), behavior });
+    }
     const el = root.querySelector<HTMLElement>(`[data-date="${t}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior, block: "start" });
-      return true;
-    }
-    /* If today has no matches, jump to the closest upcoming day. */
-    const future = root.querySelectorAll<HTMLElement>("[data-date]");
-    for (const node of Array.from(future)) {
+    if (el) { jumpTo(el); return true; }
+    /* No matches today → jump to the nearest upcoming day. */
+    const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-date]"));
+    for (const node of nodes) {
       const d = node.getAttribute("data-date") || "";
-      if (d >= t) { node.scrollIntoView({ behavior, block: "start" }); return true; }
+      if (d >= t) { jumpTo(node); return true; }
     }
+    /* Otherwise (no future day either — tournament finished), jump to the last day. */
+    const last = nodes[nodes.length - 1];
+    if (last) { jumpTo(last); return true; }
     return false;
   }
 
@@ -140,6 +146,43 @@ export default function MatchesTab() {
     today: buckets.today.length,
   };
 
+  /* After the stages view renders, scroll to today's section ONCE on mount. */
+  useEffect(() => {
+    if (section !== "stages") return;
+    if (didInitialScroll.current) return;
+    /* Wait one tick so the layout finishes painting (sticky pills get a height). */
+    const t = setTimeout(() => {
+      const ok = scrollToToday("auto"); // auto (instant) on first load
+      if (ok) didInitialScroll.current = true;
+    }, 80);
+    return () => clearTimeout(t);
+  }, [section, matches]);
+
+  /* Hide the floating "back to today" button when today's section is already
+   * in view. Falls back to "any matches at all" check otherwise. */
+  useEffect(() => {
+    if (section !== "stages") { setTodayVisible(true); return; }
+    const root = bodyRef.current;
+    if (!root) { setTodayVisible(true); return; }
+    const t = todayKey();
+    /* Find the element to watch: today's section, else closest upcoming. */
+    const exact = root.querySelector<HTMLElement>(`[data-date="${t}"]`);
+    let target: HTMLElement | null = exact;
+    if (!target) {
+      const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-date]"));
+      target = nodes.find(n => (n.getAttribute("data-date") || "") >= t) || null;
+    }
+    if (!target) { setTodayVisible(true); return; }
+    const io = new IntersectionObserver(
+      entries => { for (const e of entries) setTodayVisible(e.isIntersecting); },
+      { rootMargin: "-100px 0px -40% 0px", threshold: 0 }
+    );
+    io.observe(target);
+    return () => io.disconnect();
+  }, [section, matches]);
+
+  const showBackToToday = section === "stages" && !todayVisible;
+
   return (
     <section className="matches-tab">
       {/* Section pills */}
@@ -153,7 +196,7 @@ export default function MatchesTab() {
       </nav>
 
       {/* List body */}
-      <div className="mt-body">
+      <div className="mt-body" ref={bodyRef}>
         {section === "stages" ? (
           <AllStagesSchedule matches={matches} onOpen={setOpenId} />
         ) : visible.length === 0 ? (
@@ -163,6 +206,15 @@ export default function MatchesTab() {
                        onOpen={setOpenId} />
         )}
       </div>
+
+      {/* Floating "back to today" button — visible only when today's section
+       * exists but is currently off-screen. */}
+      {showBackToToday && (
+        <button className="mt-back-to-today" onClick={() => scrollToToday("smooth")}
+                aria-label="חזור להיום">
+          🎯 חזור להיום
+        </button>
+      )}
 
       {openId && <MatchModal matchId={openId} onClose={() => setOpenId(null)} />}
     </section>
