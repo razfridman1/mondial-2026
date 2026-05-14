@@ -15,6 +15,10 @@
     {
       "path": "/api/auto-predict",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/admin/simulation/tick",
+      "schedule": "* * * * *"
     }
   ],
   "headers": [

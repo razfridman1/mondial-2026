@@ -98,6 +98,22 @@ export default function MatchesTab() {
     return () => clearInterval(id);
   }, [simConfig?.enabled, refreshMatchResults]);
 
+  /* While simulation is active, drive the server-side tick worker from the
+   * client every 3s. The tick endpoint is idempotent and scans for matches
+   * whose simulated 115-minute window has elapsed and writes a random result.
+   * Vercel cron also runs this once a minute, but for fast sims we need
+   * more granular ticks so users see results appear in near real-time. */
+  useEffect(() => {
+    if (!simConfig?.enabled) return;
+    let cancelled = false;
+    async function pump() {
+      try { await fetch("/api/admin/simulation/tick", { cache: "no-store" }); } catch {}
+    }
+    pump();
+    const id = setInterval(() => { if (!cancelled) pump(); }, 3_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [simConfig?.enabled]);
+
   /* Resolve knockout placeholders to real team codes once previous stages finish. */
   const resolved = useMemo(() => resolveAllStages(matchResults), [matchResults]);
 

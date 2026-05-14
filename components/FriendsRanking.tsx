@@ -183,15 +183,22 @@ export default function FriendsRanking() {
           gap: 14,
           alignItems: "start",
         }}>
-          {leaderboardGroups.map(g => (
-            <GroupLeaderboardCard
-              key={g.id}
-              groupId={g.id}
-              groupName={g.name}
-              myUid={user.uid}
-              predictionRows={g.id === currentGroupId ? rows : []}
-            />
-          ))}
+          {leaderboardGroups.map(g => {
+            /* `g` may come from store `groups` (has inviteCode) OR from
+             * `adminAllGroups` (id/name only). Look up the invite code from
+             * the user's own group list when available. */
+            const fullGroup = groups.find(x => x.id === g.id);
+            return (
+              <GroupLeaderboardCard
+                key={g.id}
+                groupId={g.id}
+                groupName={g.name}
+                inviteCode={fullGroup?.inviteCode}
+                myUid={user.uid}
+                predictionRows={g.id === currentGroupId ? rows : []}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -308,10 +315,11 @@ function JoinGroupBtn({ onJoined }: { onJoined: () => void }) {
  * with its own fetch + WhatsApp share button.
  * =================================================================== */
 function GroupLeaderboardCard({
-  groupId, groupName, myUid, predictionRows, collapsed = false,
+  groupId, groupName, inviteCode, myUid, predictionRows, collapsed = false,
 }: {
   groupId: string | null;
   groupName: string;
+  inviteCode?: string;
   myUid: string;
   predictionRows: MatchRow[];
   collapsed?: boolean;
@@ -356,18 +364,41 @@ function GroupLeaderboardCard({
           <span>{groupName}</span>
           {rows.length > 0 && <span className="chip chip-soft" style={{ fontSize: 11 }}>👥 {rows.length}</span>}
         </button>
-        {rows.length > 0 && open && (
-          <button
-            className="btn btn-small wa-btn"
-            onClick={() => shareToWhatsApp(leaderboardShareText({
-              rows,
-              groupName: groupId ? groupName.replace(/^[🌍🏆📊]+\s*/, "") : null,
-              limit: 10,
-            }))}
-            title="שתף את לוח התוצאות בווטסאפ"
-          >
-            💬 שתף
-          </button>
+        {open && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {inviteCode && (
+              <button
+                className="btn btn-small wa-btn"
+                onClick={() => {
+                  const origin = typeof window !== "undefined" ? window.location.origin : "";
+                  const url = `${origin}/?invite=${inviteCode}`;
+                  const cleanGroupName = groupName.replace(/^[🌍🏆📊]+\s*/, "");
+                  const msg =
+                    `🏆 הצטרף לקבוצת מונדיאל 2026 שלי "${cleanGroupName}"!\n` +
+                    `נחש תוצאות משחקים, התחרה מול חברים על לוח תוצאות חי 🔮\n\n` +
+                    `${url}\n\n` +
+                    `(או הזן את הקוד ידנית: ${inviteCode})`;
+                  shareToWhatsApp(msg);
+                }}
+                title="הזמן חבר להצטרף לקבוצה בווטסאפ"
+              >
+                ➕ צרף חבר
+              </button>
+            )}
+            {rows.length > 0 && (
+              <button
+                className="btn btn-small wa-btn"
+                onClick={() => shareToWhatsApp(leaderboardShareText({
+                  rows,
+                  groupName: groupId ? groupName.replace(/^[🌍🏆📊]+\s*/, "") : null,
+                  limit: 10,
+                }))}
+                title="שתף את לוח התוצאות בווטסאפ"
+              >
+                💬 שתף
+              </button>
+            )}
+          </div>
         )}
       </div>
       {open && (
