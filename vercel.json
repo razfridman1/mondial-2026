@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/sync-results",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/auto-predict",
+      "schedule": "*/2 * * * *"
     }
   ],
   "headers": [

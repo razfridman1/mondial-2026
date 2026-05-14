@@ -351,6 +351,31 @@ export default function SimulationPanel() {
     } finally { setBusy(false); }
   }
 
+  /* Manually trigger auto-prediction for users who missed predictions before lock */
+  async function manualAutoPredict() {
+    if (!confirm(
+      "🎲 הרץ Auto-Predict עכשיו?\n\n" +
+      "המערכת תיצור ניחושים אקראיים (0-3) למשתמשים שלא ניחשו, " +
+      "עבור משחקים שעברו זמן נעילה ב-24 השעות האחרונות.\n\n" +
+      "ניחושים קיימים לא יידרסו. המסך יודיע כמה ניחושים נוספו."
+    )) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/auto-predict", {
+        method: "POST",
+        headers: await authHeaders(),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      alert(
+        `✓ Auto-Predict הסתיים\n\n` +
+        `סרקנו: ${data.scanned || 0} משחקים\n` +
+        `נוצרו ניחושים: ${data.inserted || 0}\n` +
+        `דולגו (קיימים): ${data.skipped || 0}`
+      );
+    } finally { setBusy(false); }
+  }
+
   if (!user) return (
     <div className="admin-locked">
       <h3>🔒 ניהול סימולציה</h3>
@@ -586,13 +611,19 @@ export default function SimulationPanel() {
                   onClick={resetSimulationOnly} disabled={busy}>
             🔄 אפס סימולציה בלבד
           </button>
+          <button className="btn"
+                  style={{ background: "rgba(34,197,94,0.15)", borderColor: "#22c55e", color: "#22c55e", fontWeight: 700 }}
+                  onClick={manualAutoPredict} disabled={busy}>
+            🎲 הרץ Auto-Predict עכשיו
+          </button>
         </div>
         <p className="muted" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
           ⚽ <strong>צור תוצאות לפי שלב:</strong> בונה תוצאות שלב‑אחר‑שלב (נוקאאוט דורש שהשלב הקודם הסתיים).<br/>
           🧹 <strong>אפס לפי שלב:</strong> מוחק רק תוצאות סימולציה (sim:true) של אותו שלב. תוצאות אמיתיות שהוזנו ידנית — יישמרו. שלבים הבאים יחזרו להיות נעולים.<br/>
           ⚽⚽ <strong>תוצאות רנדומליות:</strong> אקראי לחלוטין לכל 104 המשחקים.<br/>
           🎲 <strong>משוקללת לפי odds:</strong> מועדפות מנצחות לפי הסיכוי. בנוקאאוט אין תיקו.<br/>
-          🔄 <strong>אפס סימולציה (גלובלי):</strong> מוחק את כל תוצאות הסימולציה + overrides + מכבה סימולציה. <strong>הניחושים נשמרים!</strong>
+          🔄 <strong>אפס סימולציה (גלובלי):</strong> מוחק את כל תוצאות הסימולציה + overrides + מכבה סימולציה. <strong>הניחושים נשמרים!</strong><br/>
+          🎲 <strong>Auto-Predict:</strong> רץ אוטומטית כל 2 דקות. ממלא ניחוש רנדומלי (0-3) לכל משתמש שלא ניחש למשחק שעבר זמן נעילה. הניחוש מסומן <code>auto: true</code>.
         </p>
       </div>
 
