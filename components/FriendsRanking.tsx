@@ -145,22 +145,6 @@ export default function FriendsRanking() {
         </div>
       </header>
 
-      {currentGroup && (
-        <div className="group-meta">
-          <div>
-            <strong>{currentGroup.name}</strong>
-            {currentGroup.description && <span className="muted"> · {currentGroup.description}</span>}
-          </div>
-          <div className="muted" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            קוד הזמנה: <code className="invite-code">{currentGroup.inviteCode}</code>
-            <button className="btn btn-small wa-btn"
-                    onClick={() => shareToWhatsApp(`הצטרף לקבוצת מונדיאל 2026 שלי "${currentGroup.name}" עם קוד הזמנה: *${currentGroup.inviteCode}*`)}>
-              💬 שתף בווטסאפ
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Leaderboards — one card per group, side-by-side.
        *   Regular user: only groups they're a member of.
        *   Super admin:  ALL groups in the system. */}
