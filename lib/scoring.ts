@@ -53,6 +53,7 @@ export function scorePrediction(s: ScoreInput): ScoreBreakdown {
 export function userTotals(
   preds: Array<{ matchId: string; homeScore: number; awayScore: number; joker?: boolean }>,
   results: Record<string, { home: number; away: number; finishedAt: number }>,
+  bonusPoints: number = 0,
 ) {
   let total = 0, exact = 0, result = 0, streak = 0, currentStreak = 0;
   // sort predictions by finish time
@@ -79,6 +80,9 @@ export function userTotals(
     }
   }
 
+  /* Manual bonus points awarded by admin (can be positive or negative). */
+  total += bonusPoints;
+
   return {
     totalPoints: total,
     exactCount: exact,
@@ -86,5 +90,6 @@ export function userTotals(
     predictionsCount: preds.length,
     streak,
     jokersHit: 0,
+    bonusPoints,
   };
 }

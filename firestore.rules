@@ -96,6 +96,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------- Bonus awards (public read so leaderboard can show, admin write via API) ----------
+    match /bonus_awards/{id} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
     // ---------- Broadcast overrides (admin whitelist) ----------
     match /broadcast_overrides/{matchId} {
       allow read: if true;

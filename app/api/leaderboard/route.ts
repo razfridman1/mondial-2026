@@ -34,6 +34,16 @@ export async function GET(req: Request) {
     results[d.id] = { home: data.home, away: data.away, finishedAt: data.finishedAt || Date.now() };
   });
 
+  /* 2b. Load bonus awards (manual admin adjustments) and sum per user */
+  const bonusSnap = await db.collection("bonus_awards").get();
+  const bonusByUid: Record<string, number> = {};
+  bonusSnap.forEach(d => {
+    const data = d.data() as any;
+    if (typeof data.points === "number") {
+      bonusByUid[data.uid] = (bonusByUid[data.uid] || 0) + data.points;
+    }
+  });
+
   /* 3. Load profiles and predictions for each user */
   const rows: LeaderRow[] = [];
   for (const uid of uids) {
@@ -41,7 +51,7 @@ export async function GET(req: Request) {
     const profData = prof.data() as any || {};
     const predSnap = await db.collection("predictions").where("uid", "==", uid).get();
     const preds = predSnap.docs.map(d => d.data() as any);
-    const t = userTotals(preds, results);
+    const t = userTotals(preds, results, bonusByUid[uid] || 0);
     rows.push({
       uid,
       displayName: profData.displayName || "משתמש",

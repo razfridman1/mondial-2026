@@ -117,6 +117,11 @@ export default function SuperAdminPanel() {
         <summary>🔴 סנכרון תוצאות חי (Live Sync)</summary>
         <LiveSyncPanel />
       </details>
+
+      <details className="adm-section">
+        <summary>🎁 בונוסים ידניים — הוספת/הפחתת נקודות</summary>
+        <BonusAwardsPanel />
+      </details>
     </section>
   );
 }
@@ -1164,6 +1169,207 @@ function LiveSyncPanel() {
           </p>
         </div>
       </details>
+    </div>
+  );
+}
+
+/* ============================ 10. BONUS AWARDS ============================ */
+interface BonusAward {
+  id: string;
+  uid: string;
+  points: number;
+  reason: string;
+  awardedBy: string;
+  awardedAt: number;
+}
+interface ProfileLite {
+  uid: string;
+  displayName?: string;
+  email?: string;
+  avatarId?: string;
+}
+
+function BonusAwardsPanel() {
+  const [awards, setAwards] = useState<BonusAward[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, ProfileLite>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /* Form state */
+  const [pickUid, setPickUid] = useState<string>("");
+  const [pointsInput, setPointsInput] = useState<string>("");
+  const [reasonInput, setReasonInput] = useState<string>("");
+
+  async function load() {
+    setBusy(true); setError(null);
+    try {
+      const [aR, pR] = await Promise.all([
+        fetch("/api/admin/bonus-awards", { headers: await adminAuthHeaders() }),
+        fetch("/api/admin/profiles",     { headers: await adminAuthHeaders() }),
+      ]);
+      if (aR.ok) setAwards(await aR.json());
+      if (pR.ok) {
+        const arr = await pR.json();
+        const m: Record<string, ProfileLite> = {};
+        for (const p of arr) m[p.uid] = { uid: p.uid, displayName: p.displayName, email: p.email, avatarId: p.avatarId };
+        setProfiles(m);
+      }
+    } finally { setBusy(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function addAward() {
+    if (!pickUid) { alert("בחר משתמש"); return; }
+    const points = parseInt(pointsInput, 10);
+    if (!Number.isFinite(points) || points === 0) { alert("הזן ערך נקודות (חיובי או שלילי, לא 0)"); return; }
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/bonus-awards", {
+        method: "POST",
+        headers: await adminAuthHeaders(),
+        body: JSON.stringify({ uid: pickUid, points, reason: reasonInput.trim() }),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      const profName = profiles[pickUid]?.displayName || "משתמש";
+      alert(`✓ ${points > 0 ? "הוספו" : "נוכו"} ${Math.abs(points)} נק׳ ל${profName}`);
+      setPickUid(""); setPointsInput(""); setReasonInput("");
+      load();
+    } finally { setBusy(false); }
+  }
+
+  async function deleteAward(id: string) {
+    if (!confirm("למחוק את הבונוס הזה?")) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/bonus-awards", {
+        method: "DELETE",
+        headers: await adminAuthHeaders(),
+        body: JSON.stringify({ id }),
+      });
+      if (!r.ok) { alert("שגיאה"); return; }
+      load();
+    } finally { setBusy(false); }
+  }
+
+  /* Totals per user */
+  const totalsByUid: Record<string, number> = {};
+  for (const a of awards) totalsByUid[a.uid] = (totalsByUid[a.uid] || 0) + a.points;
+
+  return (
+    <div className="adm-body">
+      <p className="muted" style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 14 }}>
+        💡 הוסף או הפחת נקודות ידנית למשתמשים. הבונוסים נוספים <strong>גלובלית</strong> לכל הלוחות (כי הניקוד גלובלי לכל משתמש).
+        ערכים שליליים מנכים נקודות. כל בונוס נשמר עם הסיבה ומי הוסיף — אפשר למחוק בכל רגע.
+      </p>
+
+      {/* Add form */}
+      <div style={{
+        padding: 14,
+        background: "rgba(0,212,255,0.06)",
+        border: "1px solid var(--accent)",
+        borderRadius: 12,
+        marginBottom: 14,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>➕ הוספת בונוס חדש</div>
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 100px 2fr auto", gap: 8, alignItems: "end" }}>
+          <label>
+            <div style={{ fontSize: 11, marginBottom: 4 }}>משתמש</div>
+            <select value={pickUid} onChange={e => setPickUid(e.target.value)} disabled={busy}
+                    style={{ width: "100%", padding: 7, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}>
+              <option value="">— בחר משתמש —</option>
+              {Object.values(profiles)
+                .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "he"))
+                .map(p => (
+                  <option key={p.uid} value={p.uid}>{p.displayName || p.email || p.uid.slice(0, 10)}</option>
+                ))}
+            </select>
+          </label>
+          <label>
+            <div style={{ fontSize: 11, marginBottom: 4 }}>נקודות (± )</div>
+            <input type="number" value={pointsInput} onChange={e => setPointsInput(e.target.value)}
+                   disabled={busy} placeholder="10 / -5"
+                   style={{ width: "100%", padding: 7, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontVariantNumeric: "tabular-nums" }} />
+          </label>
+          <label>
+            <div style={{ fontSize: 11, marginBottom: 4 }}>סיבה (אופציונלי)</div>
+            <input type="text" value={reasonInput} onChange={e => setReasonInput(e.target.value)}
+                   disabled={busy} placeholder="לדוגמה: ניחוש מצוין בגמר"
+                   maxLength={240}
+                   style={{ width: "100%", padding: 7, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }} />
+          </label>
+          <button className="btn btn-primary" onClick={addAward}
+                  disabled={busy || !pickUid || !pointsInput}>
+            💾 הוסף
+          </button>
+        </div>
+      </div>
+
+      {/* Totals per user (top of list) */}
+      {Object.keys(totalsByUid).length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>📊 סיכום נקודות פר משתמש:</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {Object.entries(totalsByUid).map(([uid, total]) => {
+              const p = profiles[uid];
+              return (
+                <span key={uid} className="chip" style={{
+                  background: total > 0 ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)",
+                  color: total > 0 ? "#22c55e" : "#ef4444",
+                  borderColor: total > 0 ? "#22c55e" : "#ef4444",
+                }}>
+                  {p?.displayName || uid.slice(0, 10)}: {total > 0 ? "+" : ""}{total}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {error && <p className="pred-msg is-locked">{error}</p>}
+
+      {/* Awards table */}
+      <div className="adm-table-wrap" style={{ maxHeight: 420, overflowY: "auto" }}>
+        <table className="admin-table">
+          <thead><tr>
+            <th>תאריך</th><th>משתמש</th><th>נקודות</th><th>סיבה</th><th>הוסף ע"י</th><th>פעולה</th>
+          </tr></thead>
+          <tbody>
+            {awards.length === 0 && !busy && (
+              <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 20 }}>
+                אין עדיין בונוסים. השתמש בטופס למעלה כדי להוסיף.
+              </td></tr>
+            )}
+            {awards.map(a => {
+              const p = profiles[a.uid];
+              return (
+                <tr key={a.id}>
+                  <td className="muted" style={{ fontSize: 11 }}>
+                    {new Date(a.awardedAt).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })}
+                  </td>
+                  <td>{p?.displayName || a.uid.slice(0, 10) + "…"}</td>
+                  <td>
+                    <span style={{
+                      fontWeight: 800,
+                      fontSize: 14,
+                      color: a.points > 0 ? "#22c55e" : "#ef4444",
+                    }}>
+                      {a.points > 0 ? `+${a.points}` : a.points}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 12 }}>{a.reason || <span className="muted">—</span>}</td>
+                  <td className="muted" style={{ fontSize: 11 }}>{a.awardedBy}</td>
+                  <td>
+                    <button className="btn btn-small" onClick={() => deleteAward(a.id)}
+                            disabled={busy}
+                            style={{ color: "var(--red)" }}>🗑️</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
