@@ -116,10 +116,14 @@ export default function SimulationPanel() {
     } finally { setBusy(false); }
   }
 
-  /* One-click: generate random results for a specific stage only */
+  /* One-click: generate FIFA-rule-based results for a specific stage.
+   * For knockouts: requires the previous stage to be completed first. */
   async function instantResultsForStage(stageId: string, stageLabel: string, matchCount: number) {
     if (!confirm(
-      `ליצור תוצאות אקראיות ל-${matchCount} משחקי "${stageLabel}"?\n` +
+      `ליצור תוצאות לפי חוקי FIFA ל-${matchCount} משחקי "${stageLabel}"?\n\n` +
+      "• שלב הבתים: תוצאות משוקללות לפי odds.\n" +
+      "• נוקאאוט: השלב הקודם חייב להיות מסיים, אז המערכת מזהה איזה קבוצות עולות (top 2 + 8 שלישיים) ויוצרת את המשחקים בהתאם.\n" +
+      "• אין תיקו בנוקאאוט.\n\n" +
       "תוצאות קיימות יידרסו."
     )) return;
     setBusy(true);
@@ -127,11 +131,14 @@ export default function SimulationPanel() {
       const r = await fetch("/api/admin/sim/instant-results", {
         method: "POST",
         headers: await authHeaders(),
-        body: JSON.stringify({ stage: stageId, includePlaceholders: true, overwrite: true }),
+        body: JSON.stringify({ stage: stageId, overwrite: true }),
       });
       const data = await r.json();
-      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
-      alert(`✓ נוצרו ${data.inserted} תוצאות ל"${stageLabel}"`);
+      if (!r.ok) {
+        alert(`שגיאה: ${data.message || data.error || r.status}`);
+        return;
+      }
+      alert(`✓ נוצרו ${data.inserted} תוצאות ל"${stageLabel}" לפי חוקי FIFA`);
     } finally { setBusy(false); }
   }
 
@@ -523,9 +530,9 @@ export default function SimulationPanel() {
           </button>
         </div>
         <p className="muted" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
-          ⚽ <strong>כפתור לכל שלב:</strong> תוצאות אקראיות רק לאותו שלב.<br/>
-          ⚽⚽ <strong>תוצאות רנדומליות:</strong> אקראי לחלוטין לכל 104 המשחקים.<br/>
-          🎲 <strong>משוקללת לפי odds:</strong> המועדפות מנצחות לפי הסיכוי. הפתעות קורות, בנוקאאוט אין תיקו. תוצאות יותר ריאליסטיות לבדיקת לוחות התוצאות.<br/>
+          ⚽ <strong>כפתור לכל שלב (לפי חוקי FIFA):</strong> צור תוצאות שלב‑אחר‑שלב. נוקאאוט דורש שהשלב הקודם הסתיים — המערכת תזהה אוטומטית מי עולה (2 ראשונים בכל בית + 8 שלישיים) ותבנה את משחקי השלב הבא בהתאם.<br/>
+          ⚽⚽ <strong>תוצאות רנדומליות:</strong> אקראי לחלוטין לכל 104 המשחקים (פחות ריאליסטי, מהיר).<br/>
+          🎲 <strong>משוקללת לפי odds:</strong> מועדפות מנצחות לפי הסיכוי. בנוקאאוט אין תיקו.<br/>
           🔄 <strong>אפס סימולציה:</strong> מוחק תוצאות + overrides + מכבה סימולציה. <strong>הניחושים נשמרים!</strong>
         </p>
       </div>

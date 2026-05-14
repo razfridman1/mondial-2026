@@ -271,27 +271,44 @@ export interface KnockoutMatchView {
 
 export function listKnockoutMatches(
   stage: StageId,
-  results: Record<string, MatchResult>
+  results: Record<string, MatchResult & { homeTeam?: string; awayTeam?: string }>
 ): KnockoutMatchView[] {
+  /* Lazy import to avoid circular dep at module load */
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { resolveAllStages } = require("./bracket");
+  const resolved = resolveAllStages(results);
+
   return MATCHES
     .filter(m => m.stage === stage)
     .sort((a, b) => +new Date(a.utc) - +new Date(b.utc))
     .map(m => {
-      const home = TEAMS[m.home];
-      const away = TEAMS[m.away];
       const r = results[m.id];
+
+      /* Try in order:
+       *   1. The stored homeTeam/awayTeam fields (set by simulator)
+       *   2. The resolved bracket (computed live from standings)
+       *   3. The raw placeholder string */
+      let homeCode = (r as any)?.homeTeam || resolved[m.id]?.home || m.home;
+      let awayCode = (r as any)?.awayTeam || resolved[m.id]?.away || m.away;
+      const homeTeam = TEAMS[homeCode];
+      const awayTeam = TEAMS[awayCode];
+
+      /* Did we actually resolve to a real team? */
+      const homeResolved = !!homeTeam;
+      const awayResolved = !!awayTeam;
+
       const view: KnockoutMatchView = {
         matchId: m.id,
         stage: m.stage,
         utc: m.utc,
-        homeCode: m.home,
-        homeName: home?.name || m.home,
-        homeFlag: home?.flag || "🏳️",
-        homeIsPlaceholder: !!m.homeIsPlaceholder,
-        awayCode: m.away,
-        awayName: away?.name || m.away,
-        awayFlag: away?.flag || "🏳️",
-        awayIsPlaceholder: !!m.awayIsPlaceholder,
+        homeCode,
+        homeName: homeTeam?.name || homeCode,
+        homeFlag: homeTeam?.flag || "🏳️",
+        homeIsPlaceholder: !!m.homeIsPlaceholder && !homeResolved,
+        awayCode,
+        awayName: awayTeam?.name || awayCode,
+        awayFlag: awayTeam?.flag || "🏳️",
+        awayIsPlaceholder: !!m.awayIsPlaceholder && !awayResolved,
         homeScore: r ? r.home : null,
         awayScore: r ? r.away : null,
         result: null,
