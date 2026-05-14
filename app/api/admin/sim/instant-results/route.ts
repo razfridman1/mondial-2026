@@ -127,6 +127,9 @@ async function simulateBatch(
   let inserted = 0, skipped = 0;
   let batch = db.batch();
   let ops = 0;
+  /* Track teams already assigned within this stage so the same 3rd-placed
+   * team can't end up in two different R32 slots. */
+  const usedTeams = new Set<string>();
 
   for (let i = 0; i < matches.length; i++) {
     const m = matches[i];
@@ -142,8 +145,8 @@ async function simulateBatch(
     let homeCode = m.home;
     let awayCode = m.away;
     if (isKO) {
-      homeCode = resolvePlaceholder(m.home, results, resolved) || m.home;
-      awayCode = resolvePlaceholder(m.away, results, resolved) || m.away;
+      homeCode = resolvePlaceholder(m.home, results, resolved, usedTeams) || m.home;
+      awayCode = resolvePlaceholder(m.away, results, resolved, usedTeams) || m.away;
     }
 
     const { home, away } = simulateMatch(m, homeCode, awayCode, isKO);

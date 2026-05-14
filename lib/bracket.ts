@@ -54,11 +54,15 @@ function listStageMatchesOrdered(stage: StageId): Match[] {
     .sort((a, b) => +new Date(a.utc) - +new Date(b.utc));
 }
 
-/** Resolve a single placeholder string to an actual team code (or null). */
+/** Resolve a single placeholder string to an actual team code (or null).
+ *  `usedTeams` (optional) lets callers track which teams have already been
+ *  assigned within the current stage resolution pass — preventing the same
+ *  third-placed team from being picked for multiple R32 slots. */
 export function resolvePlaceholder(
   placeholder: string,
   results: Record<string, MatchResult>,
-  resolvedByMatchId: Record<string, { home: string; away: string; winner: string; loser: string }>
+  resolvedByMatchId: Record<string, { home: string; away: string; winner: string; loser: string }>,
+  usedTeams?: Set<string>,
 ): string | null {
   if (!placeholder) return null;
   const ph = placeholder.trim();
@@ -68,20 +72,28 @@ export function resolvePlaceholder(
   if (groupPos) {
     const pos = parseInt(groupPos[1], 10) - 1;
     const standings = computeGroupStandings(groupPos[2], results);
-    return standings[pos]?.teamCode || null;
+    const code = standings[pos]?.teamCode || null;
+    if (code && usedTeams) usedTeams.add(code);
+    return code;
   }
 
-  /* "3A/C/D/E" — third-placed from one of those groups, picking the best qualifying one. */
+  /* "3A/C/D/E" — third-placed from one of those groups, picking the best
+   * qualifying one that hasn't already been assigned to another slot. */
   const thirdsPattern = /^3([A-Z\/]+)$/.exec(ph);
   if (thirdsPattern) {
     const groups = thirdsPattern[1].split("/");
     const eight = bestEightThirdPlaced(results);
-    /* Find the best (highest-ranked) qualifying 3rd-placed team from the allowed groups */
+    /* Find the highest-ranked qualifying 3rd-placed team from the allowed
+     * groups that hasn't been picked yet in this resolution pass. */
     for (const t of eight) {
+      if (usedTeams?.has(t.teamCode)) continue;
       const teamGroup = MATCHES.find(m =>
         m.stage === "GROUP" && (m.home === t.teamCode || m.away === t.teamCode)
       )?.group;
-      if (teamGroup && groups.includes(teamGroup)) return t.teamCode;
+      if (teamGroup && groups.includes(teamGroup)) {
+        usedTeams?.add(t.teamCode);
+        return t.teamCode;
+      }
     }
     return null;
   }
@@ -158,9 +170,13 @@ export function resolveAllStages(
       /* Previous stage isn't fully done — leave this stage's placeholders unresolved. */
       continue;
     }
+    /* Track teams already assigned in this stage so we don't reuse the same
+     * 3rd-placed team across multiple R32 slots. New Set per stage so QF/SF
+     * can reuse the same winners as needed. */
+    const usedTeams = new Set<string>();
     for (const m of listStageMatchesOrdered(stage)) {
-      const homeCode = resolvePlaceholder(m.home, results, out) || m.home;
-      const awayCode = resolvePlaceholder(m.away, results, out) || m.away;
+      const homeCode = resolvePlaceholder(m.home, results, out, usedTeams) || m.home;
+      const awayCode = resolvePlaceholder(m.away, results, out, usedTeams) || m.away;
       const r = results[m.id];
       if (r) {
         let winner = "", loser = "";
