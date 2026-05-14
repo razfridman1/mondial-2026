@@ -25,8 +25,9 @@ import {
 import { effMatch } from "@/lib/sim";
 import type { Match } from "@/lib/types";
 import MatchModal from "./MatchModal";
+import MatchCard from "./MatchCard";
 
-type Section = "live" | "today" | "upcoming" | "finished" | "history";
+type Section = "groups" | "live" | "today" | "upcoming" | "finished" | "history";
 
 const FAV_KEY = "fav_teams_v1";
 
@@ -42,7 +43,7 @@ export default function MatchesTab() {
   const overrides = useStore(s => s.overrides);
   const simConfig = useStore(s => s.simConfig);
 
-  const [section, setSection]   = useState<Section>("today");
+  const [section, setSection]   = useState<Section>("groups");
   const [openId, setOpenId]     = useState<string | null>(null);
   const [results, setResults]   = useState<Record<string, { home: number; away: number; finishedAt: number }>>({});
   const [favs, setFavs]         = useState<string[]>(() => loadFavs());
@@ -151,6 +152,8 @@ export default function MatchesTab() {
     <section className="matches-tab">
       {/* Section pills */}
       <nav className="mt-sections" role="tablist" aria-label="קטגוריות">
+        <PillBtn active={section === "groups"}   onClick={() => setSection("groups")}
+                 icon="📋" label="שלב הבתים" />
         <PillBtn active={section === "live"}     onClick={() => setSection("live")}
                  icon={<LiveDot />} label="חי"      badge={counts.live} highlight />
         <PillBtn active={section === "today"}    onClick={() => setSection("today")}
@@ -193,10 +196,14 @@ export default function MatchesTab() {
 
       {/* List body */}
       <div className="mt-body">
-        {visible.length === 0
-          ? <EmptyState section={section} />
-          : <GroupedList list={visible} section={section} results={results}
-                         onOpen={setOpenId} isFav={isFav} onToggleFav={toggleFav} />}
+        {section === "groups" ? (
+          <GroupStageSchedule matches={matches} favOnly={favOnly} favs={favs} onOpen={setOpenId} />
+        ) : visible.length === 0 ? (
+          <EmptyState section={section} />
+        ) : (
+          <GroupedList list={visible} section={section} results={results}
+                       onOpen={setOpenId} isFav={isFav} onToggleFav={toggleFav} />
+        )}
       </div>
 
       {openId && <MatchModal matchId={openId} onClose={() => setOpenId(null)} />}
@@ -255,6 +262,58 @@ function HistoryFilters({ stage, setStage, team, setTeam, day, setDay, matches }
       </select>
       {any && <button className="mt-filter-clear" onClick={clear}>נקה</button>}
     </div>
+  );
+}
+
+/* ----------- Group-stage classic schedule (old MatchCard view) ----- */
+function GroupStageSchedule({ matches, favOnly, favs, onOpen }: {
+  matches: Match[];
+  favOnly: boolean;
+  favs: string[];
+  onOpen: (id: string) => void;
+}) {
+  /* All group-stage matches grouped by day, sorted chronologically. */
+  const groupMatches = useMemo(() => {
+    let list = matches.filter(m => m.stage === "GROUP");
+    if (favOnly) {
+      list = list.filter(m => favs.includes(m.home) || favs.includes(m.away));
+    }
+    list.sort((a, b) => +new Date(a.utc) - +new Date(b.utc));
+    const byDay = new Map<string, Match[]>();
+    for (const m of list) {
+      const k = israelDateKey(m.utc);
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k)!.push(m);
+    }
+    return [...byDay.entries()];
+  }, [matches, favOnly, favs]);
+
+  if (groupMatches.length === 0) {
+    return (
+      <div className="mt-empty">
+        <div className="mt-empty-icon" aria-hidden>⚽</div>
+        <div>אין משחקי שלב הבתים בסינון הנוכחי</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {groupMatches.map(([day, ms]) => (
+        <section key={day} className="day-section">
+          <h3 className="day-heading hide-on-mobile">
+            <span>{formatIsraelDate(ms[0].utc)}</span>
+            {relativeLabel(ms[0].utc) && (
+              <span className="chip chip-strong">{relativeLabel(ms[0].utc)}</span>
+            )}
+            <span className="muted">{ms.length} משחקים</span>
+          </h3>
+          <div className="card-grid">
+            {ms.map(m => <MatchCard key={m.id} match={m} onOpen={onOpen} />)}
+          </div>
+        </section>
+      ))}
+    </>
   );
 }
 
