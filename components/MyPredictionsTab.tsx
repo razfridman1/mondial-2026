@@ -713,6 +713,9 @@ function PredictionRow({
         <div className="mypred-row-head">
           <span className="muted">{formatIsraelDate(match.utc, { short: true })} · {formatIsraelTime(match.utc)}</span>
           <span className="badge badge-finished">הסתיים</span>
+          <span className="chip chip-stage">
+            {STAGES[match.stage].name}{match.group ? ` · בית ${match.group}` : ""}
+          </span>
         </div>
         <div className="mypred-row-teams">
           <div className="mypred-team">
@@ -763,7 +766,9 @@ function PredictionRow({
         {!locked && minsToLock <= 60 && minsToLock > 0 && (
           <span className="chip chip-strong">⚠ נעילה בעוד {minsToLock} דק׳</span>
         )}
-        {match.group && <span className="chip chip-soft">בית {match.group}</span>}
+        <span className="chip chip-stage">
+          {STAGES[match.stage].name}{match.group ? ` · בית ${match.group}` : ""}
+        </span>
         {venue.name && <span className="muted" style={{ fontSize: 11 }}>🏟️ {venue.name}</span>}
       </div>
 

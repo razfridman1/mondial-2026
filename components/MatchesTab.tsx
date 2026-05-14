@@ -400,7 +400,7 @@ function MatchCardModern({ match, result, onOpen }: {
              role="button" tabIndex={0}>
       <header className="mt-card-head">
         <div className="mt-card-stage">
-          <span className="mt-stage-chip">{stage?.name}{match.group ? ` · בית ${match.group}` : ""}</span>
+          <span className="chip chip-stage">{stage?.name}{match.group ? ` · בית ${match.group}` : ""}</span>
         </div>
         <div className="mt-card-status">
           {status === "live" && (

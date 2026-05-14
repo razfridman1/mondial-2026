@@ -4368,3 +4368,22 @@ html[data-theme="light"] .chat-panel {
   border: 1px solid rgba(255, 181, 71, 0.25);
   border-radius: 10px;
 }
+
+/* ---- Stage chip — emphasized so users always know the stage ---- */
+.chip.chip-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, rgba(79, 125, 255, 0.22) 0%, rgba(124, 77, 255, 0.18) 100%);
+  border: 1px solid rgba(79, 125, 255, 0.45);
+  color: #b8c7ff;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+}
+.chip.chip-stage::before {
+  content: "🏆";
+  font-size: 11px;
+}

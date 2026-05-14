@@ -74,7 +74,7 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
              aria-label="פתח פרטי משחק">
       <header className="mc-header">
         <div className="mc-stage">
-          <span className="chip">{stage?.name}{match.group ? ` · בית ${match.group}` : ""}</span>
+          <span className="chip chip-stage">{stage?.name}{match.group ? ` · בית ${match.group}` : ""}</span>
           {rel && <span className="chip chip-soft">{rel}</span>}
           {status === "live"    && <span className="badge badge-live">🔴 שידור חי</span>}
           {status === "pregame" && <span className="badge badge-pregame">קדם-משחק</span>}
