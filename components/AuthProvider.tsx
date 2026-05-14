@@ -1,9 +1,20 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { bootstrap, useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
+import NameSetupModal from "./NameSetupModal";
 
 const INVITE_KEY = "pending_invite_code";
+
+/** Treat a name as "default / auto-generated" when it equals the email prefix
+ *  (e.g. user "danny@gmail.com" got the auto name "danny") or is empty. */
+function needsNameSetup(displayName?: string | null, email?: string | null): boolean {
+  const n = (displayName || "").trim();
+  if (!n) return true;
+  const prefix = (email || "").split("@")[0].trim().toLowerCase();
+  if (prefix && n.toLowerCase() === prefix) return true;
+  return false;
+}
 
 /** Capture ?invite=CODE from current URL and stash in localStorage.
  *  Called both on the main page mount and on the login page mount,
@@ -29,6 +40,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const refreshGroups = useStore(s => s.refreshGroups);
   const setCurrentGroup = useStore(s => s.setCurrentGroup);
   const initialTabRef = useRef(false);
+  const [askName, setAskName] = useState(false);
 
   // 1. Capture invite code from URL on mount (before anything else).
   useEffect(() => { captureInviteFromUrl(); }, []);
@@ -79,6 +91,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             try { if (data.groupId) setCurrentGroup?.(data.groupId); } catch {}
             if (!data.alreadyMember) {
               try { alert("הצטרפת לקבוצה בהצלחה! 🎉"); } catch {}
+              /* Force-prompt for a friendly display name if this looks like
+               * a brand-new account (default name === email prefix). */
+              const profile = useStore.getState().profile;
+              if (needsNameSetup(profile?.displayName, user?.email)) {
+                setAskName(true);
+              }
             }
           }
         } else {
@@ -96,5 +114,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       </div>
     );
   }
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {askName && <NameSetupModal onDone={() => setAskName(false)} />}
+    </>
+  );
 }
