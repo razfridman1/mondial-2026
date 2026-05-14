@@ -191,6 +191,34 @@ export default function SimulationPanel() {
     }
   }
 
+  async function clearStage(stage: StageId) {
+    if (!confirm(
+      `לאפס את הנתונים בשלב "${STAGE_NAMES[stage]}"?\n\n` +
+      `• כל הניחושים שמולאו בשלב הזה (לחברי הקבוצה הנבחרת) יימחקו\n` +
+      `• כל תוצאות הסים שמולאו בשלב הזה יימחקו (תוצאות אמת לא נמחקות)\n\n` +
+      `שלבים מאוחרים יותר עלולים להינעל אם הם תלויים בשלב הזה.`
+    )) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/sim/clear-stage", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ stage, groupId: groupId || undefined }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        alert(`שגיאה: ${data.error || r.status}`);
+        return;
+      }
+      console.log(`[sim] cleared stage ${stage}:`, data);
+    } catch (e: any) {
+      alert(`שגיאה: ${e?.message || e}`);
+    } finally {
+      setBusy(false);
+      await reloadStatus();
+    }
+  }
+
   async function fullReset() {
     if (!confirm(
       "🏁 איפוס מלא לפני המונדיאל האמיתי\n\n" +
@@ -323,6 +351,30 @@ export default function SimulationPanel() {
                         {state.resultsDone ? "🔄 מילוי מחדש" : "⚽ מלא תוצאות"}
                       </button>
                     </div>
+
+                    {/* Per-stage reset — clears predictions + results just for this stage */}
+                    {(st && (st.predictionsFilled > 0 || st.resultsFilled > 0)) && (
+                      <div className="sim-step sim-step-reset">
+                        <div className="sim-step-info">
+                          <span style={{ color: "var(--red)" }}>🧹 אפס את הנתונים בשלב</span>
+                          <span className="muted" style={{ fontSize: 11 }}>
+                            מוחק ניחושי קבוצה + תוצאות סים בשלב הזה
+                          </span>
+                        </div>
+                        <button
+                          className="btn btn-small"
+                          style={{
+                            background: "rgba(239,68,68,0.12)",
+                            borderColor: "var(--red)",
+                            color: "var(--red)",
+                          }}
+                          disabled={busy}
+                          onClick={() => clearStage(s)}
+                        >
+                          🧹 אפס שלב
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

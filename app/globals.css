@@ -4352,3 +4352,10 @@ html[data-theme="light"] .chat-panel {
 @media (max-width: 720px) {
   .team-detail-modal { padding: 14px; max-height: 95vh; }
 }
+
+/* ---- Per-stage reset row in SimulationPanel ---- */
+.sim-step-reset {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(239, 68, 68, 0.25);
+}
