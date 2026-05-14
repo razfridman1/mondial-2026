@@ -4359,3 +4359,12 @@ html[data-theme="light"] .chat-panel {
   padding-top: 10px;
   border-top: 1px dashed rgba(239, 68, 68, 0.25);
 }
+
+/* ---- Inline KO winner picker in MyPredictionsTab rows ---- */
+.mypred-ko-winner {
+  padding: 8px 12px;
+  margin-top: 8px;
+  background: rgba(255, 181, 71, 0.08);
+  border: 1px solid rgba(255, 181, 71, 0.25);
+  border-radius: 10px;
+}

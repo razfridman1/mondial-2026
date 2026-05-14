@@ -602,8 +602,12 @@ function PredictionRow({
   const locked = now >= lockAt;
   const minsToLock = Math.max(0, Math.floor((lockAt - now) / 60000));
 
+  const isKnockout = match.stage !== "GROUP";
   const [h, setH] = useState<string>(prediction?.homeScore != null ? String(prediction.homeScore) : "");
   const [a, setA] = useState<string>(prediction?.awayScore != null ? String(prediction.awayScore) : "");
+  const [winnerCode, setWinnerCode] = useState<string>(
+    (prediction as any)?.predictedWinner || ""
+  );
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
@@ -611,18 +615,45 @@ function PredictionRow({
     if (prediction) {
       setH(String(prediction.homeScore));
       setA(String(prediction.awayScore));
+      if ((prediction as any).predictedWinner) {
+        setWinnerCode((prediction as any).predictedWinner);
+      }
     }
-  }, [prediction?.homeScore, prediction?.awayScore]);
+  }, [prediction?.homeScore, prediction?.awayScore, (prediction as any)?.predictedWinner]);
 
-  async function save(newH: string, newA: string) {
+  /* Auto-derive KO winner from score when not tied. Tied scores leave the
+   * winner choice to the user. */
+  useEffect(() => {
+    if (!isKnockout) return;
+    const hi = parseInt(h, 10);
+    const ai = parseInt(a, 10);
+    if (Number.isNaN(hi) || Number.isNaN(ai)) return;
+    if (hi > ai) setWinnerCode(match.home);
+    else if (ai > hi) setWinnerCode(match.away);
+  }, [h, a, isKnockout, match.home, match.away]);
+
+  async function save(newH: string, newA: string, newWinner: string) {
     const hi = parseInt(newH, 10);
     const ai = parseInt(newA, 10);
     if (Number.isNaN(hi) || Number.isNaN(ai) || hi < 0 || ai < 0 || hi > 20 || ai > 20) return;
-    if (prediction && hi === prediction.homeScore && ai === prediction.awayScore) return;
+    /* KO: winner is mandatory; for tied scores require user pick. */
+    if (isKnockout) {
+      if (hi === ai && !newWinner) {
+        /* don't auto-save until user picks winner for tied prediction */
+        return;
+      }
+    }
+    /* Skip save if nothing actually changed */
+    if (prediction
+        && hi === prediction.homeScore
+        && ai === prediction.awayScore
+        && (!isKnockout || newWinner === ((prediction as any).predictedWinner || ""))) {
+      return;
+    }
     setSaveState("saving");
     setErrMsg(null);
     try {
-      await setPrediction(match.id, hi, ai, false);
+      await setPrediction(match.id, hi, ai, false, isKnockout ? newWinner : undefined);
       setSaveState("saved");
       onSaved();
       setTimeout(() => setSaveState("idle"), 1500);
@@ -632,14 +663,18 @@ function PredictionRow({
     }
   }
 
-  /* Debounced autosave when both inputs are valid */
+  /* Debounced autosave when both inputs are valid (and winner is set for KO) */
   useEffect(() => {
     if (locked || isPlaceholder) return;
     if (h === "" || a === "") return;
-    if (prediction && Number(h) === prediction.homeScore && Number(a) === prediction.awayScore) return;
-    const id = setTimeout(() => save(h, a), 700);
+    if (isKnockout && !winnerCode) return;
+    if (prediction
+        && Number(h) === prediction.homeScore
+        && Number(a) === prediction.awayScore
+        && (!isKnockout || winnerCode === ((prediction as any).predictedWinner || ""))) return;
+    const id = setTimeout(() => save(h, a, winnerCode), 700);
     return () => clearTimeout(id);
-  }, [h, a]);
+  }, [h, a, winnerCode]);
 
   /* Score breakdown if match finished */
   const score = useMemo(() => {
@@ -762,10 +797,46 @@ function PredictionRow({
         </div>
       </div>
 
+      {/* KO-only: explicit "who advances" picker (mandatory for KO) */}
+      {isKnockout && !locked && (() => {
+        const hi = parseInt(h, 10);
+        const ai = parseInt(a, 10);
+        const isTied = !Number.isNaN(hi) && !Number.isNaN(ai) && hi === ai;
+        return (
+          <div className="mypred-ko-winner">
+            <span className="muted" style={{ fontSize: 12 }}>
+              ⚽ מי תעלה? {isTied && <strong style={{ color: "var(--orange)" }}>חובה לבחור (90 דק׳ בתיקו)</strong>}
+            </span>
+            <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className={`btn btn-small ${winnerCode === match.home ? "btn-primary" : ""}`}
+                onClick={() => setWinnerCode(match.home)}
+                style={{ fontWeight: winnerCode === match.home ? 800 : 500, fontSize: 12 }}>
+                {home.flag} {home.name}
+              </button>
+              <button
+                type="button"
+                className={`btn btn-small ${winnerCode === match.away ? "btn-primary" : ""}`}
+                onClick={() => setWinnerCode(match.away)}
+                style={{ fontWeight: winnerCode === match.away ? 800 : 500, fontSize: 12 }}>
+                {away.flag} {away.name}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="mypred-row-foot">
         {locked ? (
           <span className="pred-msg is-locked" style={{ margin: 0 }}>
-            🔒 נעול{prediction ? ` · נשמר: ${prediction.homeScore}:${prediction.awayScore}` : " · לא הוזן"}
+            🔒 נעול
+            {prediction ? ` · נשמר: ${prediction.homeScore}:${prediction.awayScore}` : " · לא הוזן"}
+            {isKnockout && prediction && (prediction as any).predictedWinner && (() => {
+              const wc = (prediction as any).predictedWinner;
+              const wt = TEAMS[wc];
+              return ` · עולה: ${wt?.flag || ""} ${wt?.name || wc}`;
+            })()}
             {prediction?.auto && " 🤖"}
           </span>
         ) : (
