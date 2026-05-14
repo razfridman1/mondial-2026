@@ -4066,3 +4066,160 @@ html[data-theme="light"] .chat-panel {
 @media (max-width: 720px) {
   .name-setup-modal { padding: 22px 18px; }
 }
+
+/* ====================================================================
+ * SimulationPanel — stage-by-stage workflow
+ * ==================================================================== */
+.sim-panel { padding: 4px 0 60px; }
+.sim-group-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+  background: rgba(79, 125, 255, 0.08);
+  border: 1px solid rgba(79, 125, 255, 0.3);
+  border-radius: 12px;
+  flex-wrap: wrap;
+}
+.sim-group-picker select {
+  flex: 1;
+  min-width: 200px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+.sim-workflow-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .sim-workflow-grid { grid-template-columns: 1fr; }
+}
+
+.sim-workflow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sim-stage-card {
+  padding: 14px 16px;
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+.sim-stage-card.is-locked {
+  opacity: 0.55;
+  background: rgba(0, 0, 0, 0.18);
+}
+.sim-stage-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.sim-stage-title {
+  flex: 1;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--text);
+}
+.sim-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.sim-badge-done {
+  background: rgba(34, 197, 94, 0.18);
+  color: #6ee7b7;
+}
+.sim-badge-locked {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+
+.sim-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.sim-step:first-of-type { border-top: none; }
+.sim-step-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+.sim-step-info .muted { font-size: 12px; }
+.sim-step .btn { white-space: nowrap; }
+
+/* Status table */
+.sim-status-table {
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  position: sticky;
+  top: 12px;
+}
+.sim-status-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.sim-status-table th {
+  text-align: right;
+  padding: 6px 4px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sim-status-table td {
+  padding: 7px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.sim-status-table tr:last-child td { border-bottom: none; }
+
+/* Reset section */
+.sim-reset {
+  margin-top: 24px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.10) 0%, rgba(255, 122, 69, 0.06) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.sim-reset-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #ff7a45 100%);
+  border: none;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 12px 22px;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+}
+.sim-reset-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+@media (max-width: 600px) {
+  .sim-step { flex-direction: column; align-items: flex-start; }
+  .sim-step .btn { width: 100%; }
+}

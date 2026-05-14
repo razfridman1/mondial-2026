@@ -67,3 +67,75 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, joker: false });
 }
+
+/* ===================================================================
+ * DELETE /api/predictions  { matchId?, stage? }
+ *
+ * Deletes the caller's own prediction(s). Always enforces the same
+ * 3-minute-before-kickoff lock as POST.
+ *   - matchId: delete one prediction (404 if not found, 403 if locked)
+ *   - stage:   delete every prediction the user has for matches in that
+ *              stage that aren't yet locked. Returns counts of deleted
+ *              and skipped (locked).
+ * Either matchId or stage is required.
+ * =================================================================== */
+export async function DELETE(req: Request) {
+  const auth = req.headers.get("authorization") || "";
+  const m = auth.match(/^Bearer (.+)$/);
+  if (!m) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  let decoded;
+  try { decoded = await verifyIdToken(m[1]); }
+  catch (e: any) { return NextResponse.json({ error: e.message }, { status: 401 }); }
+
+  const url = new URL(req.url);
+  const matchId = url.searchParams.get("matchId");
+  const stage   = url.searchParams.get("stage");
+  if (!matchId && !stage) {
+    return NextResponse.json({ error: "missing matchId or stage" }, { status: 400 });
+  }
+
+  const { db } = getAdmin();
+  const simSnap = await db.collection("sim_config").doc("global").get();
+  const sim = simSnap.exists ? (simSnap.data() as SimConfig) : null;
+
+  function isLocked(matchUtc: string): boolean {
+    const eff = new Date(effectiveUtc(matchUtc, sim)).getTime();
+    return Date.now() >= eff - 3 * 60 * 1000;
+  }
+
+  /* Single-match path */
+  if (matchId) {
+    const match = MATCHES.find(x => x.id === matchId);
+    if (!match) return NextResponse.json({ error: "match not found" }, { status: 404 });
+    if (isLocked(match.utc)) {
+      return NextResponse.json({
+        error: "locked",
+        message: "הניחוש נעול — לא ניתן למחוק (תוך 3 דקות לפני המשחק או אחרי)",
+      }, { status: 403 });
+    }
+    const docId = `${decoded.uid}_${matchId}`;
+    await db.collection("predictions").doc(docId).delete();
+    return NextResponse.json({ ok: true, deleted: 1 });
+  }
+
+  /* Stage path: delete predictions for matches in stage that are not locked. */
+  const stageMatches = MATCHES.filter(m => m.stage === stage);
+  if (!stageMatches.length) return NextResponse.json({ error: "invalid stage" }, { status: 400 });
+
+  let deleted = 0, lockedCount = 0;
+  let batch = db.batch();
+  let ops = 0;
+  for (const m of stageMatches) {
+    if (isLocked(m.utc)) { lockedCount++; continue; }
+    const ref = db.collection("predictions").doc(`${decoded.uid}_${m.id}`);
+    const snap = await ref.get();
+    if (!snap.exists) continue;
+    batch.delete(ref);
+    deleted++;
+    ops++;
+    if (ops >= 450) { await batch.commit(); batch = db.batch(); ops = 0; }
+  }
+  if (ops > 0) await batch.commit();
+
+  return NextResponse.json({ ok: true, deleted, locked: lockedCount });
+}
