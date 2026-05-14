@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { loginWithGoogle, loginWithEmail, loginWithIdentifier, registerWithEmail } from "@/lib/firebase";
+import { captureInviteFromUrl } from "@/components/AuthProvider";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +12,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /* If user landed on /login?invite=CODE, stash the code so the
+   * AuthProvider on the main page can auto-join after sign-in. */
+  useEffect(() => { captureInviteFromUrl(); }, []);
 
   async function withCatch(fn: () => Promise<any>) {
     setBusy(true); setError(null);

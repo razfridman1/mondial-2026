@@ -73,21 +73,33 @@ export default function GroupsTab() {
         </div>
       )}
 
-      {cur && (
-        <div className="group-meta">
-          <div>
-            <strong>{cur.name}</strong>
-            {cur.description && <span className="muted"> · {cur.description}</span>}
+      {cur && (() => {
+        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        const inviteUrl = `${origin}/?invite=${cur.inviteCode}`;
+        const waText = `הצטרף לקבוצת מונדיאל 2026 שלי "${cur.name}" 🏆\n${inviteUrl}\n(או הזן קוד ידני: ${cur.inviteCode})`;
+        async function copyLink() {
+          try { await navigator.clipboard.writeText(inviteUrl); alert("הקישור הועתק!"); }
+          catch { prompt("העתק את הקישור ידנית:", inviteUrl); }
+        }
+        return (
+          <div className="group-meta">
+            <div>
+              <strong>{cur.name}</strong>
+              {cur.description && <span className="muted"> · {cur.description}</span>}
+            </div>
+            <div className="muted" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              קוד הזמנה: <code className="invite-code">{cur.inviteCode}</code>
+              <button className="btn btn-small" onClick={copyLink}>
+                🔗 העתק קישור הזמנה
+              </button>
+              <button className="btn btn-small wa-btn"
+                      onClick={() => shareToWhatsApp(waText)}>
+                💬 שתף בווטסאפ
+              </button>
+            </div>
           </div>
-          <div className="muted" style={{ display: "flex", gap: 8 }}>
-            קוד הזמנה: <code className="invite-code">{cur.inviteCode}</code>
-            <button className="btn btn-small wa-btn"
-                    onClick={() => shareToWhatsApp(`הצטרף לקבוצת מונדיאל 2026 שלי "${cur.name}" עם קוד הזמנה: *${cur.inviteCode}*`)}>
-              💬 שתף בווטסאפ
-            </button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="groups-grid-two">
         <section>
