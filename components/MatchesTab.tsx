@@ -6,12 +6,10 @@
  * Sections (top pills):
  *   חי   — currently live matches (pregame + live)
  *   היום — all matches today (regardless of status)
- *   קרובים — upcoming matches in next 7 days
  *   הסתיימו — finished matches (most recent first)
  *   היסטוריה — full archive with filters
  *
  * Plus filters (date / stage / team) and a Favorites star toggle to focus
- * on a few favorite national teams.
  *
  * Designed mobile-first; dark glassmorphism aesthetic.
  * ===================================================================*/
@@ -27,17 +25,7 @@ import type { Match } from "@/lib/types";
 import MatchModal from "./MatchModal";
 import MatchCard from "./MatchCard";
 
-type Section = "groups" | "live" | "today" | "upcoming" | "finished" | "history";
-
-const FAV_KEY = "fav_teams_v1";
-
-function loadFavs(): string[] {
-  if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch { return []; }
-}
-function saveFavs(arr: string[]) {
-  try { localStorage.setItem(FAV_KEY, JSON.stringify(arr)); } catch {}
-}
+type Section = "groups" | "live" | "today" | "finished" | "history";
 
 export default function MatchesTab() {
   const overrides = useStore(s => s.overrides);
@@ -46,8 +34,6 @@ export default function MatchesTab() {
   const [section, setSection]   = useState<Section>("groups");
   const [openId, setOpenId]     = useState<string | null>(null);
   const [results, setResults]   = useState<Record<string, { home: number; away: number; finishedAt: number }>>({});
-  const [favs, setFavs]         = useState<string[]>(() => loadFavs());
-  const [favOnly, setFavOnly]   = useState(false);
   const [now, setNow]           = useState(() => Date.now());
 
   /* Filters (used in history section) */
@@ -82,38 +68,24 @@ export default function MatchesTab() {
     [overrides, simConfig]
   );
 
-  function isFav(m: Match) {
-    return favs.includes(m.home) || favs.includes(m.away);
-  }
-  function toggleFav(code: string) {
-    setFavs(prev => {
-      const next = prev.includes(code) ? prev.filter(x => x !== code) : [...prev, code];
-      saveFavs(next);
-      return next;
-    });
-  }
-
   /* Bucketed lists */
   const buckets = useMemo(() => {
     const today = todayKey();
     const live: Match[] = [];
     const todays: Match[] = [];
-    const upcoming: Match[] = [];
     const finished: Match[] = [];
 
     for (const m of matches) {
       const st = matchLiveStatus(m);
       const key = israelDateKey(m.utc);
-      const dayDiff = Math.round((+new Date(m.utc) - now) / (24 * 3600 * 1000));
 
       if (st === "live" || st === "pregame") live.push(m);
       if (key === today) todays.push(m);
       if (st === "finished") finished.push(m);
-      if (st === "scheduled" && dayDiff >= 0 && dayDiff <= 7) upcoming.push(m);
     }
     /* Finished: newest first */
     finished.sort((a, b) => +new Date(b.utc) - +new Date(a.utc));
-    return { live, today: todays, upcoming, finished };
+    return { live, today: todays, finished };
   }, [matches, now]);
 
   /* History list with filters */
@@ -122,29 +94,23 @@ export default function MatchesTab() {
     if (fltStage) list = list.filter(m => m.stage === fltStage);
     if (fltTeam)  list = list.filter(m => m.home === fltTeam || m.away === fltTeam);
     if (fltDay)   list = list.filter(m => israelDateKey(m.utc) === fltDay);
-    if (favOnly)  list = list.filter(isFav);
     return list;
-  }, [matches, fltStage, fltTeam, fltDay, favOnly, favs]);
+  }, [matches, fltStage, fltTeam, fltDay]);
 
   /* Visible list based on section */
   const visible: Match[] = useMemo(() => {
-    let list: Match[];
     switch (section) {
-      case "live":     list = buckets.live; break;
-      case "today":    list = buckets.today; break;
-      case "upcoming": list = buckets.upcoming; break;
-      case "finished": list = buckets.finished; break;
-      case "history":  list = historyList; break;
-      default:         list = buckets.today;
+      case "live":     return buckets.live;
+      case "today":    return buckets.today;
+      case "finished": return buckets.finished;
+      case "history":  return historyList;
+      default:         return buckets.today;
     }
-    if (favOnly && section !== "history") list = list.filter(isFav);
-    return list;
-  }, [section, buckets, historyList, favOnly, favs]);
+  }, [section, buckets, historyList]);
 
   const counts = {
     live: buckets.live.length,
     today: buckets.today.length,
-    upcoming: buckets.upcoming.length,
     finished: buckets.finished.length,
   };
 
@@ -158,33 +124,11 @@ export default function MatchesTab() {
                  icon={<LiveDot />} label="חי"      badge={counts.live} highlight />
         <PillBtn active={section === "today"}    onClick={() => setSection("today")}
                  icon="📅" label="היום"   badge={counts.today} />
-        <PillBtn active={section === "upcoming"} onClick={() => setSection("upcoming")}
-                 icon="⏭"  label="קרובים" badge={counts.upcoming} />
         <PillBtn active={section === "finished"} onClick={() => setSection("finished")}
                  icon="🏁" label="הסתיימו" badge={counts.finished} />
         <PillBtn active={section === "history"}  onClick={() => setSection("history")}
                  icon="🗂" label="היסטוריה" />
       </nav>
-
-      {/* Favorites bar */}
-      <div className="mt-fav-bar">
-        <button className={`mt-fav-toggle ${favOnly ? "on" : ""}`}
-                onClick={() => setFavOnly(v => !v)} title="הצג רק מועדפים">
-          {favOnly ? "★" : "☆"} מועדפים בלבד
-        </button>
-        {favs.length > 0 && (
-          <div className="mt-fav-list" aria-label="קבוצות מועדפות">
-            {favs.map(code => {
-              const t = TEAMS[code]; if (!t) return null;
-              return (
-                <button key={code} className="mt-fav-chip" onClick={() => toggleFav(code)} title="הסר מהמועדפים">
-                  <span>{t.flag}</span><span>{t.name}</span><span aria-hidden>×</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* History filters */}
       {section === "history" && <HistoryFilters
@@ -197,12 +141,12 @@ export default function MatchesTab() {
       {/* List body */}
       <div className="mt-body">
         {section === "groups" ? (
-          <GroupStageSchedule matches={matches} favOnly={favOnly} favs={favs} onOpen={setOpenId} />
+          <GroupStageSchedule matches={matches} onOpen={setOpenId} />
         ) : visible.length === 0 ? (
           <EmptyState section={section} />
         ) : (
           <GroupedList list={visible} section={section} results={results}
-                       onOpen={setOpenId} isFav={isFav} onToggleFav={toggleFav} />
+                       onOpen={setOpenId} />
         )}
       </div>
 
@@ -266,19 +210,14 @@ function HistoryFilters({ stage, setStage, team, setTeam, day, setDay, matches }
 }
 
 /* ----------- Group-stage classic schedule (old MatchCard view) ----- */
-function GroupStageSchedule({ matches, favOnly, favs, onOpen }: {
+function GroupStageSchedule({ matches, onOpen }: {
   matches: Match[];
-  favOnly: boolean;
-  favs: string[];
   onOpen: (id: string) => void;
 }) {
   /* All group-stage matches grouped by day, sorted chronologically. */
   const groupMatches = useMemo(() => {
-    let list = matches.filter(m => m.stage === "GROUP");
-    if (favOnly) {
-      list = list.filter(m => favs.includes(m.home) || favs.includes(m.away));
-    }
-    list.sort((a, b) => +new Date(a.utc) - +new Date(b.utc));
+    const list = matches.filter(m => m.stage === "GROUP")
+      .sort((a, b) => +new Date(a.utc) - +new Date(b.utc));
     const byDay = new Map<string, Match[]>();
     for (const m of list) {
       const k = israelDateKey(m.utc);
@@ -286,7 +225,7 @@ function GroupStageSchedule({ matches, favOnly, favs, onOpen }: {
       byDay.get(k)!.push(m);
     }
     return [...byDay.entries()];
-  }, [matches, favOnly, favs]);
+  }, [matches]);
 
   if (groupMatches.length === 0) {
     return (
@@ -320,7 +259,7 @@ function GroupStageSchedule({ matches, favOnly, favs, onOpen }: {
 function EmptyState({ section }: { section: Section }) {
   const msg = section === "live"     ? "אין משחקים חיים כרגע"
             : section === "today"    ? "אין משחקים היום"
-            : section === "upcoming" ? "אין משחקים בשבוע הקרוב"
+            : section === "groups"   ? "אין משחקי שלב הבתים"
             : section === "finished" ? "עוד אין משחקים שהסתיימו"
             :                          "לא נמצאו משחקים לפי הסינון";
   return (
@@ -331,12 +270,10 @@ function EmptyState({ section }: { section: Section }) {
   );
 }
 
-function GroupedList({ list, section, results, onOpen, isFav, onToggleFav }: {
+function GroupedList({ list, section, results, onOpen }: {
   list: Match[]; section: Section;
   results: Record<string, { home: number; away: number; finishedAt: number }>;
   onOpen: (id: string) => void;
-  isFav: (m: Match) => boolean;
-  onToggleFav: (code: string) => void;
 }) {
   const byDay = useMemo(() => {
     const map = new Map<string, Match[]>();
@@ -360,8 +297,7 @@ function GroupedList({ list, section, results, onOpen, isFav, onToggleFav }: {
           <div className="mt-cards">
             {ms.map(m => (
               <MatchCardModern key={m.id} match={m} result={results[m.id]}
-                onOpen={() => onOpen(m.id)}
-                isFav={isFav(m)} onToggleFav={onToggleFav} />
+                onOpen={() => onOpen(m.id)} />
             ))}
           </div>
         </div>
@@ -372,12 +308,10 @@ function GroupedList({ list, section, results, onOpen, isFav, onToggleFav }: {
 
 /* ---------------------- Modern Match Card ------------------------- */
 
-function MatchCardModern({ match, result, onOpen, isFav, onToggleFav }: {
+function MatchCardModern({ match, result, onOpen }: {
   match: Match;
   result?: { home: number; away: number; finishedAt: number };
   onOpen: () => void;
-  isFav: boolean;
-  onToggleFav: (code: string) => void;
 }) {
   const home = TEAMS[match.home] || { code: match.home, name: match.home, flag: "❓" };
   const away = TEAMS[match.away] || { code: match.away, name: match.away, flag: "❓" };
@@ -399,7 +333,7 @@ function MatchCardModern({ match, result, onOpen, isFav, onToggleFav }: {
   }, [status, match.utc]);
 
   return (
-    <article className={`mt-card status-${status} ${isFav ? "is-fav" : ""}`}
+    <article className={`mt-card status-${status}`}
              onClick={onOpen}
              onKeyDown={(e) => e.key === "Enter" && onOpen()}
              role="button" tabIndex={0}>
@@ -426,11 +360,6 @@ function MatchCardModern({ match, result, onOpen, isFav, onToggleFav }: {
       <div className="mt-card-body">
         {/* Home team */}
         <div className="mt-team home">
-          <button className={`mt-fav-star ${isFav ? "on" : ""}`}
-                  onClick={(e) => { e.stopPropagation(); onToggleFav(match.home); }}
-                  aria-label="הוסף למועדפים" title="מועדפים">
-            ★
-          </button>
           <span className="mt-flag">{home.flag}</span>
           <span className="mt-team-name">{home.name}</span>
         </div>
@@ -461,11 +390,6 @@ function MatchCardModern({ match, result, onOpen, isFav, onToggleFav }: {
         <div className="mt-team away">
           <span className="mt-team-name">{away.name}</span>
           <span className="mt-flag">{away.flag}</span>
-          <button className={`mt-fav-star ${isFav ? "on" : ""}`}
-                  onClick={(e) => { e.stopPropagation(); onToggleFav(match.away); }}
-                  aria-label="הוסף למועדפים" title="מועדפים">
-            ★
-          </button>
         </div>
       </div>
 
