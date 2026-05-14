@@ -178,9 +178,14 @@ export default function MyPredictionsTab() {
       const r = results[p.matchId];
       if (!r) return;
       total++;
+      const match = MATCHES.find(m => m.id === p.matchId);
+      const isKO = match ? match.stage !== "GROUP" : false;
       const sc = scorePrediction({
         predictedHome: p.homeScore, predictedAway: p.awayScore,
         actualHome: r.home, actualAway: r.away,
+        predictedWinner: (p as any).predictedWinner ?? null,
+        actualWinner:    (r as any).winner ?? null,
+        isKnockout: isKO,
       });
       if (sc.points > 0) hit++;
     });
@@ -600,12 +605,16 @@ function PredictionRow({
   /* Score breakdown if match finished */
   const score = useMemo(() => {
     if (!result || !prediction) return null;
+    const isKO = match.stage !== "GROUP";
     return scorePrediction({
       predictedHome: prediction.homeScore,
       predictedAway: prediction.awayScore,
       actualHome: result.home, actualAway: result.away,
+      predictedWinner: (prediction as any).predictedWinner ?? null,
+      actualWinner:    (result as any).winner ?? null,
+      isKnockout: isKO,
     });
-  }, [result, prediction]);
+  }, [result, prediction, match.stage]);
 
   /* ----- placeholder match ----- */
   if (isPlaceholder) {

@@ -33,6 +33,8 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
    * hasn't reached kickoff yet, so we must not gate on matchLiveStatus. */
   const isFinished = !!matchResult;
 
+  const isKnockout = match.stage !== "GROUP";
+
   /* Compute score if both prediction and result available */
   const myScore = useMemo(() => {
     if (!myPrediction || !matchResult) return null;
@@ -41,8 +43,11 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
       predictedAway: myPrediction.awayScore,
       actualHome: matchResult.home,
       actualAway: matchResult.away,
+      predictedWinner: (myPrediction as any).predictedWinner ?? null,
+      actualWinner:    (matchResult as any).winner ?? null,
+      isKnockout,
     });
-  }, [myPrediction, matchResult]);
+  }, [myPrediction, matchResult, isKnockout]);
 
   function scoreLabel(): string {
     if (!myScore) return "";

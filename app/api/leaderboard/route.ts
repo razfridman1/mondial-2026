@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
 import { userTotals } from "@/lib/scoring";
+import { MATCHES } from "@/lib/data";
 import type { LeaderRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -29,12 +30,25 @@ export async function GET(req: Request) {
 
   if (!uids.length) return NextResponse.json([]);
 
-  /* 2. Load match results */
+  /* 2. Load match results — including KO-specific fields (winner, isKnockout) */
   const resSnap = await db.collection("match_results").get();
-  const results: Record<string, { home: number; away: number; finishedAt: number }> = {};
+  const results: Record<string, { home: number; away: number; finishedAt: number; winner?: string; isKnockout?: boolean }> = {};
+  /* Build a stage lookup so we can flag knockouts even if the DB doc didn't
+   * store isKnockout (older docs). */
+  const stageById = new Map<string, string>();
+  for (const m of MATCHES) stageById.set(m.id, m.stage);
   resSnap.forEach(d => {
     const data = d.data() as any;
-    results[d.id] = { home: data.home, away: data.away, finishedAt: data.finishedAt || Date.now() };
+    const stage = stageById.get(d.id);
+    const isKO = data.isKnockout || (stage && stage !== "GROUP");
+    const entry: any = {
+      home: data.home,
+      away: data.away,
+      finishedAt: data.finishedAt || Date.now(),
+    };
+    if (data.winner) entry.winner = data.winner;
+    if (isKO) entry.isKnockout = true;
+    results[d.id] = entry;
   });
 
   /* 2b. Load bonus awards (manual admin adjustments) and sum per user */

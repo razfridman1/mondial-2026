@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { MATCHES, TEAMS } from "@/lib/data";
 import type { StageId, Match } from "@/lib/types";
-import { resolvePlaceholder, resolveAllStages, stageComplete, groupStageComplete } from "@/lib/bracket";
+import { resolvePlaceholder, resolveAllStages, stageComplete, groupStageComplete, bestEightThirdPlaced } from "@/lib/bracket";
 import type { MatchResult } from "@/lib/standings";
 
 export const runtime = "nodejs";
@@ -130,6 +130,17 @@ async function simulateBatch(
   /* Track teams already assigned within this stage so the same 3rd-placed
    * team can't end up in two different R32 slots. */
   const usedTeams = new Set<string>();
+  /* Pool of qualifying 3rd-placed teams — used as a "relax" fallback when
+   * a 3rd-place slot's constraint can't be satisfied. */
+  const eightThirds = stage === "R32" || stage === "ALL"
+    ? bestEightThirdPlaced(results).map(t => t.teamCode)
+    : [];
+  function relaxedThird(): string | null {
+    for (const code of eightThirds) {
+      if (!usedTeams.has(code)) { usedTeams.add(code); return code; }
+    }
+    return null;
+  }
 
   for (let i = 0; i < matches.length; i++) {
     const m = matches[i];
@@ -145,8 +156,13 @@ async function simulateBatch(
     let homeCode = m.home;
     let awayCode = m.away;
     if (isKO) {
-      homeCode = resolvePlaceholder(m.home, results, resolved, usedTeams) || m.home;
-      awayCode = resolvePlaceholder(m.away, results, resolved, usedTeams) || m.away;
+      homeCode = resolvePlaceholder(m.home, results, resolved, usedTeams) || "";
+      awayCode = resolvePlaceholder(m.away, results, resolved, usedTeams) || "";
+      /* If a 3rd-place slot didn't resolve, take any remaining qualifying team. */
+      if (!homeCode && /^3[A-Z\/]+$/.test(m.home)) homeCode = relaxedThird() || "";
+      if (!awayCode && /^3[A-Z\/]+$/.test(m.away)) awayCode = relaxedThird() || "";
+      if (!homeCode) homeCode = m.home;
+      if (!awayCode) awayCode = m.away;
     }
 
     const { home, away } = simulateMatch(m, homeCode, awayCode, isKO);
@@ -159,10 +175,29 @@ async function simulateBatch(
       sim: true,
       simKind: "fifa-rules",
     };
-    /* Store resolved teams for KO matches so display can show actual names */
+    /* Store resolved teams for KO matches so display can show actual names.
+     * Also always store an explicit `winner` for knockouts — when the
+     * 90-min score is a tie we pick one via odds-weighted coin flip (sim
+     * stand-in for ET + penalties). */
     if (isKO) {
       doc.homeTeam = homeCode;
       doc.awayTeam = awayCode;
+      doc.isKnockout = true;
+      let winnerCode: string;
+      if (home > away)      winnerCode = homeCode;
+      else if (away > home) winnerCode = awayCode;
+      else {
+        /* 90-min tie → ET + pens decider. Use odds if available. */
+        const odds = m.odds;
+        if (odds && odds.home && odds.away) {
+          const ih = 1 / parseFloat(odds.home), ia = 1 / parseFloat(odds.away);
+          winnerCode = Math.random() < ih / (ih + ia) ? homeCode : awayCode;
+        } else {
+          winnerCode = Math.random() < 0.5 ? homeCode : awayCode;
+        }
+        doc.decidedAfter90 = true; /* informational: 90 was tied, ET/pens decided */
+      }
+      doc.winner = winnerCode;
     }
     batch.set(ref, doc);
     /* Update in-memory results so subsequent matches in this batch can resolve correctly */
@@ -209,15 +244,9 @@ function simulateMatch(m: Match, homeCode: string, awayCode: string, isKnockout:
     outcome = r < 0.42 ? "home" : r < 0.70 ? "away" : "draw";
   }
 
-  /* Knockouts must have a winner — reroll draws */
-  if (isKnockout && outcome === "draw") {
-    if (odds && odds.home && odds.away) {
-      const ih = 1 / parseFloat(odds.home), ia = 1 / parseFloat(odds.away);
-      outcome = Math.random() < ih / (ih + ia) ? "home" : "away";
-    } else {
-      outcome = Math.random() < 0.5 ? "home" : "away";
-    }
-  }
+  /* In KO, ties at 90 mins are allowed (resolved by ET/penalties — handled
+   * by the caller via `doc.winner`). We DON'T reroll draws here.
+   * Group-stage draws remain valid as their final score. */
 
   function poisson(lambda: number): number {
     let L = Math.exp(-lambda), k = 0, p = 1;

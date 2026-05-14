@@ -174,18 +174,45 @@ export function resolveAllStages(
      * 3rd-placed team across multiple R32 slots. New Set per stage so QF/SF
      * can reuse the same winners as needed. */
     const usedTeams = new Set<string>();
+    /* Pre-pass for R32 (and any stage with 3rd-place slots) — find ANY
+     * unused team from the qualifying-8 pool if the strict slot constraint
+     * can't be satisfied. Guarantees all 8 best-3rds end up in R32. */
+    const eightThirds = stage === "R32" ? bestEightThirdPlaced(results).map(t => t.teamCode) : [];
+    function relaxedThird(): string | null {
+      for (const code of eightThirds) {
+        if (!usedTeams.has(code)) {
+          usedTeams.add(code);
+          return code;
+        }
+      }
+      return null;
+    }
     for (const m of listStageMatchesOrdered(stage)) {
-      const homeCode = resolvePlaceholder(m.home, results, out, usedTeams) || m.home;
-      const awayCode = resolvePlaceholder(m.away, results, out, usedTeams) || m.away;
+      let homeCode = resolvePlaceholder(m.home, results, out, usedTeams) || "";
+      let awayCode = resolvePlaceholder(m.away, results, out, usedTeams) || "";
+      /* Relaxation: if home or away is a 3rd-place placeholder that didn't
+       * resolve (no qualifying team from allowed groups), fall back to ANY
+       * unused team from the 8 best 3rd-placed pool. */
+      if (!homeCode && /^3[A-Z\/]+$/.test(m.home)) homeCode = relaxedThird() || "";
+      if (!awayCode && /^3[A-Z\/]+$/.test(m.away)) awayCode = relaxedThird() || "";
+      /* Fallback to literal placeholder text if still empty. */
+      if (!homeCode) homeCode = m.home;
+      if (!awayCode) awayCode = m.away;
       const r = results[m.id];
       if (r) {
         let winner = "", loser = "";
-        if (r.home > r.away) { winner = homeCode; loser = awayCode; }
-        else if (r.home < r.away) { winner = awayCode; loser = homeCode; }
+        /* Preferred: use explicit winner stored on the result doc (KO).
+         * This handles the case where 90-min was a tie and ET/penalties
+         * decided. Falls back to score-based winner if not present. */
+        if (r.winner && (r.winner === homeCode || r.winner === awayCode)) {
+          winner = r.winner;
+          loser = winner === homeCode ? awayCode : homeCode;
+        } else if (r.home > r.away) { winner = homeCode; loser = awayCode; }
+        else if (r.home < r.away)   { winner = awayCode; loser = homeCode; }
         else {
-          /* tie in knockout — pick winner deterministically by alphabet, for sim purposes */
+          /* Tie at 90 with no explicit winner — pick deterministically. */
           if (homeCode < awayCode) { winner = homeCode; loser = awayCode; }
-          else { winner = awayCode; loser = homeCode; }
+          else                     { winner = awayCode; loser = homeCode; }
         }
         out[m.id] = { home: homeCode, away: awayCode, winner, loser };
       } else {

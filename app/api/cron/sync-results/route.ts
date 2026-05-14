@@ -93,6 +93,10 @@ export async function GET(req: Request) {
       const existing = await ref.get();
       const finishedAt = ext.lastUpdated ? new Date(ext.lastUpdated).getTime() : Date.now();
 
+      /* Look up our match to know stage / knockout / and resolved teams. */
+      const ourMatchRecord = MATCHES.find(mm => mm.id === ourMatch.id);
+      const isKO = !!(ourMatchRecord && ourMatchRecord.stage !== "GROUP");
+
       const doc: any = {
         matchId: ourMatch.id,
         home: ext.score.fullTime.home,
@@ -102,7 +106,19 @@ export async function GET(req: Request) {
         source: "live",
         liveStatus: ext.status,
         liveExternalId: ext.id,
+        ...(isKO ? { isKnockout: true } : {}),
       };
+
+      /* For knockouts: pick the real winner (after ET/pens if present),
+       * using football-data.org's `winner` field on score. */
+      if (isKO && ext.status === "FINISHED") {
+        const koResolved = resolved[ourMatch.id];
+        const winnerSide = ext.score.winner; // "HOME_TEAM" | "AWAY_TEAM" | "DRAW"
+        if (winnerSide === "HOME_TEAM" && koResolved?.home) doc.winner = koResolved.home;
+        else if (winnerSide === "AWAY_TEAM" && koResolved?.away) doc.winner = koResolved.away;
+        /* Note: KO games never end in DRAW per FIFA rules; if the API
+         * still reports DRAW we'll leave winner unset until updated. */
+      }
 
       batch.set(ref, doc, { merge: true });
       ops++;

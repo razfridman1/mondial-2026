@@ -21,6 +21,11 @@ export interface MatchResult {
   home: number;
   away: number;
   finishedAt: number;
+  /* Knockout-only: team code of the team that ultimately advanced. When
+   * the 90-min score is a tie, this is set by ET/penalties. For group
+   * stage and clear KO wins, derived from the score. */
+  winner?: string;
+  isKnockout?: boolean;
 }
 
 export type QualificationStatus = "qualified" | "third-place" | "eliminated" | "pending";

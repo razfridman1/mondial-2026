@@ -583,11 +583,18 @@ function UserStatsModal({
         }}>
           <summary style={{ cursor: "pointer", fontWeight: 700 }}>💡 איך נצברות נקודות?</summary>
           <div style={{ marginTop: 8 }}>
+            <strong>שלב הבתים:</strong><br/>
             • 🎯 <strong>פגיעה + תוצאה</strong> (3:1 — 3:1): <strong>7 נק׳</strong><br/>
             • ✅ <strong>פגיעה + הפרש שערים</strong> (3:1 — 2:0): <strong>4 נק׳</strong><br/>
             • ✅ <strong>פגיעה</strong> (3:1 — 4:2): <strong>3 נק׳</strong><br/>
             • 🤝 <strong>תיקו</strong> (1:1 — 2:2): <strong>3 נק׳</strong> (אין בונוס הפרש שערים בתיקו)<br/>
             • ❌ <strong>פספוס</strong> (3:1 — 1:2): <strong>0 נק׳</strong> (וסטריק נשבר)<br/>
+            <br/>
+            <strong>שלב הנוקאאוט (אין תיקו — חובה לבחור מי תעלה):</strong><br/>
+            • 🎯 <strong>מנצחת + תוצאת 90 דק׳ מדויקת</strong>: <strong>8 נק׳</strong><br/>
+            • ✅ <strong>מנצחת + הפרש שערים נכון</strong>: <strong>5 נק׳</strong><br/>
+            • ✅ <strong>מנצחת בלבד</strong>: <strong>3 נק׳</strong><br/>
+            • ❌ <strong>מנצחת לא נכונה</strong>: <strong>0 נק׳</strong><br/>
             • 🔥 <strong>בונוס סטריק</strong>: כל ניחוש נכון ברצף = +1 נק׳ נוספת
           </div>
         </details>

@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   catch (e: any) { return NextResponse.json({ error: e.message }, { status: 401 }); }
 
   const body = await req.json();
-  const { matchId, homeScore, awayScore } = body;
+  const { matchId, homeScore, awayScore, predictedWinner } = body;
   const match = MATCHES.find(x => x.id === matchId);
   if (!match) return NextResponse.json({ error: "match not found" }, { status: 404 });
 
@@ -44,12 +44,26 @@ export async function POST(req: Request) {
   }
 
   const docId = `${decoded.uid}_${matchId}`;
-  await db.collection("predictions").doc(docId).set({
+  /* For knockout matches we also store a predictedWinner (team code). When
+   * the 90-min score isn't a tie, the winner is unambiguous so we derive
+   * from the score; otherwise the client must send a valid team code. */
+  const isKO = match.stage !== "GROUP";
+  let pw: string | null = null;
+  if (isKO) {
+    if (h > a)      pw = match.home;
+    else if (a > h) pw = match.away;
+    else if (typeof predictedWinner === "string" && predictedWinner.trim()) {
+      pw = predictedWinner.trim();
+    }
+  }
+  const payload: any = {
     uid: decoded.uid, matchId,
     homeScore: h, awayScore: a,
     joker: false,
     updatedAt: Date.now(),
-  }, { merge: true });
+  };
+  if (pw) payload.predictedWinner = pw;
+  await db.collection("predictions").doc(docId).set(payload, { merge: true });
 
   return NextResponse.json({ ok: true, joker: false });
 }

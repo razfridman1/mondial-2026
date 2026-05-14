@@ -43,7 +43,7 @@ interface MondialState {
   prefs: Prefs;
   setUser: (u: AppUser | null) => void;
   setLoadingAuth: (b: boolean) => void;
-  setPrediction: (matchId: string, home: number, away: number, joker?: boolean) => Promise<void>;
+  setPrediction: (matchId: string, home: number, away: number, joker?: boolean, predictedWinner?: string) => Promise<void>;
   setProfileAvatar: (avatarId: string) => Promise<void>;
   setCurrentGroup: (gid: string | null) => void;
   refreshGroups: () => Promise<void>;
@@ -85,12 +85,12 @@ export const useStore = create<MondialState>()(
       },
       setUser: (u) => set({ user: u }),
       setLoadingAuth: (b) => set({ loadingAuth: b }),
-      setPrediction: async (matchId, home, away, joker?: boolean) => {
+      setPrediction: async (matchId, home, away, joker?: boolean, predictedWinner?: string) => {
         const u = get().user;
         if (!u) {
           // anon — keep in local store only
           const p = { ...get().predictions };
-          p[matchId] = { uid: "anon", matchId, homeScore: home, awayScore: away, updatedAt: Date.now(), joker: !!joker };
+          p[matchId] = { uid: "anon", matchId, homeScore: home, awayScore: away, updatedAt: Date.now(), joker: !!joker, predictedWinner };
           set({ predictions: p });
           return;
         }
@@ -98,7 +98,7 @@ export const useStore = create<MondialState>()(
         const r = await fetch("/api/predictions", {
           method: "POST",
           headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-          body: JSON.stringify({ matchId, homeScore: home, awayScore: away, joker: !!joker }),
+          body: JSON.stringify({ matchId, homeScore: home, awayScore: away, joker: !!joker, predictedWinner }),
         });
         if (!r.ok) {
           const err = await r.json().catch(() => ({}));
@@ -111,6 +111,7 @@ export const useStore = create<MondialState>()(
           homeScore: home, awayScore: away,
           updatedAt: Date.now(),
           joker: !!data.joker,
+          ...(predictedWinner ? { predictedWinner } : {}),
         };
         set({ predictions: p });
       },

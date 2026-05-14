@@ -84,6 +84,9 @@ export interface Prediction {
   matchId: string;
   homeScore: number;
   awayScore: number;
+  /* Knockout-only: which team the user picked to advance. Used when the
+   * 90-min score is a tie so we can still score winner-correctness. */
+  predictedWinner?: string;
   updatedAt: number;
   joker?: boolean;        // ×2 score multiplier for this match
   auto?: boolean;         // generated automatically at kickoff
