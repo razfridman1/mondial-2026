@@ -114,7 +114,16 @@ export function resolvePlaceholder(
   return null;
 }
 
-/** Resolve every match in stage order, building up the resolved table as we go. */
+/** Resolve every match in stage order, building up the resolved table as we go.
+ *
+ * STRICT GATING: A stage's placeholders are only resolved when the FULL
+ * previous stage is completed. This matches FIFA: R32 brackets are only
+ * determined once all 72 group games are played; R16 only after all 16
+ * R32 games; and so on.
+ *
+ * If a stage is not yet unlocked, its entries are simply absent from the
+ * returned table, so callers fall back to the placeholder string ("1A").
+ */
 export function resolveAllStages(
   results: Record<string, MatchResult>
 ): Record<string, { home: string; away: string; winner: string; loser: string }> {
@@ -129,9 +138,26 @@ export function resolveAllStages(
     out[m.id] = { home: m.home, away: m.away, winner, loser };
   }
 
-  /* Knockouts in order: R32 → R16 → QF → SF → THIRD/FINAL */
+  /* Knockouts must wait for the FULL previous stage to be complete.
+   * Each iteration of this loop is gated on the previous stage. */
   const ORDER: StageId[] = ["R32", "R16", "QF", "SF", "THIRD", "FINAL"];
+  const PREV: Record<StageId, StageId | "GROUP"> = {
+    GROUP: "GROUP",
+    R32:   "GROUP",
+    R16:   "R32",
+    QF:    "R16",
+    SF:    "QF",
+    THIRD: "SF",
+    FINAL: "SF",
+  };
+
   for (const stage of ORDER) {
+    /* Gate: must have ALL results of the previous stage. */
+    const prev = PREV[stage];
+    if (!stageComplete(prev as StageId, results)) {
+      /* Previous stage isn't fully done — leave this stage's placeholders unresolved. */
+      continue;
+    }
     for (const m of listStageMatchesOrdered(stage)) {
       const homeCode = resolvePlaceholder(m.home, results, out) || m.home;
       const awayCode = resolvePlaceholder(m.away, results, out) || m.away;

@@ -11,7 +11,7 @@ import {
   type KnockoutMatchView,
   type ResolvedBracket,
 } from "@/lib/standings";
-import { resolveAllStages, stageComplete, groupStageComplete } from "@/lib/bracket";
+import { resolveAllStages, stageComplete } from "@/lib/bracket";
 import { applyOverride, formatIsraelDate, formatIsraelTime, matchLiveStatus } from "@/lib/utils";
 import { effectiveUtc } from "@/lib/sim";
 import type { StageId } from "@/lib/types";
