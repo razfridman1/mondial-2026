@@ -135,6 +135,29 @@ export default function SimulationPanel() {
     } finally { setBusy(false); }
   }
 
+  /* Realistic simulation using betting odds — Brazil more likely to beat Cameroon */
+  async function oddsWeightedSim() {
+    if (!confirm(
+      "🎲 סימולציה משוקללת לפי יחסי הימורים\n\n" +
+      "פעולה זו תיצור תוצאות לכל 104 המשחקים — אבל הפעם **לא רנדומלי לחלוטין**:\n" +
+      "• המועדפות לפי ה‑odds תנצחנה ברוב המקרים\n" +
+      "• הפתעות יקרו לפי הסיכוי\n" +
+      "• בנוקאאוט — אין תיקו (יקבע מנצח לפי odds)\n\n" +
+      "תוצאות קיימות יידרסו. להמשיך?"
+    )) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/sim/odds-weighted", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ stage: "ALL", overwrite: true }),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(`שגיאה: ${data.error || r.status}`); return; }
+      alert(`✓ נוצרו ${data.inserted} תוצאות משוקללות לפי odds`);
+    } finally { setBusy(false); }
+  }
+
   /* One-click: generate random results for ALL 104 matches across every stage */
   async function instantResultsAll() {
     if (!confirm(
@@ -486,7 +509,12 @@ export default function SimulationPanel() {
           <button className="btn btn-primary"
                   style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", borderColor: "#16a34a", fontWeight: 700 }}
                   onClick={instantResultsAll} disabled={busy}>
-            ⚽⚽ תוצאות לכל 104 המשחקים בבת אחת
+            ⚽⚽ תוצאות רנדומליות לכל 104 המשחקים
+          </button>
+          <button className="btn btn-primary"
+                  style={{ background: "linear-gradient(135deg, #f59e0b, #ea580c)", borderColor: "#ea580c", fontWeight: 700 }}
+                  onClick={oddsWeightedSim} disabled={busy}>
+            🎲 סימולציה משוקללת לפי odds
           </button>
           <button className="btn"
                   style={{ background: "rgba(167,139,250,0.15)", borderColor: "var(--purple)", color: "var(--purple)", fontWeight: 700 }}
@@ -495,9 +523,10 @@ export default function SimulationPanel() {
           </button>
         </div>
         <p className="muted" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
-          ⚽ <strong>כפתור לכל שלב:</strong> יוצר תוצאות אקראיות רק למשחקים של אותו שלב. שימושי לבדיקה צעד‑אחר‑צעד.<br/>
-          ⚽⚽ <strong>תוצאות לכל המשחקים:</strong> ממלא רנדומלי לכל 104 המשחקים בלחיצה אחת.<br/>
-          🔄 <strong>אפס סימולציה:</strong> מוחק רק תוצאות + overrides + מכבה סימולציה. <strong>הניחושים נשמרים!</strong>
+          ⚽ <strong>כפתור לכל שלב:</strong> תוצאות אקראיות רק לאותו שלב.<br/>
+          ⚽⚽ <strong>תוצאות רנדומליות:</strong> אקראי לחלוטין לכל 104 המשחקים.<br/>
+          🎲 <strong>משוקללת לפי odds:</strong> המועדפות מנצחות לפי הסיכוי. הפתעות קורות, בנוקאאוט אין תיקו. תוצאות יותר ריאליסטיות לבדיקת לוחות התוצאות.<br/>
+          🔄 <strong>אפס סימולציה:</strong> מוחק תוצאות + overrides + מכבה סימולציה. <strong>הניחושים נשמרים!</strong>
         </p>
       </div>
 

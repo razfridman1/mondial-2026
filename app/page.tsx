@@ -4,6 +4,7 @@ import AuthProvider from "@/components/AuthProvider";
 import Header from "@/components/Header";
 import Schedule from "@/components/Schedule";
 import MyPredictionsTab from "@/components/MyPredictionsTab";
+import StandingsTab from "@/components/StandingsTab";
 import Bracket from "@/components/Bracket";
 import AdminPanel from "@/components/AdminPanel";
 import ChatAssistant from "@/components/ChatAssistant";
@@ -24,6 +25,7 @@ function HomeInner() {
       <main className="container">
         {tab === "schedule"      && <Schedule />}
         {tab === "mypredictions" && <MyPredictionsTab />}
+        {tab === "standings"     && <StandingsTab />}
         {tab === "ranking"       && <FriendsRanking />}
         {tab === "teams"      && <TeamsTab />}
         {tab === "bracket"    && <Bracket />}

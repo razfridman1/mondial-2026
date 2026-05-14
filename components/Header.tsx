@@ -6,11 +6,12 @@ import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { AvatarDisplay } from "./AvatarPicker";
 import AvatarPicker from "./AvatarPicker";
 
-type Tab = "schedule" | "mypredictions" | "ranking" | "broadcasts" | "teams" | "bracket" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
+type Tab = "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "bracket" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 
 const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean }[] = [
   { id: "schedule",      label: "📋 לוח משחקים" },
   { id: "mypredictions", label: "🔮 הניחושים שלי" },
+  { id: "standings",     label: "📊 טבלאות" },
   { id: "ranking",       label: "🏆 דירוג חברים" },
   { id: "teams",         label: "🌍 קבוצות ושחקנים" },
   { id: "bracket",       label: "🏆 שלב הנוקאאוט" },
