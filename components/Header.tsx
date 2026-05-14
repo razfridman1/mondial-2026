@@ -10,9 +10,9 @@ type Tab = "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts"
 
 const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: boolean }[] = [
   { id: "schedule",      label: "⚽ משחקים" },
+  { id: "ranking",       label: "🏆 דירוג חברים" },
   { id: "mypredictions", label: "🔮 הניחושים שלי" },
   { id: "standings",     label: "📊 טבלאות",         hideOnMobile: true },
-  { id: "ranking",       label: "🏆 דירוג חברים" },
   { id: "teams",         label: "🌍 קבוצות ושחקנים", hideOnMobile: true },
   { id: "bracket",       label: "🏆 שלב הנוקאאוט" },
   /* Profile tab removed from nav — accessed via username click in header */
