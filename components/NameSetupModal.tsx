@@ -6,9 +6,11 @@
  * Can't be dismissed without entering a valid name (2-30 chars).
  * Saves to profiles/{uid}.displayName and updates the zustand mirror.
  * ===================================================================*/
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { setUserDoc } from "@/lib/firebase";
+
+const NAME_CONFIRMED_KEY = "display_name_confirmed_v1";
 
 export default function NameSetupModal({ onDone }: { onDone: () => void }) {
   const user    = useStore(s => s.user);
@@ -16,6 +18,15 @@ export default function NameSetupModal({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState(profile?.displayName || "");
   const [busy, setBusy] = useState(false);
   const [err,  setErr]  = useState<string | null>(null);
+
+  /* If profile loads AFTER the modal opens (race with hydrateFromFirestore),
+   * pre-fill the field with the loaded displayName so the user can either
+   * keep it or edit. We only fill when the field is still empty so we don't
+   * overwrite the user's typing. */
+  useEffect(() => {
+    if (!name && profile?.displayName) setName(profile.displayName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.displayName]);
 
   async function save() {
     const trimmed = name.trim();
@@ -28,6 +39,9 @@ export default function NameSetupModal({ onDone }: { onDone: () => void }) {
       useStore.setState(s => ({
         profile: s.profile ? { ...s.profile, displayName: trimmed } : null,
       }));
+      /* Mark that this user has actively confirmed their display name,
+       * so the modal won't re-appear on subsequent invite joins. */
+      try { localStorage.setItem(`${NAME_CONFIRMED_KEY}:${user.uid}`, "1"); } catch {}
       onDone();
     } catch (e: any) {
       setErr(e?.message || "שגיאה בשמירה");

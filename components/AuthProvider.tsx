@@ -5,16 +5,10 @@ import { getFirebase } from "@/lib/firebase";
 import NameSetupModal from "./NameSetupModal";
 
 const INVITE_KEY = "pending_invite_code";
-
-/** Treat a name as "default / auto-generated" when it equals the email prefix
- *  (e.g. user "danny@gmail.com" got the auto name "danny") or is empty. */
-function needsNameSetup(displayName?: string | null, email?: string | null): boolean {
-  const n = (displayName || "").trim();
-  if (!n) return true;
-  const prefix = (email || "").split("@")[0].trim().toLowerCase();
-  if (prefix && n.toLowerCase() === prefix) return true;
-  return false;
-}
+/* Profile flag (Firestore + zustand mirror) telling us the user has actively
+ * confirmed/picked a display name. We always force the name modal after a
+ * link-join UNTIL the user has saved at least once. */
+const NAME_CONFIRMED_KEY = "display_name_confirmed_v1";
 
 /** Capture ?invite=CODE from current URL and stash in localStorage.
  *  Called both on the main page mount and on the login page mount,
@@ -90,12 +84,18 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             try { await refreshGroups?.(); } catch {}
             try { if (data.groupId) setCurrentGroup?.(data.groupId); } catch {}
             if (!data.alreadyMember) {
-              try { alert("הצטרפת לקבוצה בהצלחה! 🎉"); } catch {}
-              /* Force-prompt for a friendly display name if this looks like
-               * a brand-new account (default name === email prefix). */
-              const profile = useStore.getState().profile;
-              if (needsNameSetup(profile?.displayName, user?.email)) {
+              /* New member of this group → force the name modal UNLESS the
+               * user has already confirmed a custom display name before
+               * (tracked via localStorage flag set by NameSetupModal). */
+              const confirmed =
+                typeof window !== "undefined" &&
+                localStorage.getItem(`${NAME_CONFIRMED_KEY}:${user?.uid || ""}`) === "1";
+              if (!confirmed) {
+                /* Show modal directly — its content already says
+                 * "ברוך הבא! הצטרפת לקבוצה בהצלחה" so no alert needed. */
                 setAskName(true);
+              } else {
+                try { alert("הצטרפת לקבוצה בהצלחה! 🎉"); } catch {}
               }
             }
           }
