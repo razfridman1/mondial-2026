@@ -18,7 +18,10 @@ export async function GET(req: Request) {
   let uids: string[];
   if (groupId) {
     const memSnap = await db.collection("group_memberships").where("groupId", "==", groupId).get();
-    uids = memSnap.docs.map(d => d.data().uid as string);
+    /* Exclude soft-left members from the leaderboard. */
+    uids = memSnap.docs
+      .filter(d => !(d.data() as any).left)
+      .map(d => d.data().uid as string);
   } else {
     const profSnap = await db.collection("profiles").get();
     uids = profSnap.docs.map(d => d.id);

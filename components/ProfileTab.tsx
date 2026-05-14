@@ -14,6 +14,10 @@ export default function ProfileTab() {
   const user = useStore(s => s.user);
   const profile = useStore(s => s.profile);
   const groups = useStore(s => s.groups);
+  const leftGroups = useStore(s => s.leftGroups);
+  const leaveGroup = useStore(s => s.leaveGroup);
+  const rejoinGroup = useStore(s => s.rejoinGroup);
+  const deleteGroup = useStore(s => s.deleteGroup);
   const predictions = useStore(s => s.predictions);
   const signOut = useStore(s => s.signOut);
 
@@ -22,6 +26,31 @@ export default function ProfileTab() {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [myRow, setMyRow] = useState<LeaderRow | null>(null);
+  const [busyGroup, setBusyGroup] = useState<string | null>(null);
+
+  /* "Leave" only allowed if user has >1 active group (so they always have at least one). */
+  const canLeave = groups.length > 1;
+
+  async function handleLeave(g: any) {
+    if (!confirm(`לעזוב את הקבוצה "${g.name}"?\nניתן לחזור בכל עת מהפרופיל.`)) return;
+    setBusyGroup(g.id);
+    try { await leaveGroup(g.id); }
+    catch (e: any) { alert(`שגיאה: ${e.message || "לא ניתן לעזוב"}`); }
+    finally { setBusyGroup(null); }
+  }
+  async function handleRejoin(g: any) {
+    setBusyGroup(g.id);
+    try { await rejoinGroup(g.id); }
+    catch (e: any) { alert(`שגיאה: ${e.message || "לא ניתן לחזור"}`); }
+    finally { setBusyGroup(null); }
+  }
+  async function handleDelete(g: any) {
+    if (!confirm(`למחוק לצמיתות את הקבוצה "${g.name}"?\nפעולה זו בלתי הפיכה — הקבוצה תיעלם מהמערכת.`)) return;
+    setBusyGroup(g.id);
+    try { await deleteGroup(g.id); }
+    catch (e: any) { alert(`שגיאה: ${e.message || "לא ניתן למחוק"}`); }
+    finally { setBusyGroup(null); }
+  }
 
   /* Pull this user's leaderboard stats (global) */
   useEffect(() => {
@@ -131,14 +160,72 @@ export default function ProfileTab() {
           <div className="empty-state">עוד לא הצטרפת לקבוצה — פתח אחת בלשונית "דירוג חברים".</div>
         ) : (
           <div className="profile-groups">
-            {groups.map(g => (
-              <div key={g.id} className="profile-group">
-                <strong>{g.name}</strong>
-                <span className="muted"> · {g.memberCount || 1} חברים</span>
-                <span className="invite-code">{g.inviteCode}</span>
-              </div>
-            ))}
+            {groups.map(g => {
+              const isOwner = g.ownerUid === user.uid;
+              const memCount = g.memberCount || 1;
+              const canDelete = isOwner && memCount <= 1;
+              const busy = busyGroup === g.id;
+              return (
+                <div key={g.id} className="profile-group">
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <strong>{g.name}</strong>
+                    {isOwner && <span className="chip chip-strong" style={{ fontSize: 10 }}>👑 בעלים</span>}
+                    <span className="muted"> · {memCount} חברים</span>
+                    <span className="invite-code">{g.inviteCode}</span>
+                  </div>
+                  <div className="profile-group-actions" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                    {canDelete && (
+                      <button
+                        className="btn btn-small"
+                        style={{ background: "rgba(239,68,68,0.12)", borderColor: "var(--red)", color: "var(--red)" }}
+                        onClick={() => handleDelete(g)}
+                        disabled={busy}
+                        title="ניתן למחוק רק קבוצה שבה אתה החבר היחיד"
+                      >
+                        🗑 מחק קבוצה
+                      </button>
+                    )}
+                    {canLeave && (
+                      <button
+                        className="btn btn-small"
+                        onClick={() => handleLeave(g)}
+                        disabled={busy}
+                        title="עזוב את הקבוצה — תוכל לחזור בכל עת"
+                      >
+                        🚪 צא מהקבוצה
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        )}
+
+        {/* Left groups — rejoin opportunity */}
+        {leftGroups.length > 0 && (
+          <>
+            <h3 className="sec-title" style={{ marginTop: 14 }}>📭 קבוצות שעזבת ({leftGroups.length})</h3>
+            <div className="profile-groups">
+              {leftGroups.map(g => {
+                const busy = busyGroup === g.id;
+                return (
+                  <div key={g.id} className="profile-group" style={{ opacity: 0.85 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <strong>{g.name}</strong>
+                      <span className="muted"> · {g.memberCount || 0} חברים פעילים</span>
+                    </div>
+                    <div style={{ marginTop: 8 }}>
+                      <button className="btn btn-small btn-primary"
+                              onClick={() => handleRejoin(g)} disabled={busy}>
+                        ↩ חזור לקבוצה
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
 
         {/* Achievements */}

@@ -34,7 +34,8 @@ interface MondialState {
   predictions: Record<string, Prediction>;  // by matchId
   matchResults: Record<string, MatchResult>; // by matchId
   overrides: Record<string, BroadcastOverrideDoc>;
-  groups: Group[];           // groups the user belongs to
+  groups: Group[];           // active groups the user belongs to
+  leftGroups: Group[];       // groups the user has soft-left (can rejoin)
   currentGroupId: string | null;
   achievements: AchievementUnlock[];
   recentActivity: ActivityEvent[];
@@ -46,6 +47,9 @@ interface MondialState {
   setProfileAvatar: (avatarId: string) => Promise<void>;
   setCurrentGroup: (gid: string | null) => void;
   refreshGroups: () => Promise<void>;
+  leaveGroup: (groupId: string) => Promise<void>;
+  rejoinGroup: (groupId: string) => Promise<void>;
+  deleteGroup: (groupId: string) => Promise<void>;
   refreshMatchResults: () => Promise<void>;
   setPref: <K extends keyof Prefs>(key: K, val: Prefs[K]) => void;
   hydrateFromFirestore: (uid: string) => Promise<void>;
@@ -64,6 +68,7 @@ export const useStore = create<MondialState>()(
       matchResults: {},
       overrides: {},
       groups: [],
+      leftGroups: [],
       currentGroupId: null,
       achievements: [],
       recentActivity: [],
@@ -134,16 +139,71 @@ export const useStore = create<MondialState>()(
       },
       refreshGroups: async () => {
         const u = get().user;
-        if (!u) { set({ groups: [] }); return; }
+        if (!u) { set({ groups: [], leftGroups: [] }); return; }
         try {
           const token = await getFirebase().auth!.currentUser!.getIdToken();
-          const r = await fetch("/api/groups/mine", { headers: { authorization: `Bearer ${token}` } });
+          /* Fetch both active and left memberships in one call. */
+          const r = await fetch("/api/groups/mine?includeLeft=true", {
+            headers: { authorization: `Bearer ${token}` },
+          });
           if (r.ok) {
-            const groups = await r.json();
-            set({ groups });
-            if (!get().currentGroupId && groups[0]) set({ currentGroupId: groups[0].id });
+            const all = await r.json();
+            const groups = all.filter((g: any) => !g._left);
+            const leftGroups = all.filter((g: any) => g._left);
+            set({ groups, leftGroups });
+            const cur = get().currentGroupId;
+            /* If the current group was removed/left, switch to first active. */
+            if (cur && !groups.find((g: any) => g.id === cur)) {
+              set({ currentGroupId: groups[0]?.id || null });
+            } else if (!cur && groups[0]) {
+              set({ currentGroupId: groups[0].id });
+            }
           }
         } catch {}
+      },
+      leaveGroup: async (groupId: string) => {
+        const u = get().user;
+        if (!u) throw new Error("not logged in");
+        const token = await getFirebase().auth!.currentUser!.getIdToken();
+        const r = await fetch("/api/groups/leave", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify({ groupId }),
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.error || "leave failed");
+        }
+        await get().refreshGroups();
+      },
+      rejoinGroup: async (groupId: string) => {
+        const u = get().user;
+        if (!u) throw new Error("not logged in");
+        const token = await getFirebase().auth!.currentUser!.getIdToken();
+        const r = await fetch("/api/groups/rejoin", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify({ groupId }),
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.error || "rejoin failed");
+        }
+        await get().refreshGroups();
+      },
+      deleteGroup: async (groupId: string) => {
+        const u = get().user;
+        if (!u) throw new Error("not logged in");
+        const token = await getFirebase().auth!.currentUser!.getIdToken();
+        const r = await fetch(`/api/groups/${groupId}`, {
+          method: "DELETE",
+          headers: { authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.error || "delete failed");
+        }
+        await get().refreshGroups();
       },
       setPref: (key, val) => set(state => ({ prefs: { ...state.prefs, [key]: val } })),
       hydrateFromFirestore: async (uid) => {

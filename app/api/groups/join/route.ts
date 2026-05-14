@@ -22,7 +22,16 @@ export async function POST(req: Request) {
   const memId = `${decoded.uid}_${g.id}`;
   const memRef = db.collection("group_memberships").doc(memId);
   const existing = await memRef.get();
-  if (existing.exists) return NextResponse.json({ ok: true, alreadyMember: true });
+  if (existing.exists) {
+    const data = existing.data() as any;
+    if (data.left) {
+      /* Previously left → rejoin and bump memberCount back up. */
+      await memRef.update({ left: false, leftAt: null, rejoinedAt: Date.now() });
+      await g.ref.update({ memberCount: (g.data().memberCount || 0) + 1 });
+      return NextResponse.json({ ok: true, groupId: g.id, rejoined: true });
+    }
+    return NextResponse.json({ ok: true, groupId: g.id, alreadyMember: true });
+  }
   await memRef.set({ uid: decoded.uid, groupId: g.id, joinedAt: Date.now(), role: "member" });
   await g.ref.update({ memberCount: (g.data().memberCount || 1) + 1 });
 
