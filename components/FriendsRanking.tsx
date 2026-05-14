@@ -395,7 +395,7 @@ function GroupLeaderboardCard({
                 }))}
                 title="שתף את לוח התוצאות בווטסאפ"
               >
-                💬 שתף
+                💬 שתף טבלה
               </button>
             )}
           </div>
