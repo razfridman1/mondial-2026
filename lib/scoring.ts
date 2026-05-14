@@ -2,7 +2,8 @@
  * Scoring engine — assigns points per finished match.
  *   exact score         : 7 pts
  *   correct result + dir: 3 pts (winner/draw correct, exact off)
- *   correct goal diff   : +1 pt (added to the 3 if applicable)
+ *   correct goal diff   : +1 pt (added to the 3, ONLY if actual diff >= 1)
+ *                         Draws never earn the diff bonus (diff is always 0).
  *   no prediction       : 0 pts
  * Streak: every consecutive match with any correct prediction +1 bonus.
  * Joker (legacy field) is now ignored — all predictions count ×1.
@@ -37,7 +38,11 @@ export function scorePrediction(s: ScoreInput): ScoreBreakdown {
     s.actualHome > s.actualAway ? "H" :
     s.actualHome < s.actualAway ? "A" : "D";
   const resultCorrect = predResult === actualResult;
-  const diffCorrect = (s.predictedHome - s.predictedAway) === (s.actualHome - s.actualAway);
+  /* Goal-diff bonus applies ONLY when the actual diff is >= 1 (i.e. not a draw).
+   * Draws never earn the +1 bonus since the diff (0) is implicit in the result. */
+  const actualDiff = s.actualHome - s.actualAway;
+  const predDiff = s.predictedHome - s.predictedAway;
+  const diffCorrect = actualDiff !== 0 && predDiff === actualDiff;
 
   let points = 0;
   if (exact) points = 7;

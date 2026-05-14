@@ -405,7 +405,7 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
               <div className="muted lb-stats">
                 <span title="ניחושים מדויקים — תוצאה זהה לחלוטין למשחק האמיתי (7 נק׳ למשחק)">🎯 {r.exactCount}</span>
                 {" · "}
-                <span title="תוצאות נכונות (מי ניצח / תיקו) מתוך כלל הניחושים — 3 נק׳ למשחק, +1 אם גם הפרש שערים נכון">✅ {r.resultCount}/{r.predictionsCount}</span>
+                <span title="תוצאות נכונות (מי ניצח / תיקו) מתוך כלל הניחושים — 3 נק׳ למשחק, +1 אם גם הפרש שערים נכון (בתיקו אין בונוס)">✅ {r.resultCount}/{r.predictionsCount}</span>
                 {" · "}
                 <span title="סטריק — רצף ארוך ביותר של ניחושים נכונים. כל ניחוש נכון ברצף = נקודת בונוס נוספת">🔥 {r.streak}</span>
               </div>
@@ -548,7 +548,7 @@ function UserStatsModal({
             icon="✅"
             value={row.resultCount}
             label="תוצאות נכונות"
-            tooltip="ניחושים שבהם ניחשת נכון מי ניצח (או תיקו), גם אם לא פגעת בתוצאה המדויקת. שווה 3 נקודות (או 4 אם גם הפרש השערים מדויק)."
+            tooltip="ניחושים שבהם ניחשת נכון מי ניצח (או תיקו), גם אם לא פגעת בתוצאה המדויקת. שווה 3 נקודות (או 4 אם גם הפרש השערים מדויק; בתיקו אין בונוס הפרש)."
           />
           <StatTile
             icon="📝"
@@ -568,10 +568,11 @@ function UserStatsModal({
         }}>
           <summary style={{ cursor: "pointer", fontWeight: 700 }}>💡 איך נצברות נקודות?</summary>
           <div style={{ marginTop: 8 }}>
-            • 🎯 <strong>תוצאה מדויקת</strong> (3:1 — 3:1): <strong>7 נק׳</strong><br/>
-            • ✅ <strong>תוצאה נכונה + הפרש שערים</strong> (3:1 — 2:0): <strong>4 נק׳</strong><br/>
-            • ✅ <strong>תוצאה נכונה</strong> (3:1 — 4:2): <strong>3 נק׳</strong><br/>
-            • ❌ <strong>תוצאה לא נכונה</strong> (3:1 — 1:2): <strong>0 נק׳</strong> (וסטריק נשבר)<br/>
+            • 🎯 <strong>פגיעה + תוצאה</strong> (3:1 — 3:1): <strong>7 נק׳</strong><br/>
+            • ✅ <strong>פגיעה + הפרש שערים</strong> (3:1 — 2:0): <strong>4 נק׳</strong><br/>
+            • ✅ <strong>פגיעה</strong> (3:1 — 4:2): <strong>3 נק׳</strong><br/>
+            • 🤝 <strong>תיקו</strong> (1:1 — 2:2): <strong>3 נק׳</strong> (אין בונוס הפרש שערים בתיקו)<br/>
+            • ❌ <strong>פספוס</strong> (3:1 — 1:2): <strong>0 נק׳</strong> (וסטריק נשבר)<br/>
             • 🔥 <strong>בונוס סטריק</strong>: כל ניחוש נכון ברצף = +1 נק׳ נוספת
           </div>
         </details>
