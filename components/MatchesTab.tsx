@@ -89,13 +89,16 @@ export default function MatchesTab() {
     return () => clearInterval(id);
   }, [simConfig?.enabled]);
 
-  /* Fetch results — faster during simulation since results land rapidly. */
+  /* Fetch results — faster during simulation since results land rapidly.
+   * Also refresh whenever the tab becomes visible (user switching back). */
   useEffect(() => {
     refreshMatchResults?.();
     const fast = !!simConfig?.enabled;
-    const interval = fast ? 5_000 : 30_000;
+    const interval = fast ? 3_000 : 10_000;
     const id = setInterval(() => refreshMatchResults?.(), interval);
-    return () => clearInterval(id);
+    const onVisible = () => { if (document.visibilityState === "visible") refreshMatchResults?.(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
   }, [simConfig?.enabled, refreshMatchResults]);
 
   /* While simulation is active, drive the server-side tick worker from the
@@ -372,7 +375,10 @@ function MatchCardModern({ match, result, onOpen }: {
   const away = TEAMS[match.away] || { code: match.away, name: match.away, flag: "❓" };
   const venue = VENUES[match.venue] || { name: match.venue, city: "", country: "", flag: "" };
   const stage = STAGES[match.stage];
-  const status = matchLiveStatus(match);
+  /* If a result exists in DB (e.g. via "instant results" in sim), treat the
+   * match as finished regardless of clock. */
+  const baseStatus = matchLiveStatus(match);
+  const status = result ? "finished" : baseStatus;
   const channels = (match.channels || []).map(c => CHANNELS[c]).filter(Boolean);
 
   /* Live minute estimate (approx, since we don't have a real live feed):

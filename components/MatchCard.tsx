@@ -28,7 +28,10 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
     [match.utc]
   );
   const predictionLocked = minutesToKick <= 3;
-  const isFinished = status === "finished" && !!matchResult;
+  /* A result existing in the DB *is* the source of truth for "finished".
+   * In simulation, "instant results" writes results to matches whose clock
+   * hasn't reached kickoff yet, so we must not gate on matchLiveStatus. */
+  const isFinished = !!matchResult;
 
   /* Compute score if both prediction and result available */
   const myScore = useMemo(() => {
