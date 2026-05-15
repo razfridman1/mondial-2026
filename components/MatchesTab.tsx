@@ -66,17 +66,23 @@ export default function MatchesTab() {
     }
     if (!dayEl) return false;
 
-    /* Inside that day, target the FIRST match card (earliest kickoff). This
-     * ensures we land on the actual match content, not on padding above it. */
+    /* Inside that day, target the FIRST match card (earliest kickoff). */
     const firstCard = dayEl.querySelector<HTMLElement>(".match-card")
                    || dayEl.querySelector<HTMLElement>(".mt-card")
                    || dayEl;
 
-    const rect = firstCard.getBoundingClientRect();
-    /* Tiny offset so the card isn't flush against the viewport top. */
-    const OFFSET = 8;
-    const y = window.scrollY + rect.top - OFFSET;
-    window.scrollTo({ top: Math.max(0, y), behavior });
+    /* Use the browser's own scrollIntoView with `block: "start"`. CSS
+     * `scroll-margin-top` on the card (set in globals.css mobile media query)
+     * leaves enough clearance for the mobile browser URL bar (which can
+     * cover the top ~60px). This is more reliable than manual scrollY math
+     * which can land mid-card while the URL bar covers the top portion. */
+    try {
+      firstCard.scrollIntoView({ block: "start", behavior });
+    } catch {
+      const rect = firstCard.getBoundingClientRect();
+      const y = window.scrollY + rect.top - 80;
+      window.scrollTo({ top: Math.max(0, y), behavior });
+    }
     return true;
   }
 
