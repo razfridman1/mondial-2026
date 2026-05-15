@@ -52,21 +52,29 @@ export default function FriendsRanking() {
    * respects the user's previously chosen group. */
   const [selectedLb, setSelectedLb] = useState<string>(() => currentGroupId || "global");
 
-  /* On mobile, force-select a real group (Global view is hidden on mobile).
-   * Switches back to "global" when desktop view is restored if user didn't
-   * change selection manually. */
+  /* On mobile, force-select the FIRST group (Global view is hidden on mobile).
+   * Fires:
+   *   - on mount (with whatever groups exist initially)
+   *   - when groups/leaderboardGroups load asynchronously
+   *   - when the viewport changes between desktop/mobile (resize)
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
     const mq = window.matchMedia("(max-width: 720px)");
     function adjust() {
-      if (mq.matches && selectedLb === "global" && groups.length > 0) {
-        setSelectedLb(groups[0].id);
+      if (!mq.matches) return;
+      if (leaderboardGroups.length === 0) return;
+      /* Switch when on "global" OR when selected group no longer exists. */
+      const stillExists = leaderboardGroups.some(g => g.id === selectedLb);
+      if (selectedLb === "global" || !stillExists) {
+        setSelectedLb(leaderboardGroups[0].id);
+        setCurrentGroup(leaderboardGroups[0].id);
       }
     }
     adjust();
     mq.addEventListener("change", adjust);
     return () => mq.removeEventListener("change", adjust);
-  }, [groups, selectedLb]);
+  }, [leaderboardGroups, selectedLb, setCurrentGroup]);
 
   /* Super-admin sees EVERY group's leaderboard, not just their own memberships */
   const [adminAllGroups, setAdminAllGroups] = useState<Array<{ id: string; name: string }>>([]);

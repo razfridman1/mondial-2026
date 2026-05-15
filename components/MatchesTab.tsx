@@ -168,16 +168,30 @@ export default function MatchesTab() {
     today: buckets.today.length,
   };
 
-  /* After the stages view renders, scroll to today's section ONCE on mount. */
+  /* After the stages view renders, scroll to today's section ONCE on mount.
+   * We FIRST reset the window scroll to the top so browser-restored scroll
+   * positions (which can drop the user at the final / bottom) don't override
+   * us, then we jump to today's day-section. Retries up to 5 times with a
+   * growing delay so layout-after-data has a chance to settle. */
   useEffect(() => {
     if (section !== "stages") return;
     if (didInitialScroll.current) return;
-    /* Wait one tick so the layout finishes painting (sticky pills get a height). */
-    const t = setTimeout(() => {
-      const ok = scrollToToday("auto"); // auto (instant) on first load
-      if (ok) didInitialScroll.current = true;
-    }, 80);
-    return () => clearTimeout(t);
+    if (typeof window === "undefined") return;
+
+    /* Always start at the top so the first card visible is the earliest
+     * (chronologically), then jumpTo refines to today. */
+    window.scrollTo({ top: 0, behavior: "auto" });
+
+    let attempts = 0;
+    let id: any;
+    function tryScroll() {
+      attempts++;
+      const ok = scrollToToday("auto");
+      if (ok) { didInitialScroll.current = true; return; }
+      if (attempts < 5) id = setTimeout(tryScroll, 120 * attempts);
+    }
+    id = setTimeout(tryScroll, 80);
+    return () => clearTimeout(id);
   }, [section, matches]);
 
   /* Hide the floating "back to today" button when today's section is already
