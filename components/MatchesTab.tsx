@@ -58,33 +58,26 @@ export default function MatchesTab() {
     const root = bodyRef.current;
     if (!root) return false;
     const t = todayKey();
-    /* Use the native scrollIntoView with `block: "start"` so the day-section's
-     * TOP edge aligns with the viewport top. CSS `scroll-margin-top` on
-     * `.day-section` handles the app-header clearance. This avoids manual
-     * scrollY math that can land the user mid-card. */
-    function jumpTo(el: HTMLElement) {
-      try {
-        el.scrollIntoView({ block: "start", behavior });
-      } catch {
-        const rect = el.getBoundingClientRect();
-        const y = window.scrollY + rect.top - 80;
-        window.scrollTo({ top: Math.max(0, y), behavior });
-      }
+    /* Pick the target DAY first (today / closest upcoming / earliest). */
+    let dayEl: HTMLElement | null = root.querySelector<HTMLElement>(`[data-date="${t}"]`);
+    if (!dayEl) {
+      const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-date]"));
+      dayEl = nodes.find(n => (n.getAttribute("data-date") || "") >= t) || nodes[0] || null;
     }
-    const el = root.querySelector<HTMLElement>(`[data-date="${t}"]`);
-    if (el) { jumpTo(el); return true; }
-    /* No matches today → jump to the nearest upcoming day (the earliest
-     * day whose date is today or later). */
-    const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-date]"));
-    for (const node of nodes) {
-      const d = node.getAttribute("data-date") || "";
-      if (d >= t) { jumpTo(node); return true; }
-    }
-    /* Otherwise (no future day either — tournament fully past), jump to
-     * the EARLIEST day so the user lands at the natural top of the schedule. */
-    const first = nodes[0];
-    if (first) { jumpTo(first); return true; }
-    return false;
+    if (!dayEl) return false;
+
+    /* Inside that day, target the FIRST match card (earliest kickoff). This
+     * ensures we land on the actual match content, not on padding above it. */
+    const firstCard = dayEl.querySelector<HTMLElement>(".match-card")
+                   || dayEl.querySelector<HTMLElement>(".mt-card")
+                   || dayEl;
+
+    const rect = firstCard.getBoundingClientRect();
+    /* Tiny offset so the card isn't flush against the viewport top. */
+    const OFFSET = 8;
+    const y = window.scrollY + rect.top - OFFSET;
+    window.scrollTo({ top: Math.max(0, y), behavior });
+    return true;
   }
 
   /* Live tick — faster during active simulation so that match cards
