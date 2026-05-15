@@ -71,13 +71,11 @@ export default function MatchesTab() {
                    || dayEl.querySelector<HTMLElement>(".mt-card")
                    || dayEl;
 
-    /* Compute the card's absolute Y in the document, then scroll the
-     * window so its TOP edge lands a fixed `OFFSET` below the viewport
-     * top. The OFFSET must clear the MOBILE browser URL bar (Chrome
-     * Android ~56px, Safari iOS ~64px) so the card's top isn't hidden
-     * behind it. */
+    /* OFFSET clears whatever sticky element covers the top of the
+     * viewport: mobile browser URL bar (~60px) or desktop sticky pills
+     * bar (~56px) — using 70-90px gives a small breathing buffer. */
     const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches;
-    const OFFSET = isMobile ? 70 : 16;
+    const OFFSET = isMobile ? 70 : 90;
     const rect = firstCard.getBoundingClientRect();
     const targetY = window.scrollY + rect.top - OFFSET;
     window.scrollTo({ top: Math.max(0, targetY), behavior });
@@ -170,30 +168,16 @@ export default function MatchesTab() {
     today: buckets.today.length,
   };
 
-  /* Auto-scroll only on DESKTOP. Mobile browsers are too inconsistent
-   * here (URL bar, scroll restoration, etc.) — instead the header is
-   * compacted so the cards are visible naturally without scrolling. */
+  /* Auto-scroll DISABLED — was causing jumpy behaviour (page lands at
+   * top, then 500ms later scrolls to first card, leaving the card top
+   * partially hidden behind the sticky pills bar). Users can scroll
+   * naturally; the floating "🎯 חזור להיום" button (when visible)
+   * provides a manual way to jump to today's match. */
   useEffect(() => {
-    if (section !== "stages") return;
-    if (didInitialScroll.current) return;
     if (typeof window === "undefined") return;
-    const isMobile = window.matchMedia("(max-width: 720px)").matches;
-    if (isMobile) {
-      didInitialScroll.current = true;
-      return;
-    }
-    didInitialScroll.current = true;
     try { (history as any).scrollRestoration = "manual"; } catch {}
-
-    const t = setTimeout(() => {
-      const root = bodyRef.current;
-      if (!root) return;
-      const firstCard = root.querySelector<HTMLElement>(".match-card");
-      if (!firstCard) return;
-      firstCard.scrollIntoView({ block: "start", behavior: "auto" });
-    }, 500);
-    return () => clearTimeout(t);
-  }, [section]);
+    didInitialScroll.current = true;
+  }, []);
 
   /* Hide the floating "back to today" button when today's section is already
    * in view. Falls back to "any matches at all" check otherwise. */
