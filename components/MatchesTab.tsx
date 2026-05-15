@@ -170,56 +170,47 @@ export default function MatchesTab() {
     today: buckets.today.length,
   };
 
-  /* After the stages view renders, scroll to today's section ONCE on mount.
-   * Robust mechanism:
-   *   1. Disable browser's scroll-position restoration
-   *   2. Reset to top
-   *   3. Run scrollToToday + VERIFY after each attempt that the target
-   *      card actually landed near the expected viewport Y.
-   *   4. Up to 8 retries with growing delays.
+  /* Auto-scroll to the chronologically EARLIEST match on mount.
    *
-   * The verification step protects against layout shifts that happen
-   * between data load and paint, which can otherwise leave the page
-   * mid-card. */
+   * Mobile browsers (Chrome Android, Safari iOS) are extremely
+   * inconsistent here: they restore scroll, hide/show the URL bar,
+   * compute layout asynchronously, double-apply CSS scroll-margin
+   * during scrollIntoView, etc. To work around ALL of this we just
+   * run the scroll multiple times over 1.5 seconds, and EACH time
+   * check whether the first card is already at the expected viewport
+   * position. If it is, do nothing; if not, scroll. By the last
+   * attempt, the layout has stabilized and the page is at the
+   * intended position. */
   useEffect(() => {
     if (section !== "stages") return;
     if (didInitialScroll.current) return;
     if (typeof window === "undefined") return;
 
     try { (history as any).scrollRestoration = "manual"; } catch {}
-    window.scrollTo({ top: 0, behavior: "auto" });
+    window.scrollTo(0, 0);
+    didInitialScroll.current = true;
 
     const isMobile = window.matchMedia("(max-width: 720px)").matches;
-    const EXPECTED_TOP = isMobile ? 70 : 16;
+    const OFFSET = isMobile ? 70 : 16;
 
-    let attempts = 0;
-    let id: any;
-    function attempt() {
-      attempts++;
-      const ok = scrollToToday("auto");
-      if (!ok) {
-        if (attempts < 8) id = setTimeout(attempt, 150);
-        return;
-      }
-      /* After scrolling, verify the first card actually landed near
-       * the EXPECTED_TOP. If not, retry — layout may have shifted. */
-      requestAnimationFrame(() => {
-        const root = bodyRef.current;
-        const firstCard = root?.querySelector<HTMLElement>(".match-card");
-        if (firstCard) {
-          const top = firstCard.getBoundingClientRect().top;
-          /* Acceptable window: card top within 60px of the expected position. */
-          if (Math.abs(top - EXPECTED_TOP) <= 60) {
-            didInitialScroll.current = true;
-            return;
-          }
-        }
-        if (attempts < 8) id = setTimeout(attempt, 150);
-        else didInitialScroll.current = true; // give up after enough tries
-      });
+    function adjust() {
+      const root = bodyRef.current;
+      if (!root) return;
+      /* Target the FIRST .match-card in the entire body — that's the
+       * earliest match of the earliest stage's earliest day. */
+      const firstCard = root.querySelector<HTMLElement>(".match-card");
+      if (!firstCard) return;
+      const rect = firstCard.getBoundingClientRect();
+      /* Skip scroll if already in the acceptable range. */
+      if (rect.top >= OFFSET - 30 && rect.top <= OFFSET + 30) return;
+      const absoluteY = window.scrollY + rect.top;
+      window.scrollTo(0, Math.max(0, absoluteY - OFFSET));
     }
-    id = setTimeout(attempt, 80);
-    return () => clearTimeout(id);
+
+    /* Fire the adjust at 5 different points so any layout shift gets
+     * corrected by a later attempt. */
+    const timeouts = [100, 250, 500, 1000, 1500].map(d => setTimeout(adjust, d));
+    return () => timeouts.forEach(clearTimeout);
   }, [section, matches]);
 
   /* Hide the floating "back to today" button when today's section is already
