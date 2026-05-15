@@ -4575,32 +4575,56 @@ html[data-theme="light"] .chat-panel {
 }
 
 /* ====================================================================
- * Mobile header — aggressive compaction so match cards are visible
- * at the natural top of the page without needing auto-scroll.
+ * Mobile header — compact layout: brand + domain side-by-side in row 1,
+ * clock in row 2. Match cards become visible at the natural top.
  * ==================================================================== */
 @media (max-width: 720px) {
-  /* Brand: keep title small, drop the subtitle (saves a big line) */
-  .brand-title { font-size: 16px !important; }
-  .brand-sub   { display: none !important; }
-  .brand-logo-img { width: 38px !important; height: 38px !important; }
-
-  /* WWW.FC26.CO.IL button: dramatically smaller on mobile */
-  .header-domain {
-    font-size: 14px !important;
-    letter-spacing: 1.5px !important;
-    padding: 4px 10px !important;
-    border-radius: 8px !important;
-    margin: 6px auto 4px !important;
+  /* Header-top: two rows max — (brand+domain) then (clock). */
+  .header { padding: 6px 10px !important; }
+  .header-top {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    padding: 4px 0 !important;
   }
 
-  /* Clock row tighter */
-  #header-clock { gap: 6px !important; flex-wrap: wrap; }
-  #header-clock span { font-size: 12px !important; }
+  /* Brand: title small, subtitle hidden, logo modest. */
+  .brand { gap: 6px !important; flex-shrink: 1 !important; min-width: 0 !important; }
+  .brand-title { font-size: 15px !important; }
+  .brand-sub   { display: none !important; }
+  .brand-logo-img { width: 36px !important; height: 36px !important; }
+
+  /* WWW.FC26.CO.IL — back to a nice large size, inline next to the brand. */
+  .header-domain {
+    position: static !important;
+    transform: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    font-size: 19px !important;
+    letter-spacing: 2px !important;
+    padding: 6px 14px !important;
+    border-radius: 10px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+  }
+  .header-domain:hover { transform: scale(1.04) !important; }
+
+  /* Clock: forced to its own row (full width below brand+domain). */
+  #header-clock {
+    width: 100% !important;
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-top: 2px !important;
+  }
+  #header-clock > span { font-size: 12px !important; }
   .header-avatar { width: 30px !important; height: 30px !important; }
   .header-avatar svg, .header-avatar img { width: 30px !important; height: 30px !important; }
   .header-name-btn { font-size: 12px !important; padding: 4px 8px !important; }
 
-  /* Tab grid: smaller and more compact */
+  /* Tab grid: compact 2x2. */
   .tabs { gap: 4px !important; padding: 4px !important; }
   .tab-btn {
     padding: 8px 4px !important;
@@ -4608,8 +4632,4 @@ html[data-theme="light"] .chat-panel {
     font-weight: 700 !important;
     min-height: 32px !important;
   }
-
-  /* Tighter header padding overall */
-  .header { padding: 6px 10px !important; }
-  .header-top { padding: 4px 0 !important; gap: 4px !important; }
 }
