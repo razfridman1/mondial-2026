@@ -6,68 +6,68 @@
  * UI converts to Asia/Jerusalem with DST awareness.
  * ===================================================================*/
 
-/* ---------- TEAMS (48 — Mondial 2026 full field) ---------- */
+/* ---------- TEAMS (48 — Mondial 2026 final draw 5/12/2025 + playoffs 31/3/2026) ---------- */
 const TEAMS = {
   // Group A
-  MEX: { code: "MEX", name: "מקסיקו",    nameEn: "Mexico",         flag: "🇲🇽", group: "A" },
-  POL: { code: "POL", name: "פולין",      nameEn: "Poland",         flag: "🇵🇱", group: "A" },
-  EGY: { code: "EGY", name: "מצרים",      nameEn: "Egypt",          flag: "🇪🇬", group: "A" },
-  ECU: { code: "ECU", name: "אקוודור",    nameEn: "Ecuador",        flag: "🇪🇨", group: "A" },
+  MEX: { code: "MEX", name: "מקסיקו",      nameEn: "Mexico",         flag: "🇲🇽", group: "A" },
+  RSA: { code: "RSA", name: "דרום אפריקה", nameEn: "South Africa",   flag: "🇿🇦", group: "A" },
+  KOR: { code: "KOR", name: "דרום קוריאה", nameEn: "South Korea",    flag: "🇰🇷", group: "A" },
+  CZE: { code: "CZE", name: "צ׳כיה",       nameEn: "Czech Republic", flag: "🇨🇿", group: "A" },
   // Group B
-  CAN: { code: "CAN", name: "קנדה",       nameEn: "Canada",         flag: "🇨🇦", group: "B" },
-  NED: { code: "NED", name: "הולנד",      nameEn: "Netherlands",    flag: "🇳🇱", group: "B" },
-  KOR: { code: "KOR", name: "דרום קוריאה", nameEn: "South Korea",    flag: "🇰🇷", group: "B" },
-  SEN: { code: "SEN", name: "סנגל",       nameEn: "Senegal",        flag: "🇸🇳", group: "B" },
+  CAN: { code: "CAN", name: "קנדה",        nameEn: "Canada",         flag: "🇨🇦", group: "B" },
+  BIH: { code: "BIH", name: "בוסניה",      nameEn: "Bosnia and Herzegovina", flag: "🇧🇦", group: "B" },
+  QAT: { code: "QAT", name: "קטאר",        nameEn: "Qatar",          flag: "🇶🇦", group: "B" },
+  SUI: { code: "SUI", name: "שווייץ",      nameEn: "Switzerland",    flag: "🇨🇭", group: "B" },
   // Group C
-  USA: { code: "USA", name: "ארה״ב",      nameEn: "USA",            flag: "🇺🇸", group: "C" },
-  GER: { code: "GER", name: "גרמניה",     nameEn: "Germany",        flag: "🇩🇪", group: "C" },
-  AUS: { code: "AUS", name: "אוסטרליה",   nameEn: "Australia",      flag: "🇦🇺", group: "C" },
-  CRC: { code: "CRC", name: "קוסטה ריקה", nameEn: "Costa Rica",     flag: "🇨🇷", group: "C" },
+  BRA: { code: "BRA", name: "ברזיל",       nameEn: "Brazil",         flag: "🇧🇷", group: "C" },
+  MAR: { code: "MAR", name: "מרוקו",       nameEn: "Morocco",        flag: "🇲🇦", group: "C" },
+  HAI: { code: "HAI", name: "האיטי",       nameEn: "Haiti",          flag: "🇭🇹", group: "C" },
+  SCO: { code: "SCO", name: "סקוטלנד",     nameEn: "Scotland",       flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", group: "C" },
   // Group D
-  ARG: { code: "ARG", name: "ארגנטינה",   nameEn: "Argentina",      flag: "🇦🇷", group: "D" },
-  CRO: { code: "CRO", name: "קרואטיה",    nameEn: "Croatia",        flag: "🇭🇷", group: "D" },
-  NGA: { code: "NGA", name: "ניגריה",     nameEn: "Nigeria",        flag: "🇳🇬", group: "D" },
-  PAN: { code: "PAN", name: "פנמה",       nameEn: "Panama",         flag: "🇵🇦", group: "D" },
+  USA: { code: "USA", name: "ארה״ב",       nameEn: "USA",            flag: "🇺🇸", group: "D" },
+  PAR: { code: "PAR", name: "פרגוואי",     nameEn: "Paraguay",       flag: "🇵🇾", group: "D" },
+  AUS: { code: "AUS", name: "אוסטרליה",    nameEn: "Australia",      flag: "🇦🇺", group: "D" },
+  TUR: { code: "TUR", name: "טורקיה",      nameEn: "Turkey",         flag: "🇹🇷", group: "D" },
   // Group E
-  FRA: { code: "FRA", name: "צרפת",       nameEn: "France",         flag: "🇫🇷", group: "E" },
-  URU: { code: "URU", name: "אורוגוואי",  nameEn: "Uruguay",        flag: "🇺🇾", group: "E" },
-  JPN: { code: "JPN", name: "יפן",        nameEn: "Japan",          flag: "🇯🇵", group: "E" },
-  TUN: { code: "TUN", name: "תוניסיה",    nameEn: "Tunisia",        flag: "🇹🇳", group: "E" },
+  GER: { code: "GER", name: "גרמניה",      nameEn: "Germany",        flag: "🇩🇪", group: "E" },
+  CUW: { code: "CUW", name: "קוראסאו",     nameEn: "Curaçao",        flag: "🇨🇼", group: "E" },
+  CIV: { code: "CIV", name: "חוף השנהב",   nameEn: "Ivory Coast",    flag: "🇨🇮", group: "E" },
+  ECU: { code: "ECU", name: "אקוודור",     nameEn: "Ecuador",        flag: "🇪🇨", group: "E" },
   // Group F
-  ESP: { code: "ESP", name: "ספרד",       nameEn: "Spain",          flag: "🇪🇸", group: "F" },
-  BEL: { code: "BEL", name: "בלגיה",      nameEn: "Belgium",        flag: "🇧🇪", group: "F" },
-  IRN: { code: "IRN", name: "איראן",      nameEn: "Iran",           flag: "🇮🇷", group: "F" },
-  JAM: { code: "JAM", name: "ג׳מייקה",    nameEn: "Jamaica",        flag: "🇯🇲", group: "F" },
+  NED: { code: "NED", name: "הולנד",       nameEn: "Netherlands",    flag: "🇳🇱", group: "F" },
+  JPN: { code: "JPN", name: "יפן",         nameEn: "Japan",          flag: "🇯🇵", group: "F" },
+  SWE: { code: "SWE", name: "שוודיה",      nameEn: "Sweden",         flag: "🇸🇪", group: "F" },
+  TUN: { code: "TUN", name: "תוניסיה",     nameEn: "Tunisia",        flag: "🇹🇳", group: "F" },
   // Group G
-  BRA: { code: "BRA", name: "ברזיל",      nameEn: "Brazil",         flag: "🇧🇷", group: "G" },
-  SUI: { code: "SUI", name: "שווייץ",     nameEn: "Switzerland",    flag: "🇨🇭", group: "G" },
-  MAR: { code: "MAR", name: "מרוקו",      nameEn: "Morocco",        flag: "🇲🇦", group: "G" },
-  NZL: { code: "NZL", name: "ניו זילנד",  nameEn: "New Zealand",    flag: "🇳🇿", group: "G" },
+  BEL: { code: "BEL", name: "בלגיה",       nameEn: "Belgium",        flag: "🇧🇪", group: "G" },
+  EGY: { code: "EGY", name: "מצרים",       nameEn: "Egypt",          flag: "🇪🇬", group: "G" },
+  IRN: { code: "IRN", name: "איראן",       nameEn: "Iran",           flag: "🇮🇷", group: "G" },
+  NZL: { code: "NZL", name: "ניו זילנד",   nameEn: "New Zealand",    flag: "🇳🇿", group: "G" },
   // Group H
-  ENG: { code: "ENG", name: "אנגליה",     nameEn: "England",        flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", group: "H" },
-  SRB: { code: "SRB", name: "סרביה",      nameEn: "Serbia",         flag: "🇷🇸", group: "H" },
-  KSA: { code: "KSA", name: "ערב הסעודית", nameEn: "Saudi Arabia",  flag: "🇸🇦", group: "H" },
-  ALG: { code: "ALG", name: "אלג׳יריה",   nameEn: "Algeria",        flag: "🇩🇿", group: "H" },
+  ESP: { code: "ESP", name: "ספרד",        nameEn: "Spain",          flag: "🇪🇸", group: "H" },
+  CPV: { code: "CPV", name: "כף ורדה",     nameEn: "Cape Verde",     flag: "🇨🇻", group: "H" },
+  KSA: { code: "KSA", name: "ערב הסעודית", nameEn: "Saudi Arabia",   flag: "🇸🇦", group: "H" },
+  URU: { code: "URU", name: "אורוגוואי",   nameEn: "Uruguay",        flag: "🇺🇾", group: "H" },
   // Group I
-  POR: { code: "POR", name: "פורטוגל",    nameEn: "Portugal",       flag: "🇵🇹", group: "I" },
-  COL: { code: "COL", name: "קולומביה",   nameEn: "Colombia",       flag: "🇨🇴", group: "I" },
-  GHA: { code: "GHA", name: "גאנה",       nameEn: "Ghana",          flag: "🇬🇭", group: "I" },
-  UZB: { code: "UZB", name: "אוזבקיסטן",  nameEn: "Uzbekistan",     flag: "🇺🇿", group: "I" },
+  FRA: { code: "FRA", name: "צרפת",        nameEn: "France",         flag: "🇫🇷", group: "I" },
+  SEN: { code: "SEN", name: "סנגל",        nameEn: "Senegal",        flag: "🇸🇳", group: "I" },
+  IRQ: { code: "IRQ", name: "עיראק",       nameEn: "Iraq",           flag: "🇮🇶", group: "I" },
+  NOR: { code: "NOR", name: "נורווגיה",    nameEn: "Norway",         flag: "🇳🇴", group: "I" },
   // Group J
-  ITA: { code: "ITA", name: "איטליה",     nameEn: "Italy",          flag: "🇮🇹", group: "J" },
-  DEN: { code: "DEN", name: "דנמרק",      nameEn: "Denmark",        flag: "🇩🇰", group: "J" },
-  CIV: { code: "CIV", name: "חוף השנהב",  nameEn: "Ivory Coast",    flag: "🇨🇮", group: "J" },
-  QAT: { code: "QAT", name: "קטאר",       nameEn: "Qatar",          flag: "🇶🇦", group: "J" },
+  ARG: { code: "ARG", name: "ארגנטינה",    nameEn: "Argentina",      flag: "🇦🇷", group: "J" },
+  ALG: { code: "ALG", name: "אלג׳יריה",    nameEn: "Algeria",        flag: "🇩🇿", group: "J" },
+  AUT: { code: "AUT", name: "אוסטריה",     nameEn: "Austria",        flag: "🇦🇹", group: "J" },
+  JOR: { code: "JOR", name: "ירדן",        nameEn: "Jordan",         flag: "🇯🇴", group: "J" },
   // Group K
-  TUR: { code: "TUR", name: "טורקיה",     nameEn: "Turkey",         flag: "🇹🇷", group: "K" },
-  AUT: { code: "AUT", name: "אוסטריה",    nameEn: "Austria",        flag: "🇦🇹", group: "K" },
-  PER: { code: "PER", name: "פרו",        nameEn: "Peru",           flag: "🇵🇪", group: "K" },
-  HAI: { code: "HAI", name: "האיטי",      nameEn: "Haiti",          flag: "🇭🇹", group: "K" },
+  POR: { code: "POR", name: "פורטוגל",     nameEn: "Portugal",       flag: "🇵🇹", group: "K" },
+  COD: { code: "COD", name: "דר״ק (קונגו)", nameEn: "DR Congo",      flag: "🇨🇩", group: "K" },
+  UZB: { code: "UZB", name: "אוזבקיסטן",   nameEn: "Uzbekistan",     flag: "🇺🇿", group: "K" },
+  COL: { code: "COL", name: "קולומביה",    nameEn: "Colombia",       flag: "🇨🇴", group: "K" },
   // Group L
-  SCO: { code: "SCO", name: "סקוטלנד",    nameEn: "Scotland",       flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", group: "L" },
-  CZE: { code: "CZE", name: "צ׳כיה",      nameEn: "Czech Republic", flag: "🇨🇿", group: "L" },
-  CMR: { code: "CMR", name: "קמרון",      nameEn: "Cameroon",       flag: "🇨🇲", group: "L" },
-  IRQ: { code: "IRQ", name: "עיראק",      nameEn: "Iraq",           flag: "🇮🇶", group: "L" },
+  ENG: { code: "ENG", name: "אנגליה",      nameEn: "England",        flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", group: "L" },
+  CRO: { code: "CRO", name: "קרואטיה",     nameEn: "Croatia",        flag: "🇭🇷", group: "L" },
+  GHA: { code: "GHA", name: "גאנה",        nameEn: "Ghana",          flag: "🇬🇭", group: "L" },
+  PAN: { code: "PAN", name: "פנמה",        nameEn: "Panama",         flag: "🇵🇦", group: "L" },
 };
 
 /* ---------- VENUES (16 stadiums) ---------- */
@@ -204,19 +204,19 @@ function pickChannels(matchIdx, stageId, isHostMatch) {
  * Knockouts: R32 (16), R16 (8), QF (4), SF (2), 3rd-place (1), Final (1). */
 
 const RAW_GROUP_FIXTURES = [
-  // Format: [groupLetter, [pair1A, pair1B], [pair2A, pair2B], [pair3A, pair3B]] over 3 matchdays
-  ["A", ["MEX","POL"], ["EGY","ECU"], ["MEX","EGY"], ["POL","ECU"], ["MEX","ECU"], ["POL","EGY"]],
-  ["B", ["CAN","NED"], ["KOR","SEN"], ["CAN","KOR"], ["NED","SEN"], ["CAN","SEN"], ["NED","KOR"]],
-  ["C", ["USA","GER"], ["AUS","CRC"], ["USA","AUS"], ["GER","CRC"], ["USA","CRC"], ["GER","AUS"]],
-  ["D", ["ARG","CRO"], ["NGA","PAN"], ["ARG","NGA"], ["CRO","PAN"], ["ARG","PAN"], ["CRO","NGA"]],
-  ["E", ["FRA","URU"], ["JPN","TUN"], ["FRA","JPN"], ["URU","TUN"], ["FRA","TUN"], ["URU","JPN"]],
-  ["F", ["ESP","BEL"], ["IRN","JAM"], ["ESP","IRN"], ["BEL","JAM"], ["ESP","JAM"], ["BEL","IRN"]],
-  ["G", ["BRA","SUI"], ["MAR","NZL"], ["BRA","MAR"], ["SUI","NZL"], ["BRA","NZL"], ["SUI","MAR"]],
-  ["H", ["ENG","SRB"], ["KSA","ALG"], ["ENG","KSA"], ["SRB","ALG"], ["ENG","ALG"], ["SRB","KSA"]],
-  ["I", ["POR","COL"], ["GHA","UZB"], ["POR","GHA"], ["COL","UZB"], ["POR","UZB"], ["COL","GHA"]],
-  ["J", ["ITA","DEN"], ["CIV","QAT"], ["ITA","CIV"], ["DEN","QAT"], ["ITA","QAT"], ["DEN","CIV"]],
-  ["K", ["TUR","AUT"], ["PER","HAI"], ["TUR","PER"], ["AUT","HAI"], ["TUR","HAI"], ["AUT","PER"]],
-  ["L", ["SCO","CZE"], ["CMR","IRQ"], ["SCO","CMR"], ["CZE","IRQ"], ["SCO","IRQ"], ["CZE","CMR"]],
+  // Round-robin pattern: 1v2, 3v4, 1v3, 2v4, 1v4, 2v3 — based on FIFA 2026 final draw.
+  ["A", ["MEX","RSA"], ["KOR","CZE"], ["MEX","KOR"], ["RSA","CZE"], ["MEX","CZE"], ["RSA","KOR"]],
+  ["B", ["CAN","BIH"], ["QAT","SUI"], ["CAN","QAT"], ["BIH","SUI"], ["CAN","SUI"], ["BIH","QAT"]],
+  ["C", ["BRA","MAR"], ["HAI","SCO"], ["BRA","HAI"], ["MAR","SCO"], ["BRA","SCO"], ["MAR","HAI"]],
+  ["D", ["USA","PAR"], ["AUS","TUR"], ["USA","AUS"], ["PAR","TUR"], ["USA","TUR"], ["PAR","AUS"]],
+  ["E", ["GER","CUW"], ["CIV","ECU"], ["GER","CIV"], ["CUW","ECU"], ["GER","ECU"], ["CUW","CIV"]],
+  ["F", ["NED","JPN"], ["SWE","TUN"], ["NED","SWE"], ["JPN","TUN"], ["NED","TUN"], ["JPN","SWE"]],
+  ["G", ["BEL","EGY"], ["IRN","NZL"], ["BEL","IRN"], ["EGY","NZL"], ["BEL","NZL"], ["EGY","IRN"]],
+  ["H", ["ESP","CPV"], ["KSA","URU"], ["ESP","KSA"], ["CPV","URU"], ["ESP","URU"], ["CPV","KSA"]],
+  ["I", ["FRA","SEN"], ["IRQ","NOR"], ["FRA","IRQ"], ["SEN","NOR"], ["FRA","NOR"], ["SEN","IRQ"]],
+  ["J", ["ARG","ALG"], ["AUT","JOR"], ["ARG","AUT"], ["ALG","JOR"], ["ARG","JOR"], ["ALG","AUT"]],
+  ["K", ["POR","COD"], ["UZB","COL"], ["POR","UZB"], ["COD","COL"], ["POR","COL"], ["COD","UZB"]],
+  ["L", ["ENG","CRO"], ["GHA","PAN"], ["ENG","GHA"], ["CRO","PAN"], ["ENG","PAN"], ["CRO","GHA"]],
 ];
 
 const HOST_TEAMS = new Set(["MEX","USA","CAN"]);

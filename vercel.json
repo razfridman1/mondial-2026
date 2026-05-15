@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/sync-results",
-      "schedule": "*/30 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/auto-predict",

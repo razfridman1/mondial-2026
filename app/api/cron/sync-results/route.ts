@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
-import { MATCHES, TEAMS } from "@/lib/data";
+import { MATCHES } from "@/lib/data";
 import { resolveAllStages } from "@/lib/bracket";
+import { teamCodeFromApiName } from "@/lib/team-name-mapper";
 import type { MatchResult } from "@/lib/standings";
 
 export const runtime = "nodejs";
@@ -48,6 +49,28 @@ export async function GET(req: Request) {
       skipped: "FOOTBALL_API_KEY not configured — live sync is disabled",
       docs: "Set FOOTBALL_API_KEY in Vercel env vars when the tournament starts. The free tier of football-data.org works.",
     });
+  }
+
+  /* ----- Rate-limit guard ---------------------------------------------
+   * The cron is scheduled every minute. To stay inside football-data.org's
+   * free tier we ONLY call the external API when at least one match is
+   * "active" — defined as starting within the next 15 minutes through
+   * 3 hours after kickoff (covers 90' + injury time + admin lag). Outside
+   * those windows we short-circuit and return ok with skipped="no-active".
+   * If the request includes ?force=1 we bypass the guard (manual sync). */
+  const url = new URL(req.url);
+  const force = url.searchParams.get("force") === "1";
+  if (!force) {
+    const now = Date.now();
+    const PRE_MS  = 15 * 60 * 1000;        // start syncing 15 min before kickoff
+    const POST_MS = 3 * 60 * 60 * 1000;    // keep syncing 3h after kickoff
+    const active = MATCHES.some(m => {
+      const t = new Date(m.utc).getTime();
+      return now >= t - PRE_MS && now <= t + POST_MS;
+    });
+    if (!active) {
+      return NextResponse.json({ ok: true, skipped: "no-active-match-window" });
+    }
   }
 
   const baseUrl = process.env.FOOTBALL_API_URL || "https://api.football-data.org/v4";
@@ -149,16 +172,12 @@ function findOurMatch(
   resolved: Record<string, { home: string; away: string; winner: string; loser: string }>,
 ): { id: string } | null {
   const extDate = ext.utcDate ? new Date(ext.utcDate).toISOString().slice(0, 10) : null;
-  const extHome = (ext.homeTeam?.name || "").toLowerCase();
-  const extAway = (ext.awayTeam?.name || "").toLowerCase();
-  if (!extDate || !extHome || !extAway) return null;
+  const extHomeCode = teamCodeFromApiName(ext.homeTeam?.name) || teamCodeFromApiName(ext.homeTeam?.shortName);
+  const extAwayCode = teamCodeFromApiName(ext.awayTeam?.name) || teamCodeFromApiName(ext.awayTeam?.shortName);
+  if (!extDate || !extHomeCode || !extAwayCode) return null;
 
-  function nameMatches(code: string | undefined, ext: string): boolean {
-    if (!code) return false;
-    const t = TEAMS[code];
-    if (!t) return false;
-    const en = t.nameEn.toLowerCase();
-    return en === ext || ext.includes(en) || en.includes(ext);
+  function nameMatches(code: string | undefined, extCode: string): boolean {
+    return !!code && !!extCode && code === extCode;
   }
 
   for (const m of MATCHES) {
@@ -177,8 +196,8 @@ function findOurMatch(
     }
 
     /* Try both orderings — football-data may swap home/away. */
-    const matchDirect = nameMatches(homeCode, extHome) && nameMatches(awayCode, extAway);
-    const matchSwap   = nameMatches(homeCode, extAway) && nameMatches(awayCode, extHome);
+    const matchDirect = nameMatches(homeCode, extHomeCode) && nameMatches(awayCode, extAwayCode);
+    const matchSwap   = nameMatches(homeCode, extAwayCode) && nameMatches(awayCode, extHomeCode);
     if (matchDirect || matchSwap) return { id: m.id };
   }
   return null;
