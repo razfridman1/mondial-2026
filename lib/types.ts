@@ -54,7 +54,7 @@ export interface Match {
   preGameMinutes: number;
   studioShow: string | null;
   odds: Odds | null;
-  aiInsight: string;
+  aiInsight: string | null;
 }
 
 /* Firestore documents */

@@ -123,21 +123,32 @@ export default function MatchesTab() {
   /* Resolve knockout placeholders to real team codes once previous stages finish. */
   const resolved = useMemo(() => resolveAllStages(matchResults), [matchResults]);
 
-  /* All effective matches — with knockout placeholders swapped for real codes when known. */
+  /* All effective matches — with knockout placeholders swapped for real codes when known.
+   * Knockout matches are HIDDEN from the schedule list until football-data.org
+   * populates real teams (i.e., until the bracket resolver fills them in from
+   * actual match results). The bracket tab still shows the bracket structure
+   * for users who want to see the format. */
   const matches = useMemo(
-    () => MATCHES.map(m => {
-      const eff = effMatch(m, overrides[m.id], simConfig);
-      if (m.stage === "GROUP") return eff;
-      const r = resolved[m.id];
-      if (!r) return eff;
-      return {
-        ...eff,
-        home: r.home || eff.home,
-        away: r.away || eff.away,
-        homeIsPlaceholder: !r.home,
-        awayIsPlaceholder: !r.away,
-      };
-    }).sort((a, b) => +new Date(a.utc) - +new Date(b.utc)),
+    () => MATCHES
+      .map(m => {
+        const eff = effMatch(m, overrides[m.id], simConfig);
+        if (m.stage === "GROUP") return eff;
+        const r = resolved[m.id];
+        if (!r) return eff;
+        return {
+          ...eff,
+          home: r.home || eff.home,
+          away: r.away || eff.away,
+          homeIsPlaceholder: !r.home,
+          awayIsPlaceholder: !r.away,
+        };
+      })
+      .filter(m => {
+        if (m.stage === "GROUP") return true;
+        /* Knockout: only show once both teams are resolved (real, not placeholder). */
+        return !m.homeIsPlaceholder && !m.awayIsPlaceholder;
+      })
+      .sort((a, b) => +new Date(a.utc) - +new Date(b.utc)),
     [overrides, simConfig, resolved]
   );
 

@@ -2,7 +2,7 @@
  * Mondial 2026 — static reference data (teams, venues, channels, stages)
  * and generated match schedule (104 matches).
  * ===================================================================*/
-import type { Team, Venue, Channel, Stage, Match, Odds, StageId } from "./types";
+import type { Team, Venue, Channel, Stage, Match, StageId } from "./types";
 
 /* =====================================================================
  * 48 teams as drawn at the FIFA World Cup 2026 Final Draw
@@ -90,6 +90,10 @@ export const VENUES: Record<string, Venue> = {
   SFO: { name: "Levi’s Stadium",         city: "סן פרנסיסקו",        country: "ארה״ב", flag: "🇺🇸", capacity: 68500 },
   SEA: { name: "Lumen Field",            city: "סיאטל",              country: "ארה״ב", flag: "🇺🇸", capacity: 69000 },
   BOS: { name: "Gillette Stadium",       city: "בוסטון",             country: "ארה״ב", flag: "🇺🇸", capacity: 65900 },
+  /* Marker for matches where venue is not yet exposed by football-data.org.
+   * UI shows "אצטדיון יוכרז". Will be replaced by the real venue once the
+   * API populates it (typically after the bracket is set). */
+  TBD: { name: "אצטדיון יוכרז",         city: "—",                   country: "—",     flag: "❓", capacity: 0 },
 };
 
 export const CHANNELS: Record<string, Channel> = {
@@ -115,16 +119,8 @@ export const STAGES: Record<StageId, Stage> = {
 /* ----- match generation ----- */
 const HOST_TEAMS = new Set(["MEX", "USA", "CAN"]);
 
-function isr(dateStr: string, hhmm: string): string {
-  const [h, m] = hhmm.split(":").map(Number);
-  const utcHour = h - 3;
-  const d = new Date(`${dateStr}T00:00:00Z`);
-  d.setUTCHours(utcHour, m, 0, 0);
-  return d.toISOString();
-}
-
-/* UK BST (UTC+1) → UTC. Used because the official FIFA 2026 schedule that
- * was sourced from Sky Sports is published in UK time. */
+/* UK BST (UTC+1) → UTC. Used for group-stage fixtures sourced from FIFA's
+ * officially published schedule (which is listed in UK time). */
 function uk(dateStr: string, hhmm: string): string {
   const [h, m] = hhmm.split(":").map(Number);
   const utcHour = h - 1;
@@ -143,29 +139,6 @@ function pickChannels(matchIdx: number, stageId: StageId, isHostMatch: boolean):
   if (isMarquee) return ["KAN11", "SPORT5"];
   const rota = [["SPORT5"], ["SPORT1"], ["SPORT2"], ["SPORT5PLUS"], ["SPORT5LIVE"], ["KANSPORT"]];
   return rota[matchIdx % rota.length];
-}
-
-function generateOdds(homeCode: string, awayCode: string): Odds {
-  const seed = (homeCode.charCodeAt(0) + awayCode.charCodeAt(0)) % 100;
-  return {
-    home: (1.4 + (seed % 25) / 10).toFixed(2),
-    draw: (3.0 + (seed % 12) / 10).toFixed(2),
-    away: (1.8 + ((seed + 7) % 30) / 10).toFixed(2),
-  };
-}
-
-function generateInsight(homeCode: string, awayCode: string): string {
-  const home = TEAMS[homeCode]?.name || homeCode;
-  const away = TEAMS[awayCode]?.name || awayCode;
-  const phrases = [
-    `${home} מול ${away} — קרב טקטי שצפוי להיות צמוד מאוד.`,
-    `שני יריבים שלא נפגשו בטורניר מאז שנים — צפויה התרגשות.`,
-    `הקבוצה הביתית מגיעה עם מומנטום חיובי מהמחזורים האחרונים.`,
-    `${home} מסתמכת על קו ההתקפה החזק, ${away} בונה על הגנה איתנה.`,
-    `משחק מפתח להעפלה — שתי הקבוצות זקוקות לנקודות.`,
-    `דרבי יבשתי שמבטיח אווירה חמה ביציעים ובבית.`,
-  ];
-  return phrases[(home.length + away.length) % phrases.length];
 }
 
 /* =====================================================================
@@ -266,16 +239,90 @@ const GROUP_FIXTURES: GroupFixture[] = [
   { group:"J", date:"2026-06-28", ukTime:"03:00", home:"JOR", away:"ARG", venue:"DAL" },
 ];
 
-const VENUE_KEYS = Object.keys(VENUES);
-const KO_KICKOFFS = ["20:00","23:00","02:00"];
+/* =====================================================================
+ * KNOCKOUT STAGE — UTC kick-off times sourced ONLY from football-data.org
+ * (competition WC, season 2026, as of May 2026). The API does NOT expose
+ * venues for any World Cup match, so venue is "TBD" until the API
+ * starts to populate it (typically after the bracket is set). Real teams
+ * are likewise filled in by football-data.org's match data once group
+ * stage finishes; until then we use the bracket placeholders below
+ * ("1A","2B", "W R32-1", etc.) so the UI can still show fixture slots.
+ * ===================================================================*/
+interface KnockoutFixture {
+  stage: StageId;
+  utc: string;       // ISO UTC, verbatim from football-data.org
+  home: string;      // bracket placeholder (e.g., "1A", "W R32-1")
+  away: string;      // bracket placeholder
+}
+
+const KNOCKOUT_FIXTURES: KnockoutFixture[] = [
+  /* ---- R32 / LAST_32 (16 matches) ---- */
+  { stage: "R32", utc: "2026-06-28T19:00:00Z", home: "1A",          away: "2B"           },
+  { stage: "R32", utc: "2026-06-29T17:00:00Z", home: "1C",          away: "2D"           },
+  { stage: "R32", utc: "2026-06-29T20:30:00Z", home: "1E",          away: "2F"           },
+  { stage: "R32", utc: "2026-06-30T01:00:00Z", home: "1G",          away: "2H"           },
+  { stage: "R32", utc: "2026-06-30T17:00:00Z", home: "1I",          away: "2J"           },
+  { stage: "R32", utc: "2026-06-30T21:00:00Z", home: "1K",          away: "2L"           },
+  { stage: "R32", utc: "2026-07-01T01:00:00Z", home: "1B",          away: "3A/C/D/E"     },
+  { stage: "R32", utc: "2026-07-01T16:00:00Z", home: "1D",          away: "3B/E/F"       },
+  { stage: "R32", utc: "2026-07-01T20:00:00Z", home: "1F",          away: "3A/B/C/G"     },
+  { stage: "R32", utc: "2026-07-02T00:00:00Z", home: "1H",          away: "3C/F/I/J"     },
+  { stage: "R32", utc: "2026-07-02T19:00:00Z", home: "1J",          away: "3D/E/H/K"     },
+  { stage: "R32", utc: "2026-07-02T23:00:00Z", home: "1L",          away: "3F/G/J/L"     },
+  { stage: "R32", utc: "2026-07-03T03:00:00Z", home: "2A",          away: "2C"           },
+  { stage: "R32", utc: "2026-07-03T18:00:00Z", home: "2E",          away: "2G"           },
+  { stage: "R32", utc: "2026-07-03T22:00:00Z", home: "2I",          away: "2K"           },
+  { stage: "R32", utc: "2026-07-04T01:30:00Z", home: "3C/D/H",      away: "3I/J/L"       },
+
+  /* ---- R16 / LAST_16 (8 matches) ---- */
+  { stage: "R16", utc: "2026-07-04T17:00:00Z", home: "W R32-1",     away: "W R32-2"      },
+  { stage: "R16", utc: "2026-07-04T21:00:00Z", home: "W R32-3",     away: "W R32-4"      },
+  { stage: "R16", utc: "2026-07-05T20:00:00Z", home: "W R32-5",     away: "W R32-6"      },
+  { stage: "R16", utc: "2026-07-06T00:00:00Z", home: "W R32-7",     away: "W R32-8"      },
+  { stage: "R16", utc: "2026-07-06T19:00:00Z", home: "W R32-9",     away: "W R32-10"     },
+  { stage: "R16", utc: "2026-07-07T00:00:00Z", home: "W R32-11",    away: "W R32-12"     },
+  { stage: "R16", utc: "2026-07-07T16:00:00Z", home: "W R32-13",    away: "W R32-14"     },
+  { stage: "R16", utc: "2026-07-07T20:00:00Z", home: "W R32-15",    away: "W R32-16"     },
+
+  /* ---- Quarter-finals (4 matches) ---- */
+  { stage: "QF",  utc: "2026-07-09T20:00:00Z", home: "W R16-1",     away: "W R16-2"      },
+  { stage: "QF",  utc: "2026-07-10T19:00:00Z", home: "W R16-3",     away: "W R16-4"      },
+  { stage: "QF",  utc: "2026-07-11T21:00:00Z", home: "W R16-5",     away: "W R16-6"      },
+  { stage: "QF",  utc: "2026-07-12T01:00:00Z", home: "W R16-7",     away: "W R16-8"      },
+
+  /* ---- Semi-finals (2 matches) ---- */
+  { stage: "SF",  utc: "2026-07-14T19:00:00Z", home: "W QF-1",      away: "W QF-2"       },
+  { stage: "SF",  utc: "2026-07-15T19:00:00Z", home: "W QF-3",      away: "W QF-4"       },
+
+  /* ---- Third-place play-off ---- */
+  { stage: "THIRD", utc: "2026-07-18T21:00:00Z", home: "L SF-1",    away: "L SF-2"       },
+
+  /* ---- Final ---- */
+  { stage: "FINAL", utc: "2026-07-19T19:00:00Z", home: "W SF-1",    away: "W SF-2"       },
+];
+
+const STAGE_STUDIO_SHOW: Record<StageId, string | null> = {
+  GROUP: null,
+  R32:   "אולפן נוקאאוט",
+  R16:   "אולפן שמינית הגמר",
+  QF:    "אולפן רבע הגמר",
+  SF:    "אולפן חצי הגמר — שידור מורחב",
+  THIRD: "אולפן ברונזה",
+  FINAL: "אולפן הגמר — שידור מיוחד 3 שעות",
+};
+
+const STAGE_PRE_GAME_MINUTES: Record<StageId, number> = {
+  GROUP: 30, R32: 45, R16: 45, QF: 60, SF: 90, THIRD: 60, FINAL: 120,
+};
 
 function buildMatches(): Match[] {
   const matches: Match[] = [];
   let seq = 1;
-  let venueIdx = 0;
   const push = (obj: Omit<Match, "id">) => matches.push({ id: "M" + String(seq++).padStart(3, "0"), ...obj });
 
-  /* Group stage — explicit FIFA-published schedule (72 matches) */
+  /* Group stage — explicit FIFA-published schedule (72 matches).
+   * Teams, dates and kick-off times verified 100% against football-data.org.
+   * Venues are from FIFA's officially published match schedule (not API). */
   GROUP_FIXTURES.forEach((fx, i) => {
     const isHost = HOST_TEAMS.has(fx.home) || HOST_TEAMS.has(fx.away);
     push({
@@ -289,132 +336,31 @@ function buildMatches(): Match[] {
       channels: pickChannels(i, "GROUP", isHost),
       preGameMinutes: 30,
       studioShow: isHost ? "אולפן מונדיאל 2026" : null,
-      odds: generateOdds(fx.home, fx.away),
-      aiInsight: generateInsight(fx.home, fx.away),
-    });
-  });
-  venueIdx = GROUP_FIXTURES.length; // keep knockout-round venue rotation deterministic
-
-  const R32_PAIRS: [string, string][] = [
-    ["1A","2B"],["1C","2D"],["1E","2F"],["1G","2H"],["1I","2J"],["1K","2L"],
-    ["1B","3A/C/D/E"],["1D","3B/E/F"],["1F","3A/B/C/G"],["1H","3C/F/I/J"],
-    ["1J","3D/E/H/K"],["1L","3F/G/J/L"],
-    ["2A","2C"],["2E","2G"],["2I","2K"],["3C/D/H","3I/J/L"],
-  ];
-  const R32_DAYS = ["2026-06-28","2026-06-29","2026-06-30","2026-07-01","2026-07-02","2026-07-03"];
-  R32_PAIRS.forEach((pair, i) => {
-    const dateStr = R32_DAYS[Math.floor(i / 3) % R32_DAYS.length];
-    const time = KO_KICKOFFS[i % KO_KICKOFFS.length];
-    push({
-      utc: isr(dateStr, time),
-      stage: "R32",
-      group: null,
-      home: pair[0],
-      away: pair[1],
-      homeIsPlaceholder: true,
-      awayIsPlaceholder: true,
-      venue: VENUE_KEYS[(venueIdx + i) % VENUE_KEYS.length],
-      status: "scheduled",
-      channels: pickChannels(i, "R32", false),
-      preGameMinutes: 45,
-      studioShow: "אולפן נוקאאוט",
-      odds: null,
-      aiInsight: "שלב נוקאאוט — המנצח עולה הלאה.",
+      odds: null,        // odds removed — no verified source via football-data.org
+      aiInsight: null,   // insights removed — were generated, not real
     });
   });
 
-  const R16_DAYS = ["2026-07-04","2026-07-05","2026-07-06","2026-07-07"];
-  for (let i = 0; i < 8; i++) {
+  /* Knockout stages — UTC times direct from football-data.org. Venue
+   * starts as "TBD"; the sync-results cron will fill it once the API
+   * exposes it (typically after the bracket is decided). */
+  KNOCKOUT_FIXTURES.forEach((kf, i) => {
     push({
-      utc: isr(R16_DAYS[i % R16_DAYS.length], KO_KICKOFFS[i % 3]),
-      stage: "R16",
+      utc: kf.utc,
+      stage: kf.stage,
       group: null,
-      home: `W R32-${i*2+1}`,
-      away: `W R32-${i*2+2}`,
+      home: kf.home,
+      away: kf.away,
       homeIsPlaceholder: true,
       awayIsPlaceholder: true,
-      venue: VENUE_KEYS[(venueIdx + i + 5) % VENUE_KEYS.length],
+      venue: "TBD",
       status: "scheduled",
-      channels: pickChannels(i, "R16", false),
-      preGameMinutes: 45,
-      studioShow: "אולפן שמינית הגמר",
+      channels: pickChannels(i, kf.stage, false),
+      preGameMinutes: STAGE_PRE_GAME_MINUTES[kf.stage],
+      studioShow: STAGE_STUDIO_SHOW[kf.stage],
       odds: null,
-      aiInsight: "שמינית הגמר — שמונה זוגות לקראת רבע הגמר.",
+      aiInsight: null,
     });
-  }
-
-  const QF_DATES = ["2026-07-09","2026-07-09","2026-07-11","2026-07-11"];
-  const QF_TIMES = ["19:00","23:00","19:00","23:00"];
-  for (let i = 0; i < 4; i++) {
-    push({
-      utc: isr(QF_DATES[i], QF_TIMES[i]),
-      stage: "QF",
-      group: null,
-      home: `W R16-${i*2+1}`,
-      away: `W R16-${i*2+2}`,
-      homeIsPlaceholder: true,
-      awayIsPlaceholder: true,
-      venue: VENUE_KEYS[(venueIdx + i + 9) % VENUE_KEYS.length],
-      status: "scheduled",
-      channels: pickChannels(i, "QF", false),
-      preGameMinutes: 60,
-      studioShow: "אולפן רבע הגמר",
-      odds: null,
-      aiInsight: "רבע הגמר — שמונה הקבוצות החזקות במונדיאל.",
-    });
-  }
-
-  for (let i = 0; i < 2; i++) {
-    push({
-      utc: isr(i === 0 ? "2026-07-14" : "2026-07-15", "22:00"),
-      stage: "SF",
-      group: null,
-      home: `W QF-${i*2+1}`,
-      away: `W QF-${i*2+2}`,
-      homeIsPlaceholder: true,
-      awayIsPlaceholder: true,
-      venue: i === 0 ? "DAL" : "ATL",
-      status: "scheduled",
-      channels: pickChannels(i, "SF", false),
-      preGameMinutes: 90,
-      studioShow: "אולפן חצי הגמר — שידור מורחב",
-      odds: null,
-      aiInsight: "חצי הגמר — שתי הקבוצות הסופיות לפני הגמר.",
-    });
-  }
-
-  push({
-    utc: isr("2026-07-18", "18:00"),
-    stage: "THIRD",
-    group: null,
-    home: "L SF-1",
-    away: "L SF-2",
-    homeIsPlaceholder: true,
-    awayIsPlaceholder: true,
-    venue: "MIA",
-    status: "scheduled",
-    channels: pickChannels(0, "THIRD", false),
-    preGameMinutes: 60,
-    studioShow: "אולפן ברונזה",
-    odds: null,
-    aiInsight: "המשחק על המקום השלישי.",
-  });
-
-  push({
-    utc: isr("2026-07-19", "22:00"),
-    stage: "FINAL",
-    group: null,
-    home: "W SF-1",
-    away: "W SF-2",
-    homeIsPlaceholder: true,
-    awayIsPlaceholder: true,
-    venue: "NYC",
-    status: "scheduled",
-    channels: pickChannels(0, "FINAL", false),
-    preGameMinutes: 120,
-    studioShow: "אולפן הגמר — שידור מיוחד 3 שעות",
-    odds: null,
-    aiInsight: "גמר המונדיאל 2026 — הרגע הגדול ביותר בכדורגל.",
   });
 
   return matches;
