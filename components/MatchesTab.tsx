@@ -71,18 +71,17 @@ export default function MatchesTab() {
                    || dayEl.querySelector<HTMLElement>(".mt-card")
                    || dayEl;
 
-    /* Use the browser's own scrollIntoView with `block: "start"`. CSS
-     * `scroll-margin-top` on the card (set in globals.css mobile media query)
-     * leaves enough clearance for the mobile browser URL bar (which can
-     * cover the top ~60px). This is more reliable than manual scrollY math
-     * which can land mid-card while the URL bar covers the top portion. */
-    try {
-      firstCard.scrollIntoView({ block: "start", behavior });
-    } catch {
-      const rect = firstCard.getBoundingClientRect();
-      const y = window.scrollY + rect.top - 80;
-      window.scrollTo({ top: Math.max(0, y), behavior });
-    }
+    /* Compute the card's absolute Y in the document, then scroll the
+     * window so its TOP edge lands a fixed `OFFSET` below the viewport
+     * top. The OFFSET leaves a tiny breathing room and prevents the
+     * card from being flush against the very top. We deliberately do
+     * NOT rely on CSS scroll-margin-top here — different browsers
+     * (especially mobile Chrome / Safari) sometimes double-apply it
+     * and land mid-next-card. */
+    const rect = firstCard.getBoundingClientRect();
+    const OFFSET = 12;
+    const targetY = window.scrollY + rect.top - OFFSET;
+    window.scrollTo({ top: Math.max(0, targetY), behavior });
     return true;
   }
 

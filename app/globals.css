@@ -4568,11 +4568,6 @@ html[data-theme="light"] .chat-panel {
   }
 }
 
-/* ---- Scroll-margin tuning for mobile: leave room for the browser URL bar
- *      (Chrome iOS ~60px, others vary) so the targeted card's top doesn't
- *      land BEHIND the URL bar and look "cut in half". */
-@media (max-width: 720px) {
-  .day-section { scroll-margin-top: 100px !important; }
-  .match-card  { scroll-margin-top: 100px !important; }
-  .mt-card     { scroll-margin-top: 100px !important; }
-}
+/* Mobile scroll-margin removed — scroll target is handled programmatically
+ * by MatchesTab via window.scrollTo with a precise OFFSET, to avoid
+ * browsers double-applying margins and landing past the intended card. */
