@@ -1,14 +1,18 @@
 "use client";
 /* =====================================================================
- * SimulationPanel — stage-by-stage testing workflow.
+ * SimulationPanel (renamed in nav → "ניהול ניחושים")
  *
- * Per stage:
- *   1) Fill random PREDICTIONS for all members of the selected group.
- *   2) Once predictions exist, fill random RESULTS for that stage.
- *   3) Next stage unlocks only when current stage's results are complete.
+ * Post-simulation admin tab. Lets the admin:
+ *   • Fill random PREDICTIONS for all members of a chosen group (per stage)
+ *     — useful when seeding test data or for groups that ask to be auto-
+ *     predicted before deadlines.
+ *   • Clear all predictions for one group in one click.
+ *   • Full reset of all sim artifacts (predictions, broadcast overrides,
+ *     activity, sim-flagged results) — preserves users, groups, profiles,
+ *     and real results from the live football-data.org sync.
  *
- * Side table shows progress per stage.
- * Reset button wipes ALL simulation data so the real World Cup can start.
+ * Results management was removed — real results now flow in from
+ * football-data.org via the /api/cron/sync-results cron.
  * ===================================================================*/
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
@@ -58,7 +62,6 @@ export default function SimulationPanel() {
     return { "content-type": "application/json", authorization: `Bearer ${token}` };
   }
 
-  /* Load admin's group list (target for prediction fills). */
   async function reloadGroups() {
     if (!user?.isAdmin) return;
     try {
@@ -72,7 +75,6 @@ export default function SimulationPanel() {
   }
   useEffect(() => { reloadGroups(); }, [user?.isAdmin]);
 
-  /* Re-fetch stage statuses whenever the chosen group changes or after actions. */
   async function reloadStatus() {
     if (!groupId) { setStatuses([]); return; }
     try {
@@ -86,47 +88,13 @@ export default function SimulationPanel() {
   }
   useEffect(() => { reloadStatus(); }, [groupId]);
 
-  /* Derived gating logic per stage. */
+  /* Derived state: which stages have predictions filled (predictionsDone). */
   const stageState = useMemo(() => {
-    const map: Record<StageId, {
-      predictionsDone: boolean;
-      resultsDone: boolean;
-      canFillPredictions: boolean;
-      canFillResults: boolean;
-      stageStatus: StageStatus | undefined;
-    }> = {} as any;
-
-    /* helper: previous stage in ORDER */
-    function prevStage(s: StageId): StageId | null {
-      const i = STAGE_ORDER.indexOf(s);
-      return i > 0 ? STAGE_ORDER[i - 1] : null;
-    }
-
+    const map: Record<StageId, { predictionsDone: boolean; stageStatus: StageStatus | undefined }> = {} as any;
     for (const s of STAGE_ORDER) {
       const st = statuses.find(x => x.stage === s);
-      const matchesTotal = STAGE_MATCH_COUNT[s];
-      /* "Done" thresholds:
-       *   predictionsDone = at least 1 prediction exists OR total expected is 0
-       *     (allows results-fill even if random-fill didn't reach 100%)
-       *   resultsDone     = all stage matches have a result */
       const predictionsDone = !!st && st.predictionsFilled > 0;
-      const resultsDone     = !!st && st.resultsFilled >= matchesTotal && matchesTotal > 0;
-      map[s] = {
-        predictionsDone, resultsDone,
-        canFillPredictions: false,
-        canFillResults: false,
-        stageStatus: st,
-      };
-    }
-    /* Gating: each stage opens once the previous stage's RESULTS are done.
-     * Within a stage, BOTH predictions and results are clickable (also for
-     * re-runs). Predictions before results is recommended but not enforced
-     * — admin tools should be flexible. */
-    for (const s of STAGE_ORDER) {
-      const prev = prevStage(s);
-      const prevResultsDone = prev ? map[prev].resultsDone : true; // GROUP has no prev
-      map[s].canFillPredictions = prevResultsDone;
-      map[s].canFillResults     = prevResultsDone;
+      map[s] = { predictionsDone, stageStatus: st };
     }
     return map;
   }, [statuses]);
@@ -146,13 +114,11 @@ export default function SimulationPanel() {
         return;
       }
       const filled = data.filled ?? 0;
-      const users  = data.users ?? 0;
-      const ms     = data.matches ?? 0;
       const stageName = STAGE_NAMES[stage];
       if (filled === 0) {
         alert(`⚠ לא מולאו ניחושים ב-"${stageName}".\n${data.reason || "ייתכן שאין חברים בקבוצה או שאין משחקים זמינים."}`);
       } else {
-        console.log(`[sim] predictions filled: ${filled} (${users} users × ${ms} matches) for stage ${stage}`);
+        console.log(`[sim] predictions filled: ${filled} for stage ${stage}`);
       }
     } catch (e: any) {
       alert(`שגיאה: ${e?.message || e}`);
@@ -162,41 +128,10 @@ export default function SimulationPanel() {
     }
   }
 
-  async function fillResultsForStage(stage: StageId) {
-    setBusy(true);
-    try {
-      const r = await fetch("/api/admin/sim/instant-results", {
-        method: "POST",
-        headers: await authHeaders(),
-        body: JSON.stringify({ stage, overwrite: true }),
-      });
-      const data = await r.json();
-      if (!r.ok) {
-        alert(`שגיאה במילוי תוצאות: ${data.message || data.error || r.status}`);
-        return;
-      }
-      const inserted = data.inserted ?? 0;
-      const skipped  = data.skipped  ?? 0;
-      const stageName = STAGE_NAMES[stage];
-      if (inserted === 0 && skipped === 0) {
-        alert(`⚠ לא נכתבו תוצאות ב-"${stageName}". בדוק שהשלב הקודם הושלם.`);
-      } else {
-        console.log(`[sim] results inserted: ${inserted}, skipped: ${skipped} for stage ${stage}`);
-      }
-    } catch (e: any) {
-      alert(`שגיאה: ${e?.message || e}`);
-    } finally {
-      setBusy(false);
-      await reloadStatus();
-    }
-  }
-
-  async function clearStage(stage: StageId) {
+  async function clearStagePredictions(stage: StageId) {
     if (!confirm(
-      `לאפס את הנתונים בשלב "${STAGE_NAMES[stage]}"?\n\n` +
-      `• כל הניחושים שמולאו בשלב הזה (לחברי הקבוצה הנבחרת) יימחקו\n` +
-      `• כל תוצאות הסים שמולאו בשלב הזה יימחקו (תוצאות אמת לא נמחקות)\n\n` +
-      `שלבים מאוחרים יותר עלולים להינעל אם הם תלויים בשלב הזה.`
+      `למחוק את הניחושים בשלב "${STAGE_NAMES[stage]}" לחברי הקבוצה הנבחרת?\n\n` +
+      `פעולה זו לא נוגעת בתוצאות אמת ולא במשתמשים/קבוצות.`
     )) return;
     setBusy(true);
     try {
@@ -210,7 +145,44 @@ export default function SimulationPanel() {
         alert(`שגיאה: ${data.error || r.status}`);
         return;
       }
-      console.log(`[sim] cleared stage ${stage}:`, data);
+      console.log(`[sim] cleared predictions in stage ${stage}:`, data);
+    } catch (e: any) {
+      alert(`שגיאה: ${e?.message || e}`);
+    } finally {
+      setBusy(false);
+      await reloadStatus();
+    }
+  }
+
+  /* NEW: one-click wipe of all predictions for the chosen group, across ALL stages. */
+  async function clearAllGroupPredictions() {
+    if (!groupId) { alert("בחר קבוצה."); return; }
+    const grp = groups.find(g => g.id === groupId);
+    if (!confirm(
+      `למחוק את כל הניחושים של הקבוצה "${grp?.name || groupId}"?\n\n` +
+      `יימחקו ניחושים בכל השלבים (שלב הבתים, 32, שמינית, רבע, חצי, גמר ועל המקום השלישי).\n` +
+      `פעולה זו לא נוגעת בתוצאות אמת, במשתמשים או בקבוצות.`
+    )) return;
+    if (!confirm("פעולה בלתי הפיכה. לאשר?")) return;
+    setBusy(true);
+    let total = 0;
+    let failed: string[] = [];
+    try {
+      for (const stage of STAGE_ORDER) {
+        const r = await fetch("/api/admin/sim/clear-stage", {
+          method: "POST",
+          headers: await authHeaders(),
+          body: JSON.stringify({ stage, groupId }),
+        });
+        const data = await r.json();
+        if (r.ok) total += data.deletedPredictions || 0;
+        else failed.push(STAGE_NAMES[stage]);
+      }
+      if (failed.length) {
+        alert(`נמחקו ${total} ניחושים, אך נכשל בשלבים: ${failed.join(", ")}`);
+      } else {
+        alert(`✓ נמחקו ${total} ניחושים בסה"כ עבור הקבוצה.`);
+      }
     } catch (e: any) {
       alert(`שגיאה: ${e?.message || e}`);
     } finally {
@@ -221,15 +193,15 @@ export default function SimulationPanel() {
 
   async function fullReset() {
     if (!confirm(
-      "🏁 איפוס מלא לפני המונדיאל האמיתי\n\n" +
+      "🏁 איפוס מלא לקראת המונדיאל האמיתי\n\n" +
       "פעולה זו תמחק:\n" +
-      "• כל הניחושים (כולל אוטומטיים שנוצרו בסים)\n" +
-      "• כל תוצאות הסים (תוצאות אמת לא נמחקות)\n" +
+      "• כל הניחושים\n" +
       "• broadcast overrides\n" +
       "• פיד הפעילות\n" +
-      "• מבטל סים זמן\n\n" +
-      "משתמשים, קבוצות, חברויות ופרופילים — יישמרו.\n\n" +
-      "המערכת תהיה נקייה לקראת המונדיאל. להמשיך?"
+      "• תוצאות-סים בלבד (אם נשארו)\n" +
+      "• מבטל את הסים\n\n" +
+      "✓ נשמרים: משתמשים, קבוצות, חברויות, פרופילים, תוצאות אמת.\n\n" +
+      "להמשיך?"
     )) return;
     if (!confirm("פעולה בלתי הפיכה. לאשר סופית?")) return;
     setBusy(true);
@@ -257,13 +229,13 @@ export default function SimulationPanel() {
   /* ---- guards ---- */
   if (!user) return (
     <div className="admin-locked">
-      <h3>🔒 ניהול סימולציה</h3>
-      <p className="muted">צריך להתחבר כדי לגשת לפאנל הסימולציה.</p>
+      <h3>🔒 ניהול ניחושים</h3>
+      <p className="muted">צריך להתחבר כדי לגשת לפאנל.</p>
     </div>
   );
   if (!user.isAdmin) return (
     <div className="admin-locked">
-      <h3>🔒 ניהול סימולציה — מנהל בלבד</h3>
+      <h3>🔒 ניהול ניחושים — מנהל בלבד</h3>
       <p className="muted">אין לך הרשאת אדמין.</p>
     </div>
   );
@@ -271,18 +243,18 @@ export default function SimulationPanel() {
   return (
     <section className="sim-panel">
       <div className="admin-bar">
-        <h3>🧪 סימולציה — בדיקת המערכת לפני המונדיאל</h3>
+        <h3>🎲 ניהול ניחושים</h3>
       </div>
 
       <p className="muted" style={{ marginBottom: 14, lineHeight: 1.6 }}>
-        מילוי מדורג של ניחושים ותוצאות שלב-אחר-שלב כדי לבדוק את כל הזרימה (טבלאות, ברקט,
-        leaderboard) לפני שהמונדיאל האמיתי מתחיל. כל לחיצה — מיידית.
+        מילוי אוטומטי של ניחושים לחברי קבוצה ומחיקתם בלחיצה אחת.
+        תוצאות אמיתיות מגיעות אוטומטית מ-FIFA דרך ה-API החי, ולא מנוהלות כאן.
       </p>
 
-      {/* Group picker */}
-      <div className="sim-group-picker">
-        <label htmlFor="sim-group" style={{ fontWeight: 700, marginInlineEnd: 8 }}>
-          👥 קבוצה למילוי ניחושים:
+      {/* Group picker + group-wide clear */}
+      <div className="sim-group-picker" style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+        <label htmlFor="sim-group" style={{ fontWeight: 700 }}>
+          👥 קבוצה:
         </label>
         <select id="sim-group" value={groupId} onChange={e => setGroupId(e.target.value)}>
           <option value="">— בחר קבוצה —</option>
@@ -292,121 +264,95 @@ export default function SimulationPanel() {
             </option>
           ))}
         </select>
+        <button
+          className="btn btn-small btn-danger"
+          disabled={busy || !groupId}
+          onClick={clearAllGroupPredictions}
+          title="מחיקת כל הניחושים בכל השלבים לחברי הקבוצה הנבחרת"
+        >
+          🧹 מחק את כל הניחושים של הקבוצה
+        </button>
       </div>
 
       {/* Two-column layout: workflow on the right, status table on the left (in RTL "side") */}
       <div className="sim-workflow-grid">
-        {/* Stage workflow */}
+        {/* Stage workflow — predictions only */}
         <div className="sim-workflow">
           {STAGE_ORDER.map(s => {
             const state = stageState[s];
             const st = state.stageStatus;
-            const matches = STAGE_MATCH_COUNT[s];
             const predFill = st ? `${st.predictionsFilled}/${st.predictionsTotal}` : "—";
-            const resFill  = st ? `${st.resultsFilled}/${matches}` : `0/${matches}`;
-            const prev = STAGE_ORDER.indexOf(s) > 0 ? STAGE_ORDER[STAGE_ORDER.indexOf(s) - 1] : null;
-            const prevResultsDone = prev ? stageState[prev].resultsDone : true;
-            const stageLocked = !prevResultsDone;
 
             return (
-              <div key={s} className={`sim-stage-card ${stageLocked ? "is-locked" : ""}`}>
+              <div key={s} className="sim-stage-card">
                 <header className="sim-stage-head">
                   <span style={{ fontSize: 22 }}>{STAGE_EMOJI[s]}</span>
                   <span className="sim-stage-title">{STAGE_NAMES[s]}</span>
-                  {state.resultsDone && <span className="sim-badge sim-badge-done">✓ הושלם</span>}
-                  {stageLocked && <span className="sim-badge sim-badge-locked">🔒 נעול</span>}
+                  {state.predictionsDone && <span className="sim-badge sim-badge-done">✓ יש ניחושים</span>}
                 </header>
 
-                {stageLocked ? (
-                  <p className="muted" style={{ fontSize: 12, margin: "6px 0 0" }}>
-                    יתפתח אחרי שתשלים את תוצאות "{STAGE_NAMES[prev!]}"
-                  </p>
-                ) : (
-                  <>
-                    <div className="sim-step">
-                      <div className="sim-step-info">
-                        <span>🎲 ניחושים של חברי הקבוצה</span>
-                        <span className="muted">{predFill}</span>
-                      </div>
-                      <button
-                        className={`btn btn-small ${state.predictionsDone ? "" : "btn-primary"}`}
-                        disabled={busy || !state.canFillPredictions || !groupId}
-                        onClick={() => fillPredictionsForStage(s)}
-                      >
-                        {state.predictionsDone ? "🔄 מילוי מחדש" : "🎲 מלא ניחושים"}
-                      </button>
-                    </div>
+                <div className="sim-step">
+                  <div className="sim-step-info">
+                    <span>🎲 ניחושים של חברי הקבוצה</span>
+                    <span className="muted">{predFill}</span>
+                  </div>
+                  <button
+                    className={`btn btn-small ${state.predictionsDone ? "" : "btn-primary"}`}
+                    disabled={busy || !groupId}
+                    onClick={() => fillPredictionsForStage(s)}
+                  >
+                    {state.predictionsDone ? "🔄 מילוי מחדש" : "🎲 מלא ניחושים"}
+                  </button>
+                </div>
 
-                    <div className="sim-step">
-                      <div className="sim-step-info">
-                        <span>⚽ תוצאות משחקים</span>
-                        <span className="muted">{resFill}</span>
-                      </div>
-                      <button
-                        className={`btn btn-small ${state.resultsDone ? "" : "btn-primary"}`}
-                        disabled={busy || !state.canFillResults}
-                        onClick={() => fillResultsForStage(s)}
-                        title={!state.predictionsDone ? "מומלץ למלא ניחושים קודם (לא חובה)" : "מילוי תוצאות מיידי"}
-                      >
-                        {state.resultsDone ? "🔄 מילוי מחדש" : "⚽ מלא תוצאות"}
-                      </button>
+                {/* Per-stage clear — predictions only */}
+                {st && st.predictionsFilled > 0 && (
+                  <div className="sim-step sim-step-reset">
+                    <div className="sim-step-info">
+                      <span style={{ color: "var(--red)" }}>🧹 מחק ניחושים בשלב</span>
+                      <span className="muted" style={{ fontSize: 11 }}>
+                        לחברי הקבוצה הנבחרת בלבד
+                      </span>
                     </div>
-
-                    {/* Per-stage reset — clears predictions + results just for this stage */}
-                    {(st && (st.predictionsFilled > 0 || st.resultsFilled > 0)) && (
-                      <div className="sim-step sim-step-reset">
-                        <div className="sim-step-info">
-                          <span style={{ color: "var(--red)" }}>🧹 אפס את הנתונים בשלב</span>
-                          <span className="muted" style={{ fontSize: 11 }}>
-                            מוחק ניחושי קבוצה + תוצאות סים בשלב הזה
-                          </span>
-                        </div>
-                        <button
-                          className="btn btn-small"
-                          style={{
-                            background: "rgba(239,68,68,0.12)",
-                            borderColor: "var(--red)",
-                            color: "var(--red)",
-                          }}
-                          disabled={busy}
-                          onClick={() => clearStage(s)}
-                        >
-                          🧹 אפס שלב
-                        </button>
-                      </div>
-                    )}
-                  </>
+                    <button
+                      className="btn btn-small"
+                      style={{
+                        background: "rgba(239,68,68,0.12)",
+                        borderColor: "var(--red)",
+                        color: "var(--red)",
+                      }}
+                      disabled={busy}
+                      onClick={() => clearStagePredictions(s)}
+                    >
+                      🧹 מחק שלב
+                    </button>
+                  </div>
                 )}
               </div>
             );
           })}
         </div>
 
-        {/* Status table */}
+        {/* Status table — predictions only */}
         <aside className="sim-status-table">
-          <h4 style={{ marginTop: 0, marginBottom: 10 }}>📊 סטטוס סימולציה</h4>
+          <h4 style={{ marginTop: 0, marginBottom: 10 }}>📊 סטטוס ניחושים</h4>
           <table>
             <thead>
               <tr>
                 <th>שלב</th>
                 <th>ניחושים</th>
-                <th>תוצאות</th>
               </tr>
             </thead>
             <tbody>
               {STAGE_ORDER.map(s => {
                 const state = stageState[s];
                 const st = state.stageStatus;
-                const matches = STAGE_MATCH_COUNT[s];
                 const predIcon = state.predictionsDone ? "🟢" :
                                  (st && st.predictionsFilled > 0) ? "🟡" : "⚪";
-                const resIcon = state.resultsDone ? "🟢" :
-                                (st && st.resultsFilled > 0) ? "🟡" : "⚪";
                 return (
                   <tr key={s}>
                     <td><span style={{ marginInlineEnd: 4 }}>{STAGE_EMOJI[s]}</span>{STAGE_NAMES[s]}</td>
                     <td>{predIcon} {st?.predictionsFilled ?? 0}/{st?.predictionsTotal ?? 0}</td>
-                    <td>{resIcon} {st?.resultsFilled ?? 0}/{matches}</td>
                   </tr>
                 );
               })}
@@ -415,13 +361,13 @@ export default function SimulationPanel() {
         </aside>
       </div>
 
-      {/* Reset section */}
+      {/* Full reset section */}
       <div className="sim-reset">
         <div>
-          <h4 style={{ margin: 0, color: "var(--red)" }}>🏁 סיימת לבדוק? נקה הכל לקראת המונדיאל</h4>
+          <h4 style={{ margin: 0, color: "var(--red)" }}>🏁 איפוס מלא לקראת המונדיאל</h4>
           <p className="muted" style={{ fontSize: 12, margin: "4px 0 0", lineHeight: 1.55 }}>
-            מוחק את כל הניחושים, תוצאות סים, broadcast overrides, פיד פעילות, ומכבה את הסים.
-            <br /><strong>משתמשים, קבוצות ופרופילים נשמרים.</strong> תוצאות אמת ידניות נשמרות.
+            מוחק את כל הניחושים, תוצאות-סים שנשארו, broadcast overrides, ופיד הפעילות.
+            <br /><strong>משתמשים, קבוצות, פרופילים ותוצאות אמת — נשמרים.</strong>
           </p>
         </div>
         <button

@@ -19,7 +19,7 @@ const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: bo
   { id: "mygroups",      label: "👥 הקבוצות שלי" },
   /* Profile tab removed from nav — accessed via username click in header */
   { id: "admin",         label: "👥 ניהול משתמשים", adminOnly: true },
-  { id: "simulation",    label: "🧪 ניהול סימולציה", adminOnly: true },
+  { id: "simulation",    label: "🎲 ניהול ניחושים", adminOnly: true },
   { id: "superadmin",    label: "🛡️ שליטה מלאה",    adminOnly: true },
 ];
 
