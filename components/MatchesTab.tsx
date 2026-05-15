@@ -170,14 +170,18 @@ export default function MatchesTab() {
     today: buckets.today.length,
   };
 
-  /* Auto-scroll the earliest match into view on mount.
-   * Uses the browser's own scrollIntoView with the simplest options.
-   * CSS `scroll-margin-top` on .match-card (mobile) handles URL bar
-   * clearance so we don't fight the browser's coordinate system. */
+  /* Auto-scroll only on DESKTOP. Mobile browsers are too inconsistent
+   * here (URL bar, scroll restoration, etc.) — instead the header is
+   * compacted so the cards are visible naturally without scrolling. */
   useEffect(() => {
     if (section !== "stages") return;
     if (didInitialScroll.current) return;
     if (typeof window === "undefined") return;
+    const isMobile = window.matchMedia("(max-width: 720px)").matches;
+    if (isMobile) {
+      didInitialScroll.current = true;
+      return;
+    }
     didInitialScroll.current = true;
     try { (history as any).scrollRestoration = "manual"; } catch {}
 

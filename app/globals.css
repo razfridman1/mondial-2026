@@ -4573,3 +4573,43 @@ html[data-theme="light"] .chat-panel {
 @media (max-width: 720px) {
   .match-card { scroll-margin-top: 70px; }
 }
+
+/* ====================================================================
+ * Mobile header — aggressive compaction so match cards are visible
+ * at the natural top of the page without needing auto-scroll.
+ * ==================================================================== */
+@media (max-width: 720px) {
+  /* Brand: keep title small, drop the subtitle (saves a big line) */
+  .brand-title { font-size: 16px !important; }
+  .brand-sub   { display: none !important; }
+  .brand-logo-img { width: 38px !important; height: 38px !important; }
+
+  /* WWW.FC26.CO.IL button: dramatically smaller on mobile */
+  .header-domain {
+    font-size: 14px !important;
+    letter-spacing: 1.5px !important;
+    padding: 4px 10px !important;
+    border-radius: 8px !important;
+    margin: 6px auto 4px !important;
+  }
+
+  /* Clock row tighter */
+  #header-clock { gap: 6px !important; flex-wrap: wrap; }
+  #header-clock span { font-size: 12px !important; }
+  .header-avatar { width: 30px !important; height: 30px !important; }
+  .header-avatar svg, .header-avatar img { width: 30px !important; height: 30px !important; }
+  .header-name-btn { font-size: 12px !important; padding: 4px 8px !important; }
+
+  /* Tab grid: smaller and more compact */
+  .tabs { gap: 4px !important; padding: 4px !important; }
+  .tab-btn {
+    padding: 8px 4px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    min-height: 32px !important;
+  }
+
+  /* Tighter header padding overall */
+  .header { padding: 6px 10px !important; }
+  .header-top { padding: 4px 0 !important; gap: 4px !important; }
+}
