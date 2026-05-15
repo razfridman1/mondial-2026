@@ -2103,6 +2103,70 @@ button { font-family: inherit; cursor: pointer; }
 .profile-sub { margin-top: 4px; font-size: 14px; }
 .profile-sub-2 { margin-top: 6px; font-size: 12px; }
 
+/* ---------- Scoring legend (lives inside .profile-hero) ---------- */
+.scoring-legend {
+  flex: 0 0 260px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.scoring-legend-title {
+  font-weight: 800;
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+.scoring-legend-section + .scoring-legend-section { margin-top: 8px; }
+.scoring-legend-stage {
+  font-weight: 700;
+  font-size: 12px;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+.scoring-legend ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.scoring-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.scoring-legend .pts {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 12px;
+}
+.scoring-legend .pts-gold   { background: linear-gradient(135deg, #facc15, #f59e0b); color: #1a1a1a; }
+.scoring-legend .pts-silver { background: linear-gradient(135deg, #cbd5e1, #94a3b8); color: #1a1a1a; }
+.scoring-legend .pts-bronze { background: linear-gradient(135deg, #fb923c, #c2410c); color: #1a1a1a; }
+.scoring-legend .pts-fire   { background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; min-width: auto; padding: 0 10px; }
+.scoring-legend-bonus {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .scoring-legend { flex: 1 1 100%; }
+}
+
 /* Stats grid */
 .profile-stats {
   display: grid; gap: 10px;

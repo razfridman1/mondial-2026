@@ -74,16 +74,6 @@ export default function SuperAdminPanel() {
       </p>
 
       <details className="adm-section" open>
-        <summary>🏁 תוצאות משחקים</summary>
-        <ResultsAdmin />
-      </details>
-
-      <details className="adm-section">
-        <summary>👥 משתמשים — שמות, אווטר, סיסמה, השבתה, מחיקה</summary>
-        <UsersAdmin />
-      </details>
-
-      <details className="adm-section">
         <summary>🔮 כל הניחושים של כל המשתמשים — צפייה ועריכה</summary>
         <PredictionsAdmin />
       </details>
@@ -91,11 +81,6 @@ export default function SuperAdminPanel() {
       <details className="adm-section">
         <summary>👫 קבוצות חברים — עריכה ומחיקה</summary>
         <GroupsAdmin />
-      </details>
-
-      <details className="adm-section">
-        <summary>📡 פיד פעילות — ניקוי</summary>
-        <ActivityAdmin />
       </details>
 
       <details className="adm-section">

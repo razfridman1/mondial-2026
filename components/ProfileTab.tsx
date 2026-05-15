@@ -130,6 +130,9 @@ export default function ProfileTab() {
               📧 {user.email}
             </div>
           </div>
+
+          {/* Scoring legend — how points are awarded */}
+          <ScoringLegend />
         </div>
 
         {/* Stats */}
@@ -263,5 +266,40 @@ export default function ProfileTab() {
       {pickingAvatar && <AvatarPicker onClose={() => setPickingAvatar(false)} />}
       {showTutorial && <Onboarding force onClose={() => setShowTutorial(false)} />}
     </>
+  );
+}
+
+/* =====================================================================
+ * ScoringLegend — quick-reference card that explains how points are
+ * awarded. Lives inside the profile hero so users always see it.
+ * ===================================================================*/
+function ScoringLegend() {
+  return (
+    <aside className="scoring-legend" aria-label="מפתח ניקוד">
+      <div className="scoring-legend-title">🧮 מפתח ניקוד</div>
+
+      <div className="scoring-legend-section">
+        <div className="scoring-legend-stage">🏟 שלב הבתים</div>
+        <ul>
+          <li><span className="pts pts-gold">7</span> תוצאה מדויקת</li>
+          <li><span className="pts pts-silver">4</span> תוצאה נכונה + הפרש שערים</li>
+          <li><span className="pts pts-bronze">3</span> רק תוצאה נכונה (מנצח/תיקו)</li>
+        </ul>
+      </div>
+
+      <div className="scoring-legend-section">
+        <div className="scoring-legend-stage">🥊 שלבי נוקאאוט</div>
+        <ul>
+          <li><span className="pts pts-gold">8</span> תוצאה מדויקת + מנצח</li>
+          <li><span className="pts pts-silver">5</span> מנצח נכון + הפרש שערים</li>
+          <li><span className="pts pts-bronze">3</span> רק מנצח נכון (כולל הארכה/פנדלים)</li>
+        </ul>
+      </div>
+
+      <div className="scoring-legend-bonus">
+        <span className="pts pts-fire">🔥 +1</span>
+        בונוס על כל ניחוש נכון ברצף
+      </div>
+    </aside>
   );
 }
