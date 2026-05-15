@@ -4568,6 +4568,8 @@ html[data-theme="light"] .chat-panel {
   }
 }
 
-/* Mobile scroll-margin removed — scroll target is handled programmatically
- * by MatchesTab via window.scrollTo with a precise OFFSET, to avoid
- * browsers double-applying margins and landing past the intended card. */
+/* Mobile scroll-margin: clearance for the browser URL bar so the auto-
+ * scrolled card top isn't hidden behind it. Applied only on .match-card. */
+@media (max-width: 720px) {
+  .match-card { scroll-margin-top: 70px; }
+}

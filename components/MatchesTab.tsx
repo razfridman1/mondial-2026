@@ -170,48 +170,26 @@ export default function MatchesTab() {
     today: buckets.today.length,
   };
 
-  /* Auto-scroll to the chronologically EARLIEST match on mount.
-   *
-   * Mobile browsers (Chrome Android, Safari iOS) are extremely
-   * inconsistent here: they restore scroll, hide/show the URL bar,
-   * compute layout asynchronously, double-apply CSS scroll-margin
-   * during scrollIntoView, etc. To work around ALL of this we just
-   * run the scroll multiple times over 1.5 seconds, and EACH time
-   * check whether the first card is already at the expected viewport
-   * position. If it is, do nothing; if not, scroll. By the last
-   * attempt, the layout has stabilized and the page is at the
-   * intended position. */
+  /* Auto-scroll the earliest match into view on mount.
+   * Uses the browser's own scrollIntoView with the simplest options.
+   * CSS `scroll-margin-top` on .match-card (mobile) handles URL bar
+   * clearance so we don't fight the browser's coordinate system. */
   useEffect(() => {
     if (section !== "stages") return;
     if (didInitialScroll.current) return;
     if (typeof window === "undefined") return;
-
-    try { (history as any).scrollRestoration = "manual"; } catch {}
-    window.scrollTo(0, 0);
     didInitialScroll.current = true;
+    try { (history as any).scrollRestoration = "manual"; } catch {}
 
-    const isMobile = window.matchMedia("(max-width: 720px)").matches;
-    const OFFSET = isMobile ? 70 : 16;
-
-    function adjust() {
+    const t = setTimeout(() => {
       const root = bodyRef.current;
       if (!root) return;
-      /* Target the FIRST .match-card in the entire body — that's the
-       * earliest match of the earliest stage's earliest day. */
       const firstCard = root.querySelector<HTMLElement>(".match-card");
       if (!firstCard) return;
-      const rect = firstCard.getBoundingClientRect();
-      /* Skip scroll if already in the acceptable range. */
-      if (rect.top >= OFFSET - 30 && rect.top <= OFFSET + 30) return;
-      const absoluteY = window.scrollY + rect.top;
-      window.scrollTo(0, Math.max(0, absoluteY - OFFSET));
-    }
-
-    /* Fire the adjust at 5 different points so any layout shift gets
-     * corrected by a later attempt. */
-    const timeouts = [100, 250, 500, 1000, 1500].map(d => setTimeout(adjust, d));
-    return () => timeouts.forEach(clearTimeout);
-  }, [section, matches]);
+      firstCard.scrollIntoView({ block: "start", behavior: "auto" });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [section]);
 
   /* Hide the floating "back to today" button when today's section is already
    * in view. Falls back to "any matches at all" check otherwise. */
