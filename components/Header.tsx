@@ -7,14 +7,16 @@ import { shareToWhatsApp } from "@/lib/share";
 import { AvatarDisplay } from "./AvatarPicker";
 import AvatarPicker from "./AvatarPicker";
 
-type Tab = "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "bracket" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
+type Tab = "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 
-const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: boolean }[] = [
+const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: boolean; hideOnDesktop?: boolean }[] = [
   { id: "schedule",      label: "⚽ משחקים" },
   { id: "ranking",       label: "🏆 דירוג חברים" },
   { id: "mypredictions", label: "🔮 הניחושים שלי" },
   { id: "standings",     label: "📊 טבלאות",         hideOnMobile: true },
-  { id: "bracket",       label: "🏆 שלב הנוקאאוט" },
+  /* "🏆 שלב הנוקאאוט" — desktop only (mobile gets "הקבוצות שלי" instead) */
+  { id: "bracket",       label: "🏆 שלב הנוקאאוט",   hideOnMobile: true },
+  { id: "mygroups",      label: "👥 הקבוצות שלי" },
   /* Profile tab removed from nav — accessed via username click in header */
   { id: "admin",         label: "👥 ניהול משתמשים", adminOnly: true },
   { id: "simulation",    label: "🧪 ניהול סימולציה", adminOnly: true },
@@ -46,7 +48,7 @@ export default function Header() {
    * Also re-check when the window resizes (e.g. rotating phone). */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const MOBILE_HIDDEN_TABS: Tab[] = ["standings"];
+    const MOBILE_HIDDEN_TABS: Tab[] = ["standings", "bracket"];
     const mq = window.matchMedia("(max-width: 720px)");
     const check = () => {
       if (mq.matches && MOBILE_HIDDEN_TABS.includes(tab as Tab)) {

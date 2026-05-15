@@ -47,6 +47,8 @@ export default function FriendsRanking() {
   const [loading, setLoading] = useState(false);
   const [openMatch, setOpenMatch] = useState<string | null>(null);
   const [scope, setScope] = useState<"upcoming" | "finished" | "all">("upcoming");
+  /* Selected leaderboard view: "global" or a specific group id */
+  const [selectedLb, setSelectedLb] = useState<string>("global");
 
   /* Super-admin sees EVERY group's leaderboard, not just their own memberships */
   const [adminAllGroups, setAdminAllGroups] = useState<Array<{ id: string; name: string }>>([]);
@@ -146,44 +148,53 @@ export default function FriendsRanking() {
         </div>
       </header>
 
-      {/* Leaderboards — one card per group, side-by-side.
-       *   Regular user: only groups they're a member of.
-       *   Super admin:  ALL groups in the system. */}
-      <h3 className="sec-title" style={{ marginTop: 18 }}>
-        📊 לוחות התוצאות
-        {user.isAdmin && adminAllGroups.length > 0
-          ? <span className="chip chip-strong" style={{ marginInlineStart: 8, fontSize: 11 }}>🛡️ Super Admin · רואה את כל הקבוצות ({adminAllGroups.length})</span>
-          : leaderboardGroups.length > 1
-            ? <span className="muted" style={{ marginInlineStart: 8, fontSize: 13 }}>שלך ({leaderboardGroups.length} קבוצות)</span>
-            : null}
-      </h3>
-      {leaderboardGroups.length === 0 ? (
-        <div className="empty-state">
-          עוד לא הצטרפת לקבוצה. צור קבוצה משלך או הצטרף לקבוצה קיימת עם קוד הזמנה למעלה.
+      {/* Leaderboard filter — single button per option: Global + each
+       *   group the user is a member of (super admin sees all groups). */}
+      <h3 className="sec-title" style={{ marginTop: 18 }}>📊 לוחות התוצאות</h3>
+      <div className="fr-lb-filter" role="tablist">
+        <button
+          className={`seg ${selectedLb === "global" ? "on" : ""}`}
+          onClick={() => setSelectedLb("global")}
+        >
+          🌍 גלובלי
+        </button>
+        {leaderboardGroups.map(g => (
+          <button
+            key={g.id}
+            className={`seg ${selectedLb === g.id ? "on" : ""}`}
+            onClick={() => setSelectedLb(g.id)}
+          >
+            👥 {g.name}
+          </button>
+        ))}
+      </div>
+
+      {(selectedLb === "global" || leaderboardGroups.length === 0) ? (
+        <div style={{ marginTop: 12 }}>
+          <GroupLeaderboardCard
+            groupId={null}
+            groupName="🌍 לוח גלובלי"
+            myUid={user.uid}
+            predictionRows={!currentGroupId ? rows : []}
+          />
         </div>
       ) : (
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(auto-fit, minmax(${leaderboardGroups.length === 1 ? 320 : 300}px, 1fr))`,
-          gap: 14,
-          alignItems: "start",
-        }}>
-          {leaderboardGroups.map(g => {
-            /* `g` may come from store `groups` (has inviteCode) OR from
-             * `adminAllGroups` (id/name only). Look up the invite code from
-             * the user's own group list when available. */
-            const fullGroup = groups.find(x => x.id === g.id);
-            return (
-              <GroupLeaderboardCard
-                key={g.id}
-                groupId={g.id}
-                groupName={g.name}
-                inviteCode={fullGroup?.inviteCode}
-                myUid={user.uid}
-                predictionRows={g.id === currentGroupId ? rows : []}
-              />
-            );
-          })}
+        <div style={{ marginTop: 12 }}>
+          {leaderboardGroups
+            .filter(g => g.id === selectedLb)
+            .map(g => {
+              const fullGroup = groups.find(x => x.id === g.id);
+              return (
+                <GroupLeaderboardCard
+                  key={g.id}
+                  groupId={g.id}
+                  groupName={g.name}
+                  inviteCode={fullGroup?.inviteCode}
+                  myUid={user.uid}
+                  predictionRows={g.id === currentGroupId ? rows : []}
+                />
+              );
+            })}
         </div>
       )}
 
@@ -425,13 +436,9 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
                 {r.displayName}
                 {r.uid === myUid && <span className="chip" style={{ marginInlineStart: 6, fontSize: 9 }}>אתה</span>}
               </div>
-              <div className="muted lb-stats">
-                <span title="ניחושים מדויקים — תוצאה זהה לחלוטין למשחק האמיתי (7 נק׳ למשחק)">🎯 {r.exactCount}</span>
-                {" · "}
-                <span title="תוצאות נכונות (מי ניצח / תיקו) מתוך כלל הניחושים — 3 נק׳ למשחק, +1 אם גם הפרש שערים נכון (בתיקו אין בונוס)">✅ {r.resultCount}/{r.predictionsCount}</span>
-                {" · "}
-                <span title="סטריק — רצף ארוך ביותר של ניחושים נכונים. כל ניחוש נכון ברצף = נקודת בונוס נוספת">🔥 {r.streak}</span>
-              </div>
+              {/* Per-user mini stats (exactCount, streak, resultCount) — removed
+               * per design: keep the leaderboard clean. Stats are still available
+               * by clicking a user (UserStatsModal). */}
             </div>
             <div className="lb-points">{r.totalPoints}<span className="muted" style={{ fontSize: 11 }}> נק׳</span></div>
           </div>

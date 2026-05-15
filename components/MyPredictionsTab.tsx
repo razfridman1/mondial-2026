@@ -231,80 +231,14 @@ export default function MyPredictionsTab() {
 
   return (
     <section className="mypred">
-      {/* ============ HERO ============ */}
-      <div className="mypred-hero">
-        <div className="mypred-hero-left">
-          <AvatarDisplay avatarId={profile?.avatarId || "messi"} size={64} />
-          <div className="mypred-hero-meta">
-            <div className="mypred-hero-name">{profile?.displayName || user.email}</div>
-            <div className="muted mypred-hero-sub">
-              {groups.length > 0 ? (
-                <select
-                  className="mypred-group-pick"
-                  value={currentGroupId || ""}
-                  onChange={e => setCurrentGroup(e.target.value || null)}
-                >
-                  <option value="">🌍 דירוג גלובלי</option>
-                  {groups.map(g => <option key={g.id} value={g.id}>👥 {g.name}</option>)}
-                </select>
-              ) : (
-                <span>🌍 דירוג גלובלי</span>
-              )}
-            </div>
-          </div>
+      {/* Slim progress strip — replaces the profile hero and mini-leaderboards */}
+      <div className="mypred-progress mypred-progress-standalone">
+        <div className="mypred-progress-row">
+          <span>📊 התקדמות הניחושים שלי</span>
+          <strong>{myPredCount}/{totalAvailable} ({completionPct}%)</strong>
         </div>
-
-        <div className="mypred-stats">
-          <StatTile icon="🏆" value={myRow?.totalPoints ?? 0} label="נקודות" big />
-          <StatTile icon="#"  value={myRow?.rank ? `#${myRow.rank}` : "—"} label="מקום" />
-          <StatTile icon="🎯" value={`${accuracy.pct}%`} label={`דיוק (${accuracy.hit}/${accuracy.total})`} />
-          <StatTile icon="🔥" value={myRow?.streak ?? 0} label="סטריק" />
-          <StatTile icon="🎯" value={myRow?.exactCount ?? 0} label="מדויקים" />
-        </div>
-
-        {/* Completion bar */}
-        <div className="mypred-progress">
-          <div className="mypred-progress-row">
-            <span>התקדמות ניחושים</span>
-            <strong>{myPredCount}/{totalAvailable} ({completionPct}%)</strong>
-          </div>
-          <div className="mypred-progress-bar"><div style={{ width: `${completionPct}%` }} /></div>
-        </div>
-
-        {gapToFirst !== null && gapToFirst > 0 && (
-          <div className="mypred-gap muted">
-            ⚡ {gapToFirst} נקודות מהמקום הראשון בקבוצה
-          </div>
-        )}
+        <div className="mypred-progress-bar"><div style={{ width: `${completionPct}%` }} /></div>
       </div>
-
-      {/* ============ MINI LEADERBOARDS — one per group, side by side ============ */}
-      {groups.length === 1 && leaderboard.length > 1 && (
-        <div className="mypred-mini-lb">
-          <h3>🏅 מובילים בקבוצה</h3>
-          <div className="mypred-mini-rows">
-            {leaderboard.slice(0, 5).map((r, i) => (
-              <div key={r.uid} className={`mypred-mini-row ${r.uid === user.uid ? "is-me" : ""}`}>
-                <span className={`mypred-mini-rank rank-${i + 1}`}>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}</span>
-                <AvatarDisplay avatarId={r.avatarId} size={28} />
-                <span className="mypred-mini-name">{r.displayName}{r.uid === user.uid && " (אני)"}</span>
-                <span className="mypred-mini-pts">{r.totalPoints}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {groups.length > 1 && (
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-          gap: 10,
-        }}>
-          {groups.map(g => (
-            <MiniGroupLeaderboard key={g.id} groupId={g.id} groupName={g.name} myUid={user.uid} />
-          ))}
-        </div>
-      )}
 
       {/* ============ STAGE NAV ============ */}
       <div className="mypred-stage-nav">

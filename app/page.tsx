@@ -11,6 +11,7 @@ import ChatAssistant from "@/components/ChatAssistant";
 import TeamsTab from "@/components/TeamsTab";
 import ProfileTab from "@/components/ProfileTab";
 import FriendsRanking from "@/components/FriendsRanking";
+import MyGroupsTab from "@/components/MyGroupsTab";
 import Onboarding from "@/components/Onboarding";
 import SimulationBanner from "@/components/SimulationBanner";
 import SimulationPanel from "@/components/SimulationPanel";
@@ -29,6 +30,7 @@ function HomeInner() {
         {tab === "ranking"       && <FriendsRanking />}
         {tab === "teams"      && <TeamsTab />}
         {tab === "bracket"    && <Bracket />}
+        {tab === "mygroups"   && <MyGroupsTab />}
         {tab === "profile"    && <ProfileTab />}
         {tab === "admin"      && <AdminPanel />}
         {tab === "simulation" && <SimulationPanel />}

@@ -4400,3 +4400,72 @@ html[data-theme="light"] .chat-panel {
   color: #ffd089;
   letter-spacing: 0.2px;
 }
+
+/* ====================================================================
+ * MyGroupsTab — list of all groups the user is part of
+ * ==================================================================== */
+.mygroups-tab { padding: 0 0 40px; }
+.mygroups-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+.mygroups-card {
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.045) 0%,
+    rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+.mygroups-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(79, 125, 255, 0.4);
+}
+.mygroups-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mygroups-card-name {
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--text);
+}
+.mygroups-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.mygroups-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+/* ---- FriendsRanking leaderboard filter (single-button per option) ---- */
+.fr-lb-filter {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 0 14px;
+}
+.fr-lb-filter .seg {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* Standalone progress strip on the predictions tab (after removing hero) */
+.mypred-progress-standalone {
+  margin: 4px 0 16px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(79, 125, 255, 0.10) 0%, rgba(124, 77, 255, 0.06) 100%);
+  border: 1px solid rgba(79, 125, 255, 0.3);
+  border-radius: 12px;
+}

@@ -292,10 +292,7 @@ function AllStagesSchedule({ matches, onOpen }: {
     <>
       {stageBlocks.map(block => (
         <section key={block.stage} className="mt-stage-block">
-          <h2 className="mt-stage-title">
-            <span className="mt-stage-title-text">{STAGE_TITLES[block.stage]}</span>
-            <span className="mt-stage-title-count">{block.count} משחקים</span>
-          </h2>
+          {/* Stage title removed — each MatchCard shows its own stage chip. */}
           {block.byDay.map(([day, ms]) => (
             <section key={day} className="day-section" data-date={day}>
               <h3 className="day-heading hide-on-mobile">
