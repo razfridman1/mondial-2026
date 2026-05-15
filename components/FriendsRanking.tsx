@@ -52,6 +52,25 @@ export default function FriendsRanking() {
    * respects the user's previously chosen group. */
   const [selectedLb, setSelectedLb] = useState<string>(() => currentGroupId || "global");
 
+  /* Super-admin sees EVERY group's leaderboard, not just their own memberships */
+  const [adminAllGroups, setAdminAllGroups] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    if (!user?.isAdmin) { setAdminAllGroups([]); return; }
+    (async () => {
+      try {
+        const token = await getFirebase().auth!.currentUser!.getIdToken();
+        const r = await fetch("/api/admin/groups", { headers: { authorization: `Bearer ${token}` } });
+        if (r.ok) {
+          const arr = await r.json();
+          setAdminAllGroups(arr.map((g: any) => ({ id: g.id, name: g.name })));
+        }
+      } catch {}
+    })();
+  }, [user?.isAdmin]);
+
+  /* Group list to render leaderboards for. Admin sees all; regular user sees their own. */
+  const leaderboardGroups = user?.isAdmin && adminAllGroups.length > 0 ? adminAllGroups : groups;
+
   /* On mobile, force-select the FIRST group (Global view is hidden on mobile).
    * Fires:
    *   - on mount (with whatever groups exist initially)
@@ -75,25 +94,6 @@ export default function FriendsRanking() {
     mq.addEventListener("change", adjust);
     return () => mq.removeEventListener("change", adjust);
   }, [leaderboardGroups, selectedLb, setCurrentGroup]);
-
-  /* Super-admin sees EVERY group's leaderboard, not just their own memberships */
-  const [adminAllGroups, setAdminAllGroups] = useState<Array<{ id: string; name: string }>>([]);
-  useEffect(() => {
-    if (!user?.isAdmin) { setAdminAllGroups([]); return; }
-    (async () => {
-      try {
-        const token = await getFirebase().auth!.currentUser!.getIdToken();
-        const r = await fetch("/api/admin/groups", { headers: { authorization: `Bearer ${token}` } });
-        if (r.ok) {
-          const arr = await r.json();
-          setAdminAllGroups(arr.map((g: any) => ({ id: g.id, name: g.name })));
-        }
-      } catch {}
-    })();
-  }, [user?.isAdmin]);
-
-  /* Group list to render leaderboards for. Admin sees all; regular user sees their own. */
-  const leaderboardGroups = user?.isAdmin && adminAllGroups.length > 0 ? adminAllGroups : groups;
 
   useEffect(() => { refreshGroups(); }, [refreshGroups]);
 
