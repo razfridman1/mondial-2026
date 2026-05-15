@@ -4567,3 +4567,11 @@ html[data-theme="light"] .chat-panel {
     margin-top: 12px;
   }
 }
+
+/* ---- Scroll-margin tuning for mobile: smaller offset so the day-section's
+ *      first card lands right under the app header (and ABOVE the section
+ *      pills, which are now at the bottom on mobile). */
+@media (max-width: 720px) {
+  .day-section { scroll-margin-top: 70px !important; }
+  .match-card  { scroll-margin-top: 70px !important; }
+}

@@ -58,27 +58,32 @@ export default function MatchesTab() {
     const root = bodyRef.current;
     if (!root) return false;
     const t = todayKey();
-    /* Clearance for the sticky section-pills row + sticky stage title above.
-     * On mobile the pills are moved to the bottom and stage titles were
-     * removed, so a smaller offset (just the app header) is enough. */
-    const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches;
-    const OFFSET = isMobile ? 70 : 120;
+    /* Use the native scrollIntoView with `block: "start"` so the day-section's
+     * TOP edge aligns with the viewport top. CSS `scroll-margin-top` on
+     * `.day-section` handles the app-header clearance. This avoids manual
+     * scrollY math that can land the user mid-card. */
     function jumpTo(el: HTMLElement) {
-      const rect = el.getBoundingClientRect();
-      const y = window.scrollY + rect.top - OFFSET;
-      window.scrollTo({ top: Math.max(0, y), behavior });
+      try {
+        el.scrollIntoView({ block: "start", behavior });
+      } catch {
+        const rect = el.getBoundingClientRect();
+        const y = window.scrollY + rect.top - 80;
+        window.scrollTo({ top: Math.max(0, y), behavior });
+      }
     }
     const el = root.querySelector<HTMLElement>(`[data-date="${t}"]`);
     if (el) { jumpTo(el); return true; }
-    /* No matches today → jump to the nearest upcoming day. */
+    /* No matches today → jump to the nearest upcoming day (the earliest
+     * day whose date is today or later). */
     const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-date]"));
     for (const node of nodes) {
       const d = node.getAttribute("data-date") || "";
       if (d >= t) { jumpTo(node); return true; }
     }
-    /* Otherwise (no future day either — tournament finished), jump to the last day. */
-    const last = nodes[nodes.length - 1];
-    if (last) { jumpTo(last); return true; }
+    /* Otherwise (no future day either — tournament fully past), jump to
+     * the EARLIEST day so the user lands at the natural top of the schedule. */
+    const first = nodes[0];
+    if (first) { jumpTo(first); return true; }
     return false;
   }
 
@@ -169,17 +174,20 @@ export default function MatchesTab() {
   };
 
   /* After the stages view renders, scroll to today's section ONCE on mount.
-   * We FIRST reset the window scroll to the top so browser-restored scroll
-   * positions (which can drop the user at the final / bottom) don't override
-   * us, then we jump to today's day-section. Retries up to 5 times with a
-   * growing delay so layout-after-data has a chance to settle. */
+   * Prevents the browser from restoring an old scroll position (which on
+   * mobile can drop the user at the bottom / latest match), then aligns
+   * the viewport with today's day-section start. Retries with a growing
+   * delay so layout-after-data has time to settle. */
   useEffect(() => {
     if (section !== "stages") return;
     if (didInitialScroll.current) return;
     if (typeof window === "undefined") return;
 
-    /* Always start at the top so the first card visible is the earliest
-     * (chronologically), then jumpTo refines to today. */
+    /* Tell the browser NOT to restore an earlier scroll position. */
+    try { (history as any).scrollRestoration = "manual"; } catch {}
+    /* Always start at the very top of the document so the natural visible
+     * card is the chronologically EARLIEST one. jumpTo() then refines to
+     * today if today's section exists. */
     window.scrollTo({ top: 0, behavior: "auto" });
 
     let attempts = 0;
@@ -190,7 +198,7 @@ export default function MatchesTab() {
       if (ok) { didInitialScroll.current = true; return; }
       if (attempts < 5) id = setTimeout(tryScroll, 120 * attempts);
     }
-    id = setTimeout(tryScroll, 80);
+    id = setTimeout(tryScroll, 100);
     return () => clearTimeout(id);
   }, [section, matches]);
 
