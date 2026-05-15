@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
@@ -42,17 +42,42 @@ export default function MyPredictionsTab() {
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [now, setNow] = useState(Date.now());
 
-  /* Restore last position from localStorage on first client mount.
-   * Done in useEffect (not useState init) to avoid SSR/CSR hydration mismatch. */
+  /* Determine the CURRENT tournament stage based on results:
+   * the first stage whose matches aren't all completed. */
+  function currentTournamentStage(rs: Record<string, MatchResult>): StageId {
+    for (const s of STAGE_ORDER) {
+      const stageMs = MATCHES.filter(m => m.stage === s);
+      if (stageMs.length === 0) continue;
+      const done = stageMs.every(m => !!rs[m.id]);
+      if (!done) return s;
+    }
+    return "FINAL"; // tournament fully finished
+  }
+
+  /* On first mount, always default to the CURRENT tournament stage
+   * (the earliest stage that isn't fully complete). Users can navigate
+   * to any other stage afterwards. The localStorage of last group letter
+   * is still respected. */
   useEffect(() => {
     try {
-      const s = localStorage.getItem(LS_STAGE);
-      if (s && STAGE_ORDER.includes(s as StageId)) setStage(s as StageId);
       const g = localStorage.getItem(LS_GROUP);
       if (g) setGroupLetter(g);
     } catch {}
+    setStage(currentTournamentStage(results));
     setRestored(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* When match results finish loading from server, refine the default stage
+   * if we initially guessed wrong (mount happened before results arrived). */
+  const didStageInit = useRef(false);
+  useEffect(() => {
+    if (!restored) return;
+    if (didStageInit.current) return;
+    if (Object.keys(results).length === 0) return;
+    didStageInit.current = true;
+    setStage(currentTournamentStage(results));
+  }, [results, restored]);
 
   /* Persist last position whenever stage/group changes (but only after restore). */
   useEffect(() => {

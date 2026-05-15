@@ -4541,3 +4541,29 @@ html[data-theme="light"] .chat-panel {
   .match-card .mc-time-time { font-size: 14px !important; }
   .match-card .mc-time-date { font-size: 11px !important; }
 }
+
+/* ====================================================================
+ * Mobile MatchesTab — move the section pills (Stages/Live/Today)
+ * BELOW the card grid so the cards are what the user lands on first.
+ * ==================================================================== */
+@media (max-width: 720px) {
+  .matches-tab {
+    display: flex;
+    flex-direction: column;
+  }
+  /* Cards go first */
+  .matches-tab .mt-body { order: 1; }
+  /* Section pills go after the cards. Drop the sticky behaviour so they
+   * sit at the natural bottom of the page; they remain reachable via
+   * scroll and via the floating "back to today" button. */
+  .matches-tab .mt-sections {
+    order: 2;
+    position: static;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 14px 4px 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin-top: 12px;
+  }
+}

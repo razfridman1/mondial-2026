@@ -58,8 +58,11 @@ export default function MatchesTab() {
     const root = bodyRef.current;
     if (!root) return false;
     const t = todayKey();
-    /* Clearance for the sticky section-pills row + sticky stage title above. */
-    const OFFSET = 120;
+    /* Clearance for the sticky section-pills row + sticky stage title above.
+     * On mobile the pills are moved to the bottom and stage titles were
+     * removed, so a smaller offset (just the app header) is enough. */
+    const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches;
+    const OFFSET = isMobile ? 70 : 120;
     function jumpTo(el: HTMLElement) {
       const rect = el.getBoundingClientRect();
       const y = window.scrollY + rect.top - OFFSET;
