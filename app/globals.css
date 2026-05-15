@@ -4568,8 +4568,9 @@ html[data-theme="light"] .chat-panel {
   }
 }
 
-/* Mobile scroll-margin: clearance for the browser URL bar so the auto-
- * scrolled card top isn't hidden behind it. Applied only on .match-card. */
+/* Scroll-margin: clearance so the auto-scrolled card top isn't hidden
+ * behind the sticky pills bar (desktop) or browser URL bar (mobile). */
+.match-card { scroll-margin-top: 90px; }
 @media (max-width: 720px) {
   .match-card { scroll-margin-top: 70px; }
 }
