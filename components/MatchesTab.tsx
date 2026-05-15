@@ -73,13 +73,12 @@ export default function MatchesTab() {
 
     /* Compute the card's absolute Y in the document, then scroll the
      * window so its TOP edge lands a fixed `OFFSET` below the viewport
-     * top. The OFFSET leaves a tiny breathing room and prevents the
-     * card from being flush against the very top. We deliberately do
-     * NOT rely on CSS scroll-margin-top here — different browsers
-     * (especially mobile Chrome / Safari) sometimes double-apply it
-     * and land mid-next-card. */
+     * top. The OFFSET must clear the MOBILE browser URL bar (Chrome
+     * Android ~56px, Safari iOS ~64px) so the card's top isn't hidden
+     * behind it. */
+    const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches;
+    const OFFSET = isMobile ? 70 : 16;
     const rect = firstCard.getBoundingClientRect();
-    const OFFSET = 12;
     const targetY = window.scrollY + rect.top - OFFSET;
     window.scrollTo({ top: Math.max(0, targetY), behavior });
     return true;
@@ -172,31 +171,54 @@ export default function MatchesTab() {
   };
 
   /* After the stages view renders, scroll to today's section ONCE on mount.
-   * Prevents the browser from restoring an old scroll position (which on
-   * mobile can drop the user at the bottom / latest match), then aligns
-   * the viewport with today's day-section start. Retries with a growing
-   * delay so layout-after-data has time to settle. */
+   * Robust mechanism:
+   *   1. Disable browser's scroll-position restoration
+   *   2. Reset to top
+   *   3. Run scrollToToday + VERIFY after each attempt that the target
+   *      card actually landed near the expected viewport Y.
+   *   4. Up to 8 retries with growing delays.
+   *
+   * The verification step protects against layout shifts that happen
+   * between data load and paint, which can otherwise leave the page
+   * mid-card. */
   useEffect(() => {
     if (section !== "stages") return;
     if (didInitialScroll.current) return;
     if (typeof window === "undefined") return;
 
-    /* Tell the browser NOT to restore an earlier scroll position. */
     try { (history as any).scrollRestoration = "manual"; } catch {}
-    /* Always start at the very top of the document so the natural visible
-     * card is the chronologically EARLIEST one. jumpTo() then refines to
-     * today if today's section exists. */
     window.scrollTo({ top: 0, behavior: "auto" });
+
+    const isMobile = window.matchMedia("(max-width: 720px)").matches;
+    const EXPECTED_TOP = isMobile ? 70 : 16;
 
     let attempts = 0;
     let id: any;
-    function tryScroll() {
+    function attempt() {
       attempts++;
       const ok = scrollToToday("auto");
-      if (ok) { didInitialScroll.current = true; return; }
-      if (attempts < 5) id = setTimeout(tryScroll, 120 * attempts);
+      if (!ok) {
+        if (attempts < 8) id = setTimeout(attempt, 150);
+        return;
+      }
+      /* After scrolling, verify the first card actually landed near
+       * the EXPECTED_TOP. If not, retry — layout may have shifted. */
+      requestAnimationFrame(() => {
+        const root = bodyRef.current;
+        const firstCard = root?.querySelector<HTMLElement>(".match-card");
+        if (firstCard) {
+          const top = firstCard.getBoundingClientRect().top;
+          /* Acceptable window: card top within 60px of the expected position. */
+          if (Math.abs(top - EXPECTED_TOP) <= 60) {
+            didInitialScroll.current = true;
+            return;
+          }
+        }
+        if (attempts < 8) id = setTimeout(attempt, 150);
+        else didInitialScroll.current = true; // give up after enough tries
+      });
     }
-    id = setTimeout(tryScroll, 100);
+    id = setTimeout(attempt, 80);
     return () => clearTimeout(id);
   }, [section, matches]);
 
