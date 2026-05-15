@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken } from "@/lib/firebase-admin";
 import { MATCHES } from "@/lib/data";
 import { effectiveUtc, type SimConfig } from "@/lib/sim";
+import { backupPrediction, snapshotPredictionsToBackup } from "@/lib/predictions-backup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,6 +66,11 @@ export async function POST(req: Request) {
   if (pw) payload.predictedWinner = pw;
   await db.collection("predictions").doc(docId).set(payload, { merge: true });
 
+  /* Mirror to predictions_backup. Best-effort: a backup failure must not
+   * fail the save itself. */
+  try { await backupPrediction(payload, "save"); }
+  catch (e) { console.warn("[predictions] backup failed:", e); }
+
   return NextResponse.json({ ok: true, joker: false });
 }
 
@@ -114,6 +120,12 @@ export async function DELETE(req: Request) {
       }, { status: 403 });
     }
     const docId = `${decoded.uid}_${matchId}`;
+    /* Pre-delete snapshot: ensure the latest state is in backup. */
+    const liveSnap = await db.collection("predictions").doc(docId).get();
+    if (liveSnap.exists) {
+      try { await snapshotPredictionsToBackup([liveSnap.data() as any], "pre-delete-single"); }
+      catch (e) { console.warn("[predictions] pre-delete backup failed:", e); }
+    }
     await db.collection("predictions").doc(docId).delete();
     return NextResponse.json({ ok: true, deleted: 1 });
   }
@@ -125,17 +137,26 @@ export async function DELETE(req: Request) {
   let deleted = 0, lockedCount = 0;
   let batch = db.batch();
   let ops = 0;
+  const toBackup: any[] = [];
   for (const m of stageMatches) {
     if (isLocked(m.utc)) { lockedCount++; continue; }
     const ref = db.collection("predictions").doc(`${decoded.uid}_${m.id}`);
     const snap = await ref.get();
     if (!snap.exists) continue;
+    toBackup.push(snap.data());
     batch.delete(ref);
     deleted++;
     ops++;
     if (ops >= 450) { await batch.commit(); batch = db.batch(); ops = 0; }
   }
   if (ops > 0) await batch.commit();
+  /* Pre-delete snapshot to backup (best-effort, after live delete succeeded
+   * we still write to backup because backup already has these from saves;
+   * we just refresh the deletedAt marker). */
+  if (toBackup.length) {
+    try { await snapshotPredictionsToBackup(toBackup, "pre-delete-stage"); }
+    catch (e) { console.warn("[predictions] stage-delete backup failed:", e); }
+  }
 
   return NextResponse.json({ ok: true, deleted, locked: lockedCount });
 }

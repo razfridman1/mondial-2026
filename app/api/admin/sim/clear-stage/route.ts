@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { MATCHES } from "@/lib/data";
+import { snapshotPredictionsToBackup } from "@/lib/predictions-backup";
 import type { StageId } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -88,6 +89,7 @@ export async function POST(req: Request) {
       .map(d => (d.data() as any).uid as string);
   }
 
+  const toBackup: any[] = [];
   if (uids) {
     /* Per-group: only this group's members. Build (uid_matchId) keys and
      * delete by doc reference directly — fast and bypasses query limits. */
@@ -98,6 +100,7 @@ export async function POST(req: Request) {
         const ref = db.collection("predictions").doc(`${uid}_${mid}`);
         const snap = await ref.get();
         if (!snap.exists) continue;
+        toBackup.push(snap.data());
         pbatch.delete(ref);
         deletedPredictions++;
         pops++;
@@ -113,6 +116,7 @@ export async function POST(req: Request) {
       let pbatch = db.batch();
       let pops = 0;
       for (const d of snap.docs) {
+        toBackup.push(d.data());
         pbatch.delete(d.ref);
         deletedPredictions++;
         pops++;
@@ -120,6 +124,12 @@ export async function POST(req: Request) {
       }
       if (pops > 0) await pbatch.commit();
     }
+  }
+
+  /* Snapshot deleted predictions to backup (best-effort). */
+  if (toBackup.length) {
+    try { await snapshotPredictionsToBackup(toBackup, "pre-delete-stage"); }
+    catch (e) { console.warn("[clear-stage] backup failed:", e); }
   }
 
   return NextResponse.json({ ok: true, stage, deletedResults, deletedPredictions, groupScoped: !!groupId });

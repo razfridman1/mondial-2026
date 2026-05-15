@@ -89,12 +89,15 @@ export default function SimulationPanel() {
     return map;
   }, [statuses]);
 
-  /* Reset predictions for ONE stage, scoped to the selected group. */
+  /* Reset predictions for ONE stage, scoped to the selected group.
+   * Every delete is mirrored to predictions_backup automatically by the
+   * API — recoverable via the "שחזר ניחושים" button below. */
   async function resetStagePredictions(stage: StageId) {
     if (!groupId) { alert("בחר קבוצה."); return; }
     const grp = groups.find(g => g.id === groupId);
     if (!confirm(
       `לאפס את הניחושים של "${grp?.name || groupId}" בשלב "${STAGE_NAMES[stage]}"?\n\n` +
+      `הניחושים נשמרים אוטומטית בגיבוי וניתן לשחזר אותם בלחיצה.\n` +
       `פעולה זו לא נוגעת בתוצאות אמת, במשתמשים או בקבוצות.`
     )) return;
     setBusy(true);
@@ -109,7 +112,41 @@ export default function SimulationPanel() {
         alert(`שגיאה: ${data.error || r.status}`);
         return;
       }
-      alert(`✓ נמחקו ${data.deletedPredictions || 0} ניחושים בשלב "${STAGE_NAMES[stage]}".`);
+      alert(`✓ נמחקו ${data.deletedPredictions || 0} ניחושים בשלב "${STAGE_NAMES[stage]}".\nניתן לשחזר אותם דרך "🔄 שחזר ניחושים".`);
+    } catch (e: any) {
+      alert(`שגיאה: ${e?.message || e}`);
+    } finally {
+      setBusy(false);
+      await reloadStatus();
+    }
+  }
+
+  /* Restore deleted predictions for one stage from the backup collection.
+   * `onlyIfMissing: true` means we won't overwrite predictions that
+   * already exist live — restore is purely additive. */
+  async function restoreStagePredictions(stage: StageId) {
+    if (!groupId) { alert("בחר קבוצה."); return; }
+    const grp = groups.find(g => g.id === groupId);
+    if (!confirm(
+      `לשחזר ניחושים שנמחקו של "${grp?.name || groupId}" בשלב "${STAGE_NAMES[stage]}"?\n\n` +
+      `נשחזרו רק ניחושים שנמחקו (לא נדרסים ניחושים קיימים).`
+    )) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/restore-predictions", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ groupId, stage, onlyIfMissing: true }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        alert(`שגיאה: ${data.error || r.status}`);
+        return;
+      }
+      alert(
+        `✓ שוחזרו ${data.restored || 0} ניחושים.\n` +
+        `דולגו (קיימים כבר): ${data.skippedExisting || 0}.`
+      );
     } catch (e: any) {
       alert(`שגיאה: ${e?.message || e}`);
     } finally {
@@ -181,7 +218,7 @@ export default function SimulationPanel() {
                   <div className="sim-step-info">
                     <span style={{ color: "var(--red)" }}>🧹 אפס ניחושים בשלב זה</span>
                     <span className="muted" style={{ fontSize: 11 }}>
-                      מוחק לכל חברי הקבוצה הנבחרת בשלב הזה
+                      מוחק לכל חברי הקבוצה הנבחרת — גיבוי נשמר אוטומטית
                     </span>
                   </div>
                   <button
@@ -196,6 +233,28 @@ export default function SimulationPanel() {
                     title={!groupId ? "בחר קבוצה" : "אפס ניחושים בשלב"}
                   >
                     🧹 אפס שלב
+                  </button>
+                </div>
+
+                <div className="sim-step">
+                  <div className="sim-step-info">
+                    <span style={{ color: "var(--accent)" }}>🔄 שחזר ניחושים מהגיבוי</span>
+                    <span className="muted" style={{ fontSize: 11 }}>
+                      משחזר ניחושים שנמחקו לחברי הקבוצה (לא דורס קיימים)
+                    </span>
+                  </div>
+                  <button
+                    className="btn btn-small"
+                    style={{
+                      background: "rgba(80,180,255,0.12)",
+                      borderColor: "var(--accent)",
+                      color: "var(--accent)",
+                    }}
+                    disabled={busy || !groupId}
+                    onClick={() => restoreStagePredictions(s)}
+                    title={!groupId ? "בחר קבוצה" : "שחזר ניחושים מהגיבוי"}
+                  >
+                    🔄 שחזר
                   </button>
                 </div>
               </div>

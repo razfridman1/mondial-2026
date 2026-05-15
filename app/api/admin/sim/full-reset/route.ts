@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
+import { snapshotPredictionsToBackup } from "@/lib/predictions-backup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,18 @@ export async function POST(req: Request) {
       if (ops >= 450) { await batch.commit(); batch = db.batch(); ops = 0; }
     }
     if (ops > 0) await batch.commit();
+  }
+
+  /* PRE-DELETE SNAPSHOT: copy all predictions to predictions_backup
+   * BEFORE wiping the live collection, so they're recoverable. */
+  try {
+    const allPredictions = await db.collection("predictions").get();
+    const toBackup = allPredictions.docs.map(d => d.data() as any);
+    if (toBackup.length) {
+      await snapshotPredictionsToBackup(toBackup, "pre-delete-full");
+    }
+  } catch (e) {
+    console.warn("[full-reset] pre-delete backup failed:", e);
   }
 
   await wipeAll("predictions", "predictions");
