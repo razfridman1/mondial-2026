@@ -14,6 +14,8 @@ export default function MyGroupsTab() {
   const setCurrentGroup = useStore(s => s.setCurrentGroup);
   const setPref     = useStore(s => s.setPref);
   const rejoinGroup = useStore(s => s.rejoinGroup);
+  const deleteGroup = useStore(s => s.deleteGroup);
+  const leaveGroup  = useStore(s => s.leaveGroup);
 
   if (!user) {
     return (
@@ -44,6 +46,33 @@ export default function MyGroupsTab() {
   async function handleRejoin(groupId: string) {
     try { await rejoinGroup(groupId); }
     catch (e: any) { alert(`שגיאה: ${e?.message || "לא ניתן לחזור"}`); }
+  }
+
+  async function handleDelete(g: any) {
+    if ((g.memberCount || 1) > 1) {
+      alert("לא ניתן למחוק כאשר יש עוד חברים");
+      return;
+    }
+    if (!confirm(`האם למחוק את הקבוצה "${g.name}"? פעולה זו אינה הפיכה.`)) return;
+    try { await deleteGroup(g.id); }
+    catch (e: any) {
+      const msg = e?.message || "";
+      if (/members?|חבר/i.test(msg)) {
+        alert("לא ניתן למחוק כאשר יש עוד חברים");
+      } else {
+        alert(`שגיאה: ${msg || "לא ניתן למחוק את הקבוצה"}`);
+      }
+    }
+  }
+
+  async function handleLeave(g: any) {
+    if ((g.memberCount || 1) <= 1) {
+      alert("לא ניתן לעזוב את הקבוצה כשאתה החבר היחיד בה");
+      return;
+    }
+    if (!confirm(`האם לעזוב את הקבוצה "${g.name}"?`)) return;
+    try { await leaveGroup(g.id); }
+    catch (e: any) { alert(`שגיאה: ${e?.message || "לא ניתן לעזוב את הקבוצה"}`); }
   }
 
   return (
@@ -88,6 +117,23 @@ export default function MyGroupsTab() {
                   </button>
                   <button className="btn btn-small wa-btn" onClick={() => shareInvite(g)}>
                     ➕ צרף חבר
+                  </button>
+                  {isOwner && (
+                    <button
+                      className="btn btn-small btn-danger"
+                      onClick={() => handleDelete(g)}
+                      title={(g.memberCount || 1) > 1 ? "לא ניתן למחוק כאשר יש עוד חברים" : "מחיקת הקבוצה"}
+                    >
+                      🗑️ מחק קבוצה
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-small"
+                    onClick={() => handleLeave(g)}
+                    disabled={(g.memberCount || 1) <= 1}
+                    title={(g.memberCount || 1) <= 1 ? "אין משתמשים נוספים בקבוצה" : "יציאה מהקבוצה"}
+                  >
+                    🚪 צא מהקבוצה
                   </button>
                 </div>
               </div>

@@ -977,6 +977,12 @@ button { font-family: inherit; cursor: pointer; }
 .btn-watch { background: var(--red); border-color: var(--red); color: #fff; }
 .btn-on { background: var(--accent); color: #1a1a1a; border-color: var(--accent); }
 .btn-small { padding: 5px 10px; font-size: 11px; }
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  border-color: #ef4444; color: #fff;
+}
+.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
 
 /* ---------- CALENDAR ---------- */
 .cal-wrap { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 18px; }
