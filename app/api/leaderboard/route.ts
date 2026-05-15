@@ -61,6 +61,28 @@ export async function GET(req: Request) {
     }
   });
 
+  /* 2c. Batch-load Firebase Auth metadata for every uid we'll show.
+   * This catches Google sign-ins whose Firestore profile doc was never
+   * written, so we can fall back to the Google displayName / email
+   * instead of the generic "משתמש". */
+  const { auth } = getAdmin();
+  const authMetaByUid: Record<string, { displayName?: string; email?: string }> = {};
+  for (let i = 0; i < uids.length; i += 100) {
+    const chunk = uids.slice(i, i + 100).map(uid => ({ uid }));
+    try {
+      const res = await auth.getUsers(chunk);
+      for (const u of res.users) {
+        authMetaByUid[u.uid] = {
+          displayName: u.displayName || undefined,
+          email: u.email || undefined,
+        };
+      }
+    } catch {
+      /* If a batch fails, fall through silently. Leaderboard still shows uids
+       * — just with the "משתמש" default for whoever couldn't be resolved. */
+    }
+  }
+
   /* 3. Load profiles and predictions for each user */
   const rows: LeaderRow[] = [];
   for (const uid of uids) {
@@ -69,9 +91,17 @@ export async function GET(req: Request) {
     const predSnap = await db.collection("predictions").where("uid", "==", uid).get();
     const preds = predSnap.docs.map(d => d.data() as any);
     const t = userTotals(preds, results, bonusByUid[uid] || 0);
+    const authMeta = authMetaByUid[uid] || {};
+    /* Resolution order: Firestore profile → Firebase Auth (Google name)
+     * → email prefix → "משתמש" as a final fallback. */
+    const displayName =
+      profData.displayName ||
+      authMeta.displayName ||
+      (authMeta.email ? authMeta.email.split("@")[0] : null) ||
+      "משתמש";
     rows.push({
       uid,
-      displayName: profData.displayName || "משתמש",
+      displayName,
       avatarId: profData.avatarId || "messi",
       ...t,
     });

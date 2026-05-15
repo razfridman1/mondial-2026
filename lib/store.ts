@@ -266,16 +266,33 @@ export const useStore = create<MondialState>()(
             arr.forEach(p => { predictions[p.matchId] = p; });
           }
         } catch {}
-        const profile: UserProfile = profDoc || {
-          uid,
-          avatarId: defaultAvatarId(),
-          displayName: get().user?.displayName || get().user?.email?.split("@")[0] || "משתמש",
-          joinedAt: Date.now(),
-        };
-        set({
-          predictions,
-          profile,
-        });
+        const authUser = get().user;
+        let profile: UserProfile;
+        if (profDoc) {
+          profile = profDoc;
+          /* Heal old profiles where displayName was never set (or is the
+           * generic "משתמש" placeholder) — backfill from Google Auth. */
+          const looksUnset = !profDoc.displayName || profDoc.displayName === "משתמש";
+          const better =
+            authUser?.displayName ||
+            (authUser?.email ? authUser.email.split("@")[0] : null);
+          if (looksUnset && better) {
+            profile = { ...profDoc, displayName: better };
+            try { await setUserDoc(`profiles/${uid}`, profile); } catch {}
+          }
+        } else {
+          /* No profile doc yet — Google sign-in's first time, or local-only
+           * profile created in a past version. Persist NOW to Firestore so
+           * server-side queries (leaderboard, etc.) see the real name. */
+          profile = {
+            uid,
+            avatarId: defaultAvatarId(),
+            displayName: authUser?.displayName || authUser?.email?.split("@")[0] || "משתמש",
+            joinedAt: Date.now(),
+          };
+          try { await setUserDoc(`profiles/${uid}`, profile); } catch {}
+        }
+        set({ predictions, profile });
         await get().refreshGroups();
       },
       signOut: async () => {
