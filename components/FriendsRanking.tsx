@@ -47,8 +47,26 @@ export default function FriendsRanking() {
   const [loading, setLoading] = useState(false);
   const [openMatch, setOpenMatch] = useState<string | null>(null);
   const [scope, setScope] = useState<"upcoming" | "finished" | "all">("upcoming");
-  /* Selected leaderboard view: "global" or a specific group id */
-  const [selectedLb, setSelectedLb] = useState<string>("global");
+  /* Selected leaderboard view: "global" or a specific group id.
+   * Initialized from currentGroupId so navigation back to this tab
+   * respects the user's previously chosen group. */
+  const [selectedLb, setSelectedLb] = useState<string>(() => currentGroupId || "global");
+
+  /* On mobile, force-select a real group (Global view is hidden on mobile).
+   * Switches back to "global" when desktop view is restored if user didn't
+   * change selection manually. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 720px)");
+    function adjust() {
+      if (mq.matches && selectedLb === "global" && groups.length > 0) {
+        setSelectedLb(groups[0].id);
+      }
+    }
+    adjust();
+    mq.addEventListener("change", adjust);
+    return () => mq.removeEventListener("change", adjust);
+  }, [groups, selectedLb]);
 
   /* Super-admin sees EVERY group's leaderboard, not just their own memberships */
   const [adminAllGroups, setAdminAllGroups] = useState<Array<{ id: string; name: string }>>([]);
@@ -128,45 +146,31 @@ export default function FriendsRanking() {
     <section>
       <h2 className="sec-title">🏆 דירוג חברים</h2>
 
-      {/* Group selector + create / join */}
-      <header className="groups-header">
-        <div className="groups-tabs">
-          <button className={`seg ${!currentGroupId ? "on" : ""}`} onClick={() => setCurrentGroup(null)}>
+      {/* Filter row + create-group button. On mobile the "🌍 גלובלי"
+       * option is suppressed via CSS so the user must always pick a
+       * specific group. Selecting a group also updates `currentGroupId`
+       * so the per-match predictions section stays in sync. */}
+      <div className="fr-lb-filter-row">
+        <div className="fr-lb-filter" role="tablist">
+          <button
+            className={`seg fr-lb-global ${selectedLb === "global" ? "on" : ""}`}
+            onClick={() => { setSelectedLb("global"); setCurrentGroup(null); }}
+          >
             🌍 גלובלי
           </button>
-          {groups.map(g => (
-            <button key={g.id}
-              className={`seg ${currentGroupId === g.id ? "on" : ""}`}
-              onClick={() => setCurrentGroup(g.id)}>
-              {g.name} · {g.memberCount || 1}
+          {leaderboardGroups.map(g => (
+            <button
+              key={g.id}
+              className={`seg ${selectedLb === g.id ? "on" : ""}`}
+              onClick={() => { setSelectedLb(g.id); setCurrentGroup(g.id); }}
+            >
+              👥 {g.name}
             </button>
           ))}
         </div>
-        <div className="groups-actions">
+        <div className="fr-lb-create-wrap">
           <CreateGroupBtn onCreated={refreshGroups} />
-          <JoinGroupBtn   onJoined={refreshGroups} />
         </div>
-      </header>
-
-      {/* Leaderboard filter — single button per option: Global + each
-       *   group the user is a member of (super admin sees all groups). */}
-      <h3 className="sec-title" style={{ marginTop: 18 }}>📊 לוחות התוצאות</h3>
-      <div className="fr-lb-filter" role="tablist">
-        <button
-          className={`seg ${selectedLb === "global" ? "on" : ""}`}
-          onClick={() => setSelectedLb("global")}
-        >
-          🌍 גלובלי
-        </button>
-        {leaderboardGroups.map(g => (
-          <button
-            key={g.id}
-            className={`seg ${selectedLb === g.id ? "on" : ""}`}
-            onClick={() => setSelectedLb(g.id)}
-          >
-            👥 {g.name}
-          </button>
-        ))}
       </div>
 
       {(selectedLb === "global" || leaderboardGroups.length === 0) ? (

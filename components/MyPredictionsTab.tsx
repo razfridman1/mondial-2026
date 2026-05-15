@@ -231,15 +231,6 @@ export default function MyPredictionsTab() {
 
   return (
     <section className="mypred">
-      {/* Slim progress strip — replaces the profile hero and mini-leaderboards */}
-      <div className="mypred-progress mypred-progress-standalone">
-        <div className="mypred-progress-row">
-          <span>📊 התקדמות הניחושים שלי</span>
-          <strong>{myPredCount}/{totalAvailable} ({completionPct}%)</strong>
-        </div>
-        <div className="mypred-progress-bar"><div style={{ width: `${completionPct}%` }} /></div>
-      </div>
-
       {/* ============ STAGE NAV ============ */}
       <div className="mypred-stage-nav">
         {STAGE_ORDER.map(s => {

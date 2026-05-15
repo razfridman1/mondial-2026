@@ -4469,3 +4469,75 @@ html[data-theme="light"] .chat-panel {
   border: 1px solid rgba(79, 125, 255, 0.3);
   border-radius: 12px;
 }
+
+/* ====================================================================
+ * Mobile-only adjustments — round of UX cleanups
+ * ==================================================================== */
+@media (max-width: 720px) {
+  /* FriendsRanking: hide the global leaderboard option, force group pick */
+  .fr-lb-global { display: none !important; }
+  /* MatchCard: shrink overall card to ~2/3 of current height by trimming
+   * the heavier internal blocks. Stage chip + teams + score + prediction
+   * status remain visible; venue/broadcast/odds hide. */
+  .match-card { padding: 10px !important; gap: 8px !important; }
+  .match-card .mc-venue,
+  .match-card .mc-broadcast,
+  .match-card .odds { display: none !important; }
+  .match-card .mc-actions { padding-top: 4px; }
+  .match-card .mc-date-mobile { font-size: 13px !important; padding: 4px 8px !important; }
+  .match-card .team-name { font-size: 14px !important; }
+  .match-card .flag { font-size: 24px !important; }
+  /* Ensure card starts from its top edge cleanly — no negative top margin,
+   * and scroll-margin so anchors land on the header, not mid-card. */
+  .match-card { scroll-margin-top: 100px; }
+  .card-grid { gap: 8px !important; }
+}
+
+/* FriendsRanking — desktop filter+create row */
+.fr-lb-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 0 14px;
+}
+.fr-lb-filter-row .fr-lb-filter {
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+}
+.fr-lb-create-wrap {
+  flex-shrink: 0;
+}
+@media (max-width: 720px) {
+  /* On mobile this row stacks cleaner — filter scrolls horizontally and
+   * the create button sits below. */
+  .fr-lb-filter-row { gap: 6px; }
+  .fr-lb-filter {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    margin-bottom: 0;
+  }
+  .fr-lb-filter::-webkit-scrollbar { display: none; }
+  .fr-lb-filter .seg { flex-shrink: 0; white-space: nowrap; }
+}
+
+@media (max-width: 720px) {
+  /* Compact prediction status on mobile cards (was big & padded). */
+  .match-card .status-pill {
+    font-size: 13px !important;
+    padding: 6px 12px !important;
+    font-weight: 700 !important;
+  }
+  /* Compact pred-result-stack on mobile cards */
+  .match-card .pred-result-stack {
+    padding: 8px 10px !important;
+  }
+  .match-card .pred-result-row { font-size: 12px !important; }
+  .match-card .pred-result-val { font-size: 14px !important; }
+  /* Header chips smaller */
+  .match-card .mc-header { gap: 6px; }
+  .match-card .mc-time-time { font-size: 14px !important; }
+  .match-card .mc-time-date { font-size: 11px !important; }
+}
