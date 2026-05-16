@@ -104,12 +104,15 @@ export async function GET(req: Request) {
     } catch { profByUid[uid] = {}; }
   }));
 
-  const { auth } = getAdmin();
+  /* Renamed from `auth` to `adminAuth` to avoid shadowing the
+   * `auth` variable used at the top of the handler for the request's
+   * Authorization header. */
+  const { auth: adminAuth } = getAdmin();
   const authMetaByUid: Record<string, { displayName?: string; email?: string }> = {};
   for (let i = 0; i < memberUids.length; i += 100) {
     const chunk = memberUids.slice(i, i + 100).map(uid => ({ uid }));
     try {
-      const res = await auth.getUsers(chunk);
+      const res = await adminAuth.getUsers(chunk);
       for (const u of res.users) {
         authMetaByUid[u.uid] = {
           displayName: u.displayName || undefined,
