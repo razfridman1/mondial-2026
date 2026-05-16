@@ -34,6 +34,7 @@ export default function AdminUsers() {
   const [groupModal, setGroupModal] = useState<UserRow | null>(null);
   const [filter, setFilter] = useState("");
   const [onlyUnassigned, setOnlyUnassigned] = useState(false);
+  const [groupFilter, setGroupFilter] = useState<string>(""); // "" = all groups
 
   async function authHeaders() {
     const token = await getFirebase().auth!.currentUser!.getIdToken();
@@ -204,7 +205,10 @@ export default function AdminUsers() {
   if (!me.isAdmin) return null;
 
   const filtered = users.filter(u => {
-    if (onlyUnassigned && (u.groupIds || []).length > 0) return false;
+    const userGroups = u.groupIds || [];
+    if (onlyUnassigned && userGroups.length > 0) return false;
+    if (groupFilter === "__none__" && userGroups.length > 0) return false;
+    if (groupFilter && groupFilter !== "__none__" && !userGroups.includes(groupFilter)) return false;
     if (!filter) return true;
     const q = filter.toLowerCase();
     return (u.displayName || "").toLowerCase().includes(q)
@@ -232,19 +236,65 @@ export default function AdminUsers() {
         💡 <strong>פעולות:</strong> 🔑 סיסמה · 👤 שם משתמש · ✏️ שם תצוגה · 👥 שיוך לקבוצות · 🤖 חסימת AI · 🚫 השבתה · 🗑️ מחיקה
       </p>
 
-      <div className="filter-row" style={{ marginBottom: 10 }}>
+      <div className="filter-row" style={{ marginBottom: 10, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
         <input
           type="text"
           placeholder="🔎 חפש לפי שם / אימייל / username..."
           value={filter}
           onChange={e => setFilter(e.target.value)}
-          style={{ flex: 1, padding: 7, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
+          style={{ flex: 1, minWidth: 220, padding: 7, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
         />
+        <select
+          value={groupFilter}
+          onChange={e => {
+            const v = e.target.value;
+            setGroupFilter(v);
+            /* If user picks "ללא קבוצה" from the dropdown, keep the checkbox in sync
+             * and vice-versa, so the two controls don't contradict each other. */
+            if (v === "__none__") setOnlyUnassigned(true);
+            else if (v !== "") setOnlyUnassigned(false);
+          }}
+          title="סנן לפי שיוך לקבוצה"
+          style={{ padding: 7, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", minWidth: 180 }}
+        >
+          <option value="">👥 כל הקבוצות</option>
+          <option value="__none__">⚠ ללא שיוך לקבוצה{unassignedCount > 0 ? ` (${unassignedCount})` : ""}</option>
+          {groups.length > 0 && <option value="__sep__" disabled>──────────</option>}
+          {groups.map(g => {
+            const count = users.filter(u => (u.groupIds || []).includes(g.id)).length;
+            return (
+              <option key={g.id} value={g.id}>
+                🔹 {g.name}{count > 0 ? ` (${count})` : ""}
+              </option>
+            );
+          })}
+        </select>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-          <input type="checkbox" checked={onlyUnassigned} onChange={e => setOnlyUnassigned(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={onlyUnassigned}
+            onChange={e => {
+              const checked = e.target.checked;
+              setOnlyUnassigned(checked);
+              /* Keep dropdown consistent: checking the box means "ללא שיוך";
+               * unchecking clears it back to "all" only if dropdown was on "__none__". */
+              if (checked) setGroupFilter("__none__");
+              else if (groupFilter === "__none__") setGroupFilter("");
+            }}
+          />
           הצג רק לא משויכים לקבוצה
           {unassignedCount > 0 && <span className="chip" style={{ background: "var(--orange)", color: "#fff" }}>{unassignedCount}</span>}
         </label>
+        {(filter || groupFilter || onlyUnassigned) && (
+          <button
+            type="button"
+            className="btn btn-small"
+            onClick={() => { setFilter(""); setGroupFilter(""); setOnlyUnassigned(false); }}
+            title="נקה את כל הסינונים"
+          >
+            ✕ נקה סינונים
+          </button>
+        )}
       </div>
 
       {error && <p className="pred-msg is-locked">{error}</p>}
