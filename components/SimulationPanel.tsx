@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
 import { MATCHES } from "@/lib/data";
+import { AvatarDisplay } from "./AvatarPicker";
 import type { StageId } from "@/lib/types";
 
 interface GroupRow { id: string; name: string; memberCount?: number; }
@@ -21,6 +22,16 @@ interface StageStatus {
   resultsFilled: number;
   predictionsFilled: number;
   predictionsTotal: number;
+}
+interface MemberStageEntry { stage: StageId; filled: number; total: number; }
+interface MemberStatus {
+  uid: string;
+  displayName: string;
+  avatarId: string;
+  lastUpdated: number;
+  totalFilled: number;
+  totalMatches: number;
+  stages: MemberStageEntry[];
 }
 
 const STAGE_ORDER: StageId[] = ["GROUP", "R32", "R16", "QF", "SF", "THIRD", "FINAL"];
@@ -48,6 +59,8 @@ export default function SimulationPanel() {
   const [groups, setGroups]     = useState<GroupRow[]>([]);
   const [groupId, setGroupId]   = useState<string>("");
   const [statuses, setStatuses] = useState<StageStatus[]>([]);
+  const [members, setMembers]   = useState<MemberStatus[]>([]);
+  const [memberStageFilter, setMemberStageFilter] = useState<StageId | "ALL">("ALL");
   const [busy, setBusy]         = useState(false);
 
   async function authHeaders() {
@@ -69,13 +82,14 @@ export default function SimulationPanel() {
   useEffect(() => { reloadGroups(); }, [user?.isAdmin]);
 
   async function reloadStatus() {
-    if (!groupId) { setStatuses([]); return; }
+    if (!groupId) { setStatuses([]); setMembers([]); return; }
     try {
       const r = await fetch(`/api/admin/sim/status?groupId=${encodeURIComponent(groupId)}`,
                             { headers: await authHeaders() });
       if (r.ok) {
         const data = await r.json();
         setStatuses(data.stages || []);
+        setMembers(data.members || []);
       }
     } catch {}
   }
@@ -289,6 +303,182 @@ export default function SimulationPanel() {
           </table>
         </aside>
       </div>
+
+      {/* ============================================================
+       * Per-user predictions breakdown.
+       * Shows which users in the selected group have filled in
+       * predictions and for which stage. Switch the stage filter to
+       * see a single-stage view, or stay on "ALL" for the per-stage
+       * progress matrix.
+       * ============================================================ */}
+      {groupId && (
+        <section style={{ marginTop: 24 }}>
+          <header style={{
+            display: "flex", flexWrap: "wrap", alignItems: "center",
+            justifyContent: "space-between", gap: 10, marginBottom: 10,
+          }}>
+            <h3 style={{ margin: 0 }}>
+              👥 ניחושים לפי משתמש
+              <span className="muted" style={{ fontSize: 12, marginInlineStart: 8 }}>
+                ({members.length} חברים)
+              </span>
+            </h3>
+            <div className="filter-row" style={{ margin: 0, flexWrap: "wrap" }}>
+              <button
+                className={`seg ${memberStageFilter === "ALL" ? "on" : ""}`}
+                onClick={() => setMemberStageFilter("ALL")}
+              >
+                כל השלבים
+              </button>
+              {STAGE_ORDER.map(s => (
+                <button
+                  key={s}
+                  className={`seg ${memberStageFilter === s ? "on" : ""}`}
+                  onClick={() => setMemberStageFilter(s)}
+                  title={STAGE_NAMES[s]}
+                >
+                  {STAGE_EMOJI[s]} {STAGE_NAMES[s]}
+                </button>
+              ))}
+            </div>
+          </header>
+
+          {members.length === 0 ? (
+            <div className="empty-state">אין חברים פעילים בקבוצה הנבחרת.</div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="sim-members-table" style={{
+                width: "100%", borderCollapse: "collapse", fontSize: 13,
+              }}>
+                <thead>
+                  <tr style={{ background: "var(--bg-elev)" }}>
+                    <th style={{ textAlign: "start", padding: "8px 10px" }}>משתמש</th>
+                    {memberStageFilter === "ALL" ? (
+                      <>
+                        {STAGE_ORDER.map(s => (
+                          <th key={s} style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>
+                            <span title={STAGE_NAMES[s]}>{STAGE_EMOJI[s]}</span>
+                            <span style={{ marginInlineStart: 4 }}>{STAGE_NAMES[s]}</span>
+                          </th>
+                        ))}
+                        <th style={{ padding: "8px 10px" }}>סך הכל</th>
+                      </>
+                    ) : (
+                      <>
+                        <th style={{ padding: "8px 10px" }}>
+                          {STAGE_EMOJI[memberStageFilter]} {STAGE_NAMES[memberStageFilter]}
+                        </th>
+                        <th style={{ padding: "8px 10px" }}>אחוז שלב</th>
+                      </>
+                    )}
+                    <th style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>עדכון אחרון</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map(m => {
+                    const last = m.lastUpdated
+                      ? new Date(m.lastUpdated).toLocaleString("he-IL", {
+                          day: "2-digit", month: "2-digit",
+                          hour: "2-digit", minute: "2-digit",
+                        })
+                      : "—";
+                    return (
+                      <tr key={m.uid} style={{ borderTop: "1px solid var(--border-soft)" }}>
+                        <td style={{ padding: "8px 10px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <AvatarDisplay avatarId={m.avatarId} size={28} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 700 }}>{m.displayName}</div>
+                              <div className="muted" style={{ fontSize: 11 }}>
+                                סך הניחושים: {m.totalFilled}/{m.totalMatches}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {memberStageFilter === "ALL" ? (
+                          <>
+                            {STAGE_ORDER.map(s => {
+                              const entry = m.stages.find(x => x.stage === s);
+                              const filled = entry?.filled ?? 0;
+                              const total  = entry?.total  ?? 0;
+                              const icon = filled === 0
+                                ? "⚪"
+                                : filled < total ? "🟡" : "🟢";
+                              return (
+                                <td key={s} style={{
+                                  padding: "8px 6px",
+                                  textAlign: "center",
+                                  whiteSpace: "nowrap",
+                                }}>
+                                  <span title={`${STAGE_NAMES[s]} — ${filled}/${total}`}>
+                                    {icon} {filled}/{total}
+                                  </span>
+                                </td>
+                              );
+                            })}
+                            <td style={{
+                              padding: "8px 10px",
+                              fontWeight: 700,
+                              textAlign: "center",
+                            }}>
+                              {m.totalFilled}/{m.totalMatches}
+                            </td>
+                          </>
+                        ) : (() => {
+                          const entry = m.stages.find(x => x.stage === memberStageFilter);
+                          const filled = entry?.filled ?? 0;
+                          const total  = entry?.total  ?? 0;
+                          const pct    = total > 0 ? Math.round((filled / total) * 100) : 0;
+                          const icon = filled === 0
+                            ? "⚪"
+                            : filled < total ? "🟡" : "🟢";
+                          return (
+                            <>
+                              <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                                {icon} {filled}/{total}
+                              </td>
+                              <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                                <div style={{
+                                  position: "relative",
+                                  height: 8,
+                                  background: "var(--bg-elev)",
+                                  borderRadius: 4,
+                                  overflow: "hidden",
+                                  minWidth: 80,
+                                }}>
+                                  <div style={{
+                                    position: "absolute", inset: 0,
+                                    width: `${pct}%`,
+                                    background: pct === 100
+                                      ? "var(--green, #22c55e)"
+                                      : pct > 0 ? "var(--accent)" : "transparent",
+                                  }} />
+                                </div>
+                                <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+                                  {pct}%
+                                </div>
+                              </td>
+                            </>
+                          );
+                        })()}
+
+                        <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                          <span className="muted" style={{ fontSize: 12 }}>{last}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <p className="muted" style={{ fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
+            🟢 הכל מולא · 🟡 חלקי · ⚪ עוד לא התחיל. מיון: לפי כמות הניחושים יורד.
+          </p>
+        </section>
+      )}
     </section>
   );
 }
