@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdmin } from "@/lib/firebase-admin";
+import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { userTotals } from "@/lib/scoring";
 import { MATCHES } from "@/lib/data";
 import type { LeaderRow } from "@/lib/types";
@@ -8,24 +8,73 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /* GET /api/leaderboard?groupId=...
- * Returns the leaderboard scoped to a group (or global if omitted). */
+ *
+ * Returns the leaderboard scoped to a single group. There is no
+ * "global" view: the leaderboard is ALWAYS limited to members of one
+ * group, so a regular user can only ever see the other people in the
+ * group they currently belong to.
+ *
+ * Defense-in-depth rules:
+ *   1. `groupId` is REQUIRED for regular users. If omitted we return
+ *      an empty array rather than leaking a cross-group leaderboard.
+ *   2. When `groupId` IS provided, the caller must either be an admin
+ *      (`ADMIN_EMAILS`) OR an active member of that group. Otherwise
+ *      we return 403, so a user cannot fish leaderboards of groups
+ *      they don't belong to by guessing/altering the URL.
+ *   3. Admin callers (super-admin tooling) may pass any groupId, or
+ *      omit it to get the historical cross-group view.
+ */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const groupId = url.searchParams.get("groupId");
 
   const { db } = getAdmin();
 
-  /* 1. Find user uids in the requested group (or all users if global) */
+  /* Resolve the caller. Auth is optional — if no token is sent we
+   * treat the caller as a regular non-admin user and apply the
+   * strictest rules below. */
+  let callerUid: string | null = null;
+  let callerIsAdmin = false;
+  const authHeader = req.headers.get("authorization") || "";
+  const tokMatch = authHeader.match(/^Bearer (.+)$/);
+  if (tokMatch) {
+    try {
+      const decoded = await verifyIdToken(tokMatch[1]);
+      callerUid = decoded.uid;
+      callerIsAdmin = isAdminEmail(decoded.email);
+    } catch { /* fall through as anon */ }
+  }
+
+  /* 1. Find user uids in the requested group.
+   *    - No groupId + not admin → empty (no global view).
+   *    - No groupId +     admin → keep legacy behaviour (all profiles).
+   *    - groupId        + not admin → must be an active member of the group.
+   */
   let uids: string[];
   if (groupId) {
+    /* Membership check: regular users must belong to the group. */
+    if (!callerIsAdmin) {
+      if (!callerUid) return NextResponse.json([], { status: 200 });
+      const myMem = await db
+        .collection("group_memberships")
+        .doc(`${callerUid}_${groupId}`)
+        .get();
+      const myMemData = myMem.exists ? (myMem.data() as any) : null;
+      if (!myMemData || myMemData.left) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+    }
     const memSnap = await db.collection("group_memberships").where("groupId", "==", groupId).get();
     /* Exclude soft-left members from the leaderboard. */
     uids = memSnap.docs
       .filter(d => !(d.data() as any).left)
       .map(d => d.data().uid as string);
-  } else {
+  } else if (callerIsAdmin) {
     const profSnap = await db.collection("profiles").get();
     uids = profSnap.docs.map(d => d.id);
+  } else {
+    /* No group scope + no admin rights → never leak a global leaderboard. */
+    return NextResponse.json([]);
   }
 
   if (!uids.length) return NextResponse.json([]);

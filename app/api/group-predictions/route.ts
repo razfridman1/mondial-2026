@@ -31,15 +31,38 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const groupId = url.searchParams.get("groupId");
   const { db } = getAdmin();
+  const callerIsAdminInit = isAdminEmail(decoded.email);
 
-  /* 1. UIDs in scope */
+  /* 1. UIDs in scope.
+   *
+   * No cross-group view: a regular user MUST pass a groupId, and the
+   * caller MUST be an active member of that group. Without a groupId
+   * we return an empty payload rather than predictions across all
+   * users. Admins keep their legacy view (all groups when no groupId).
+   */
   let uids: string[];
   if (groupId) {
+    if (!callerIsAdminInit) {
+      const myMem = await db
+        .collection("group_memberships")
+        .doc(`${decoded.uid}_${groupId}`)
+        .get();
+      const myMemData = myMem.exists ? (myMem.data() as any) : null;
+      if (!myMemData || myMemData.left) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+    }
     const mem = await db.collection("group_memberships").where("groupId", "==", groupId).get();
-    uids = mem.docs.map(d => d.data().uid as string);
-  } else {
+    /* Exclude soft-left members so they don't appear in the per-group
+     * predictions table either. */
+    uids = mem.docs
+      .filter(d => !(d.data() as any).left)
+      .map(d => d.data().uid as string);
+  } else if (callerIsAdminInit) {
     const profs = await db.collection("profiles").get();
     uids = profs.docs.map(d => d.id);
+  } else {
+    return NextResponse.json({ members: [], rows: [] });
   }
   if (!uids.length) return NextResponse.json({ members: [], rows: [] });
 
@@ -74,7 +97,7 @@ export async function GET(req: Request) {
    *    Super-admins see EVERY prediction regardless of timing (no privacy redaction). */
   const now = Date.now();
   const callerUid = decoded.uid;
-  const callerIsAdmin = isAdminEmail(decoded.email);
+  const callerIsAdmin = callerIsAdminInit;
 
   const rows = matchEff
     .filter(mt => allPreds.some(p => p.matchId === mt.id))

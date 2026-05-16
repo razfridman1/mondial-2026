@@ -47,72 +47,60 @@ export default function FriendsRanking() {
   const [loading, setLoading] = useState(false);
   const [openMatch, setOpenMatch] = useState<string | null>(null);
   const [scope, setScope] = useState<"upcoming" | "finished" | "all">("upcoming");
-  /* Selected leaderboard view: "global" or a specific group id.
-   * Initialized from currentGroupId so navigation back to this tab
-   * respects the user's previously chosen group. */
-  const [selectedLb, setSelectedLb] = useState<string>(() => currentGroupId || "global");
+  /* Selected leaderboard view: ALWAYS a specific group id.
+   * The user can never see a global / cross-group view — every view
+   * is scoped to one of the user's own groups. Initialized from
+   * currentGroupId; if none yet, the first group will populate it
+   * once `refreshGroups` finishes. */
+  const [selectedLb, setSelectedLb] = useState<string>(() => currentGroupId || "");
 
-  /* Super-admin sees EVERY group's leaderboard, not just their own memberships */
-  const [adminAllGroups, setAdminAllGroups] = useState<Array<{ id: string; name: string }>>([]);
+  /* The user can ONLY ever see groups they are a member of.
+   * No admin override — admins use the SuperAdmin panel for cross-group views. */
+  const leaderboardGroups = groups;
+
+  /* Keep selectedLb in sync with the user's actual memberships:
+   *   - if no group is selected but the user has groups, pick the first
+   *   - if the selected group is no longer one of the user's groups, switch
+   * Runs on group list changes (initial load, join, leave). */
   useEffect(() => {
-    if (!user?.isAdmin) { setAdminAllGroups([]); return; }
-    (async () => {
-      try {
-        const token = await getFirebase().auth!.currentUser!.getIdToken();
-        const r = await fetch("/api/admin/groups", { headers: { authorization: `Bearer ${token}` } });
-        if (r.ok) {
-          const arr = await r.json();
-          setAdminAllGroups(arr.map((g: any) => ({ id: g.id, name: g.name })));
-        }
-      } catch {}
-    })();
-  }, [user?.isAdmin]);
-
-  /* Group list to render leaderboards for. Admin sees all; regular user sees their own. */
-  const leaderboardGroups = user?.isAdmin && adminAllGroups.length > 0 ? adminAllGroups : groups;
-
-  /* On mobile, force-select the FIRST group (Global view is hidden on mobile).
-   * Fires:
-   *   - on mount (with whatever groups exist initially)
-   *   - when groups/leaderboardGroups load asynchronously
-   *   - when the viewport changes between desktop/mobile (resize)
-   */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 720px)");
-    function adjust() {
-      if (!mq.matches) return;
-      if (leaderboardGroups.length === 0) return;
-      /* Switch when on "global" OR when selected group no longer exists. */
-      const stillExists = leaderboardGroups.some(g => g.id === selectedLb);
-      if (selectedLb === "global" || !stillExists) {
-        setSelectedLb(leaderboardGroups[0].id);
-        setCurrentGroup(leaderboardGroups[0].id);
-      }
+    if (leaderboardGroups.length === 0) {
+      if (selectedLb !== "") setSelectedLb("");
+      return;
     }
-    adjust();
-    mq.addEventListener("change", adjust);
-    return () => mq.removeEventListener("change", adjust);
-  }, [leaderboardGroups, selectedLb, setCurrentGroup]);
+    const stillExists = leaderboardGroups.some(g => g.id === selectedLb);
+    if (!selectedLb || !stillExists) {
+      const next = currentGroupId && leaderboardGroups.some(g => g.id === currentGroupId)
+        ? currentGroupId
+        : leaderboardGroups[0].id;
+      setSelectedLb(next);
+      setCurrentGroup(next);
+    }
+  }, [leaderboardGroups, selectedLb, currentGroupId, setCurrentGroup]);
 
   useEffect(() => { refreshGroups(); }, [refreshGroups]);
 
-  const currentGroup = useMemo(
-    () => groups.find(g => g.id === currentGroupId),
-    [groups, currentGroupId]
-  );
-
   async function load() {
     if (!user) return;
+    /* Never fetch without a group scope — there is no global view, and
+     * skipping the request prevents the server from accidentally
+     * leaking cross-group data if a defense-in-depth check is missed. */
+    if (!currentGroupId) {
+      setLeaderboard([]); setRows([]); setActivity([]);
+      return;
+    }
     setLoading(true);
     try {
       const token = await getFirebase().auth!.currentUser!.getIdToken();
-      const q = currentGroupId ? `?groupId=${currentGroupId}` : "";
-      const acQ = currentGroupId ? `?groupId=${currentGroupId}&limit=30` : "?limit=30";
+      const q = `?groupId=${currentGroupId}`;
+      const acQ = `?groupId=${currentGroupId}&limit=30`;
+      /* All three endpoints now require the auth header so the server
+       * can verify the caller is an active member of the requested
+       * group before returning anything. */
+      const authHeaders = { authorization: `Bearer ${token}` };
       const [lbR, prR, acR] = await Promise.all([
-        fetch(`/api/leaderboard${q}`),
-        fetch(`/api/group-predictions${q}`, { headers: { authorization: `Bearer ${token}` } }),
-        fetch(`/api/activity${acQ}`),
+        fetch(`/api/leaderboard${q}`,        { headers: authHeaders }),
+        fetch(`/api/group-predictions${q}`,  { headers: authHeaders }),
+        fetch(`/api/activity${acQ}`,         { headers: authHeaders }),
       ]);
       if (lbR.ok) setLeaderboard(await lbR.json());
       if (prR.ok) {
@@ -154,18 +142,14 @@ export default function FriendsRanking() {
     <section>
       <h2 className="sec-title">🏆 דירוג חברים</h2>
 
-      {/* Filter row + create-group button. On mobile the "🌍 גלובלי"
-       * option is suppressed via CSS so the user must always pick a
-       * specific group. Selecting a group also updates `currentGroupId`
+      {/* Filter row + create-group button. The "🌍 גלובלי" option has
+       * been removed entirely — there is no cross-group view at any
+       * stage. If the user belongs to several groups they can switch
+       * between them here, but each view shows ONLY members of that
+       * single group. Selecting a group also updates `currentGroupId`
        * so the per-match predictions section stays in sync. */}
       <div className="fr-lb-filter-row">
         <div className="fr-lb-filter" role="tablist">
-          <button
-            className={`seg fr-lb-global ${selectedLb === "global" ? "on" : ""}`}
-            onClick={() => { setSelectedLb("global"); setCurrentGroup(null); }}
-          >
-            🌍 גלובלי
-          </button>
           {leaderboardGroups.map(g => (
             <button
               key={g.id}
@@ -181,14 +165,10 @@ export default function FriendsRanking() {
         </div>
       </div>
 
-      {(selectedLb === "global" || leaderboardGroups.length === 0) ? (
-        <div style={{ marginTop: 12 }}>
-          <GroupLeaderboardCard
-            groupId={null}
-            groupName="🌍 לוח גלובלי"
-            myUid={user.uid}
-            predictionRows={!currentGroupId ? rows : []}
-          />
+      {leaderboardGroups.length === 0 ? (
+        <div className="empty-state" style={{ marginTop: 12 }}>
+          עוד לא הצטרפת לקבוצה. צור קבוצה חדשה או הצטרף עם קוד הזמנה כדי לראות
+          את לוח התוצאות ואת הניחושים של חברי הקבוצה שלך.
         </div>
       ) : (
         <div style={{ marginTop: 12 }}>
@@ -337,10 +317,17 @@ function GroupLeaderboardCard({
   const [open, setOpen] = useState(!collapsed);
 
   async function load() {
+    /* Same defense as the parent component: never fetch a global
+     * leaderboard. If somehow the groupId is missing, render empty. */
+    if (!groupId) { setRows([]); setLoading(false); return; }
     setLoading(true);
     try {
-      const q = groupId ? `?groupId=${groupId}` : "";
-      const r = await fetch(`/api/leaderboard${q}`);
+      /* Server requires an auth token to verify group membership. */
+      const fb = getFirebase();
+      const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
+      const headers: Record<string, string> = tok ? { authorization: `Bearer ${tok}` } : {};
+      const q = `?groupId=${groupId}`;
+      const r = await fetch(`/api/leaderboard${q}`, { headers });
       if (r.ok) setRows(await r.json());
     } finally { setLoading(false); }
   }

@@ -98,15 +98,23 @@ export default function MyPredictionsTab() {
     return () => clearInterval(id);
   }, []);
 
-  /* Load results + leaderboard */
+  /* Load results + leaderboard. Leaderboard is scoped to the user's
+   * current group — there is no global view anywhere in the app. If
+   * the user has no group selected we just skip the leaderboard fetch. */
   async function load() {
     try {
-      const [rRes, lbRes] = await Promise.all([
-        fetch("/api/match-results"),
-        fetch(currentGroupId ? `/api/leaderboard?groupId=${currentGroupId}` : "/api/leaderboard"),
-      ]);
+      const fb = getFirebase();
+      const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
+      const headers: Record<string, string> = tok ? { authorization: `Bearer ${tok}` } : {};
+      const tasks: Promise<Response>[] = [fetch("/api/match-results")];
+      if (currentGroupId) {
+        tasks.push(fetch(`/api/leaderboard?groupId=${currentGroupId}`, { headers }));
+      } else {
+        setLeaderboard([]);
+      }
+      const [rRes, lbRes] = await Promise.all(tasks);
       if (rRes.ok) setResults(await rRes.json());
-      if (lbRes.ok) setLeaderboard(await lbRes.json());
+      if (lbRes && lbRes.ok) setLeaderboard(await lbRes.json());
     } catch {}
   }
   useEffect(() => { load(); }, [currentGroupId, user?.uid]);
@@ -386,7 +394,11 @@ function MiniGroupLeaderboard({
     (async () => {
       setLoading(true);
       try {
-        const r = await fetch(`/api/leaderboard?groupId=${groupId}`);
+        /* Server requires an auth token to verify group membership. */
+        const fb = getFirebase();
+        const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
+        const headers: Record<string, string> = tok ? { authorization: `Bearer ${tok}` } : {};
+        const r = await fetch(`/api/leaderboard?groupId=${groupId}`, { headers });
         if (r.ok) setRows(await r.json());
       } finally { setLoading(false); }
     })();

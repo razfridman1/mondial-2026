@@ -362,10 +362,16 @@ function AllLeaderboardsModal({
     (async () => {
       setBusy(true);
       try {
+        /* This panel is admin-only, but the leaderboard endpoint now
+         * requires an auth token for every per-group fetch (it uses the
+         * token to bypass the membership check for admins). */
+        const fb = getFirebase();
+        const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
+        const headers: Record<string, string> = tok ? { authorization: `Bearer ${tok}` } : {};
         const out: Record<string, LeaderRow[]> = {};
         await Promise.all(groups.map(async g => {
           try {
-            const r = await fetch(`/api/leaderboard?groupId=${g.id}`);
+            const r = await fetch(`/api/leaderboard?groupId=${g.id}`, { headers });
             if (r.ok) out[g.id] = await r.json();
           } catch {}
         }));

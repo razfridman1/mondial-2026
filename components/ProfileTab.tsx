@@ -52,19 +52,29 @@ export default function ProfileTab() {
     finally { setBusyGroup(null); }
   }
 
-  /* Pull this user's leaderboard stats (global) */
+  /* Pull this user's leaderboard stats, scoped to their first active
+   * group. The leaderboard endpoint no longer exposes a global view to
+   * regular users, so we always query against a group the user is a
+   * member of. Points are global per-user (a prediction earns the same
+   * regardless of which group the leaderboard is sliced by) so any of
+   * the user's groups gives us the correct totals. */
   useEffect(() => {
     if (!user) return;
+    const groupId = groups[0]?.id;
+    if (!groupId) { setMyRow(null); return; }
     (async () => {
       try {
-        const r = await fetch(`/api/leaderboard`);
+        const fb = getFirebase();
+        const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
+        const headers: Record<string, string> = tok ? { authorization: `Bearer ${tok}` } : {};
+        const r = await fetch(`/api/leaderboard?groupId=${groupId}`, { headers });
         if (!r.ok) return;
         const rows: LeaderRow[] = await r.json();
         const me = rows.find(x => x.uid === user.uid);
         if (me) setMyRow(me);
       } catch {}
     })();
-  }, [user?.uid]);
+  }, [user?.uid, groups]);
 
   if (!user) {
     return (
@@ -141,7 +151,7 @@ export default function ProfileTab() {
           <div className="stat-card stat-gold">
             <div className="stat-val">{myRow?.totalPoints ?? 0}</div>
             <div className="stat-lbl">סך נקודות</div>
-            {myRow?.rank && <div className="stat-sub">מקום #{myRow.rank} בגלובלי</div>}
+            {myRow?.rank && <div className="stat-sub">מקום #{myRow.rank} בקבוצה</div>}
           </div>
           <div className="stat-card">
             <div className="stat-val">{myRow?.exactCount ?? 0}</div>

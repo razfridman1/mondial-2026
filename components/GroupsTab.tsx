@@ -20,12 +20,23 @@ export default function GroupsTab() {
   useEffect(() => { refreshGroups(); }, [refreshGroups]);
 
   async function loadGroupData(gid: string | null) {
+    /* No global view — without a groupId we render nothing rather than
+     * leaking cross-group data. */
+    if (!gid) {
+      setLeaderboard([]); setActivity([]); setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const q = gid ? `?groupId=${gid}` : "";
+      /* Server requires an auth token so it can verify the caller is an
+       * active member of the requested group before returning anything. */
+      const fb = getFirebase();
+      const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
+      const headers: Record<string, string> = tok ? { authorization: `Bearer ${tok}` } : {};
+      const q = `?groupId=${gid}`;
       const [lbR, acR] = await Promise.all([
-        fetch(`/api/leaderboard${q}`),
-        fetch(`/api/activity${q}&limit=40`.replace("?&", "?")),
+        fetch(`/api/leaderboard${q}`, { headers }),
+        fetch(`/api/activity${q}&limit=40`.replace("?&", "?"), { headers }),
       ]);
       if (lbR.ok) setLeaderboard(await lbR.json());
       if (acR.ok) setActivity(await acR.json());
@@ -60,9 +71,10 @@ export default function GroupsTab() {
 
       {groups.length > 0 && (
         <div className="groups-tabs">
-          <button className={`seg ${!currentGroupId ? "on" : ""}`} onClick={() => setCurrentGroup(null)}>
-            🌍 גלובלי
-          </button>
+          {/* The "🌍 גלובלי" button was removed — there is no cross-group
+           * view at any stage. The user can only switch between groups
+           * they are actually a member of, and the leaderboard / activity
+           * feed shows only members of the currently-selected group. */}
           {groups.map(g => (
             <button key={g.id}
               className={`seg ${currentGroupId === g.id ? "on" : ""}`}
@@ -103,8 +115,12 @@ export default function GroupsTab() {
 
       <div className="groups-grid-two">
         <section>
-          <h3 className="sec-title">🏆 לוח תוצאות {currentGroupId ? "" : "(גלובלי)"}</h3>
-          {loading ? <div className="muted">…טוען</div> : <Leaderboard rows={leaderboard} />}
+          <h3 className="sec-title">🏆 לוח תוצאות</h3>
+          {!currentGroupId ? (
+            <div className="empty-state">בחר קבוצה כדי לראות את לוח התוצאות שלה.</div>
+          ) : loading ? (
+            <div className="muted">…טוען</div>
+          ) : <Leaderboard rows={leaderboard} />}
         </section>
 
         <section>
