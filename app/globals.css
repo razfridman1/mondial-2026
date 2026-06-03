@@ -4531,6 +4531,52 @@ html[data-theme="light"] .chat-panel {
   font-size: 13px;
 }
 
+/* Groups selector — dropdown picks the viewed group; actions sit to the side */
+.fr-groups-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  flex: 1; min-width: 0;
+}
+.fr-group-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.groups-dd { position: relative; display: inline-flex; }
+.groups-dd-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-elev); color: var(--text);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 9px 16px; font-size: 14px; font-weight: 700; cursor: pointer;
+  max-width: 60vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.groups-dd-btn:hover { border-color: var(--accent); }
+.groups-dd-caret { font-size: 10px; opacity: 0.8; }
+.groups-dd-menu {
+  position: fixed; z-index: 1000;
+  max-height: 60vh; overflow-y: auto;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 6px;
+  box-shadow: 0 16px 36px rgba(0,0,0,0.4);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.groups-dd-item {
+  display: flex; align-items: center; gap: 8px;
+  background: transparent; border: none; cursor: pointer;
+  text-align: start; padding: 10px 12px; border-radius: 8px;
+  color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap;
+}
+.groups-dd-item:hover { background: var(--bg-elev); }
+.groups-dd-item.on { background: var(--bg-elev); color: var(--accent); }
+.groups-dd-item-name { font-weight: 700; }
+.groups-dd-check { color: var(--accent); font-weight: 900; }
+.groups-dd-left-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: 8px;
+}
+.groups-dd-left-row .btn { margin-inline-start: auto; }
+.groups-dd-sep {
+  font-size: 12px; font-weight: 800; color: var(--text-muted);
+  padding: 8px 6px 4px; margin-top: 4px;
+  border-top: 1px solid var(--border-soft);
+}
+
 /* Standalone progress strip on the predictions tab (after removing hero) */
 .mypred-progress-standalone {
   margin: 4px 0 16px;
@@ -4704,3 +4750,148 @@ html[data-theme="light"] .chat-panel {
     min-height: 32px !important;
   }
 }
+
+/* =====================================================================
+ * NAV DROPDOWN (דירוג חברים → leaderboard + my groups)
+ * ===================================================================*/
+.nav-dropdown { position: relative; display: inline-flex; }
+.nav-dropdown-btn { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.nav-dropdown-caret { font-size: 10px; opacity: 0.8; }
+.nav-dropdown-menu {
+  position: fixed; z-index: 1000;
+  min-width: 190px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 6px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.nav-dropdown-item {
+  background: transparent; border: none; cursor: pointer;
+  text-align: start; padding: 10px 12px; border-radius: 8px;
+  color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap;
+}
+.nav-dropdown-item:hover { background: var(--bg-elev); }
+.nav-dropdown-item.on { background: var(--bg-elev); color: var(--accent); }
+
+/* =====================================================================
+ * MY TEAMS TAB (הנבחרות שלי)
+ * ===================================================================*/
+.myteams-picker { position: relative; display: inline-block; }
+.myteams-picker-menu {
+  position: absolute; top: 100%; inset-inline-start: 0; z-index: 50;
+  margin-top: 6px; width: 280px; max-width: 86vw;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 8px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+}
+.myteams-picker-input, .myteams-search-input {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px;
+}
+.myteams-picker-list { margin-top: 6px; max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.myteams-picker-opt, .myteams-search-opt {
+  display: flex; align-items: center; gap: 8px;
+  background: transparent; border: none; cursor: pointer;
+  padding: 9px 10px; border-radius: 8px; text-align: start;
+  color: var(--text); font-size: 14px; width: 100%;
+}
+.myteams-picker-opt:hover, .myteams-search-opt:hover { background: var(--bg-elev); }
+
+.myteams-search { margin-top: 6px; }
+.myteams-search-results {
+  margin-top: 6px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  max-width: 460px;
+}
+
+.myteams-list { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+
+/* ---------- Team dossier card ---------- */
+.dossier {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 16px;
+}
+.dossier-head { display: flex; align-items: flex-start; gap: 14px; }
+.dossier-flag { font-size: 44px; line-height: 1; }
+.dossier-head-main { flex: 1; min-width: 0; }
+.dossier-name { margin: 0; font-size: 22px; font-weight: 800; }
+.dossier-sub { font-size: 13px; margin-top: 2px; }
+.dossier-head-action { flex-shrink: 0; }
+.dossier-status {
+  display: inline-block; margin-top: 8px;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 13px; font-weight: 700;
+}
+.dossier-status-pending { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+.dossier-status-group   { background: rgba(0,212,255,0.12);  color: var(--accent); }
+.dossier-status-active  { background: rgba(34,197,94,0.14);  color: #22c55e; }
+.dossier-status-out     { background: rgba(239,68,68,0.14);  color: #ef4444; }
+.dossier-status-champ   { background: linear-gradient(135deg,#f59e0b,#fbbf24); color: #1a1300; }
+
+.dossier-coach {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 14px; padding: 10px 12px;
+  background: var(--bg-elev); border-radius: 10px; font-size: 14px;
+}
+.dossier-coach-label { font-weight: 800; }
+.dossier-coach-name { font-weight: 600; }
+
+.dossier-block { margin-top: 18px; }
+.dossier-block-title { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
+.dossier-empty { font-size: 13px; padding: 8px 0; }
+.dossier-note { font-size: 11px; margin-top: 8px; }
+
+/* results */
+.dossier-results { display: flex; flex-direction: column; gap: 6px; }
+.dossier-result {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 10px;
+  background: var(--bg-elev); border-inline-start: 4px solid var(--border);
+  font-size: 13px;
+}
+.dossier-result.res-W { border-inline-start-color: #22c55e; }
+.dossier-result.res-D { border-inline-start-color: #f59e0b; }
+.dossier-result.res-L { border-inline-start-color: #ef4444; }
+.dossier-result-stage { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.dossier-result-mid { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dossier-result-badge {
+  width: 20px; height: 20px; border-radius: 6px; display: inline-flex;
+  align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: #fff;
+}
+.res-W .dossier-result-badge { background: #22c55e; }
+.res-D .dossier-result-badge { background: #f59e0b; }
+.res-L .dossier-result-badge { background: #ef4444; }
+.dossier-result-score { font-size: 15px; font-variant-numeric: tabular-nums; }
+.dossier-result-date { font-size: 11px; white-space: nowrap; }
+
+/* upcoming lineups */
+.dossier-upcoming { display: flex; flex-direction: column; gap: 8px; }
+.dossier-upcoming-item { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.dossier-upcoming-head {
+  width: 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--bg-elev); border: none; cursor: pointer;
+  padding: 10px 12px; text-align: start; color: var(--text); font-size: 13px;
+}
+.dossier-upcoming-caret { font-size: 11px; opacity: 0.8; }
+.dossier-upcoming-stage { font-size: 11px; color: var(--text-muted); }
+.dossier-upcoming-opp { font-weight: 700; }
+.dossier-upcoming-date { margin-inline-start: auto; font-size: 11px; }
+.dossier-upcoming-body { padding: 12px; }
+
+/* squad */
+.dossier-squad { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.dossier-pos-title { margin: 0 0 8px; font-size: 13px; font-weight: 800; }
+.dossier-pos-grid { display: flex; flex-direction: column; gap: 6px; }
+.dossier-player {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px;
+  padding: 8px 10px; background: var(--bg-elev); border-radius: 8px; font-size: 13px;
+}
+.dossier-player-jersey {
+  grid-row: span 2; width: 30px; height: 30px; border-radius: 8px;
+  background: var(--bg-card); display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 12px; color: var(--accent);
+}
+.dossier-player-name { font-weight: 700; }
+.dossier-player-club { font-size: 11px; grid-column: 2; }
+.dossier-cap { color: var(--accent); font-weight: 800; }

@@ -209,6 +209,36 @@ export function playerById(id: string): Player | undefined {
   return undefined;
 }
 
+/* ---------- Head coaches (preliminary, curated teams) ----------
+ * Real, publicly-known head coaches as of the 2025/26 cycle. Like the
+ * squads, this is preliminary reference data and may change before the
+ * tournament. Teams without a curated coach return null → UI shows
+ * "טרם פורסם". */
+export interface Coach {
+  name: string;     // Hebrew
+  nameEn: string;
+  nationality: string; // Hebrew nationality
+  flag: string;
+}
+
+const COACHES: Record<string, Coach> = {
+  ARG: { name: "ליונל סקלוני",        nameEn: "Lionel Scaloni",      nationality: "ארגנטינה", flag: "🇦🇷" },
+  BRA: { name: "קרלו אנצ׳לוטי",       nameEn: "Carlo Ancelotti",     nationality: "איטליה",   flag: "🇮🇹" },
+  FRA: { name: "דידייה דשאם",         nameEn: "Didier Deschamps",    nationality: "צרפת",     flag: "🇫🇷" },
+  ENG: { name: "תומאס טוכל",          nameEn: "Thomas Tuchel",       nationality: "גרמניה",   flag: "🇩🇪" },
+  ESP: { name: "לואיס דה לה פואנטה",  nameEn: "Luis de la Fuente",   nationality: "ספרד",     flag: "🇪🇸" },
+  GER: { name: "יוליאן נגלסמן",       nameEn: "Julian Nagelsmann",   nationality: "גרמניה",   flag: "🇩🇪" },
+  POR: { name: "רוברטו מרטינס",       nameEn: "Roberto Martínez",    nationality: "ספרד",     flag: "🇪🇸" },
+  NED: { name: "רונלד קומאן",         nameEn: "Ronald Koeman",       nationality: "הולנד",    flag: "🇳🇱" },
+  MEX: { name: "חאבייר אגירה",        nameEn: "Javier Aguirre",      nationality: "מקסיקו",   flag: "🇲🇽" },
+  USA: { name: "מאוריסיו פוצ׳טינו",   nameEn: "Mauricio Pochettino", nationality: "ארגנטינה", flag: "🇦🇷" },
+  CAN: { name: "ג׳סי מארש",           nameEn: "Jesse Marsch",        nationality: "ארה״ב",    flag: "🇺🇸" },
+};
+
+export function coachFor(teamCode: string): Coach | null {
+  return COACHES[teamCode] || null;
+}
+
 export function teamsByGroup(): Record<string, Team[]> {
   const map: Record<string, Team[]> = {};
   Object.values(TEAMS).forEach(t => {

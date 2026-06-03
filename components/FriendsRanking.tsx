@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
 import { TEAMS, STAGES } from "@/lib/data";
@@ -37,8 +37,12 @@ interface MatchRow {
 export default function FriendsRanking() {
   const user = useStore(s => s.user);
   const groups = useStore(s => s.groups);
+  const leftGroups = useStore(s => s.leftGroups);
   const currentGroupId = useStore(s => s.currentGroupId);
   const setCurrentGroup = useStore(s => s.setCurrentGroup);
+  const leaveGroup = useStore(s => s.leaveGroup);
+  const deleteGroup = useStore(s => s.deleteGroup);
+  const rejoinGroup = useStore(s => s.rejoinGroup);
 
   const refreshGroups = useStore(s => s.refreshGroups);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
@@ -129,6 +133,28 @@ export default function FriendsRanking() {
     });
   }, [rows, scope]);
 
+  /* ---- group management (merged in from the old "הקבוצות שלי" tab) ---- */
+  async function handleLeave(g: any) {
+    if ((g.memberCount || 1) <= 1) { alert("לא ניתן לעזוב את הקבוצה כשאתה החבר היחיד בה"); return; }
+    if (!confirm(`האם לעזוב את הקבוצה "${g.name}"?`)) return;
+    try { await leaveGroup(g.id); }
+    catch (e: any) { alert(`שגיאה: ${e?.message || "לא ניתן לעזוב את הקבוצה"}`); }
+  }
+  async function handleDelete(g: any) {
+    if ((g.memberCount || 1) > 1) { alert("לא ניתן למחוק כאשר יש עוד חברים"); return; }
+    if (!confirm(`האם למחוק את הקבוצה "${g.name}"? פעולה זו אינה הפיכה.`)) return;
+    try { await deleteGroup(g.id); }
+    catch (e: any) {
+      const msg = e?.message || "";
+      if (/members?|חבר/i.test(msg)) alert("לא ניתן למחוק כאשר יש עוד חברים");
+      else alert(`שגיאה: ${msg || "לא ניתן למחוק את הקבוצה"}`);
+    }
+  }
+  async function handleRejoin(groupId: string) {
+    try { await rejoinGroup(groupId); }
+    catch (e: any) { alert(`שגיאה: ${e?.message || "לא ניתן לחזור"}`); }
+  }
+
   if (!user) {
     return (
       <section className="empty-state">
@@ -149,17 +175,13 @@ export default function FriendsRanking() {
        * single group. Selecting a group also updates `currentGroupId`
        * so the per-match predictions section stays in sync. */}
       <div className="fr-lb-filter-row">
-        <div className="fr-lb-filter" role="tablist">
-          {leaderboardGroups.map(g => (
-            <button
-              key={g.id}
-              className={`seg ${selectedLb === g.id ? "on" : ""}`}
-              onClick={() => { setSelectedLb(g.id); setCurrentGroup(g.id); }}
-            >
-              👥 {g.name}
-            </button>
-          ))}
-        </div>
+        <GroupsSelect
+          groups={leaderboardGroups}
+          leftGroups={leftGroups}
+          selectedId={selectedLb}
+          onSelect={(id) => { setSelectedLb(id); setCurrentGroup(id); }}
+          onRejoin={handleRejoin}
+        />
         <div className="fr-lb-create-wrap">
           <CreateGroupBtn onCreated={refreshGroups} />
         </div>
@@ -183,6 +205,10 @@ export default function FriendsRanking() {
                   groupName={g.name}
                   inviteCode={fullGroup?.inviteCode}
                   myUid={user.uid}
+                  memberCount={(fullGroup as any)?.memberCount || 1}
+                  isOwner={(fullGroup as any)?.ownerUid === user.uid}
+                  onLeave={() => handleLeave(fullGroup || g)}
+                  onDelete={() => handleDelete(fullGroup || g)}
                   predictionRows={g.id === currentGroupId ? rows : []}
                 />
               );
@@ -254,6 +280,112 @@ function ActivityFeed({ items }: { items: ActivityEvent[] }) {
   );
 }
 
+/* ===================================================================
+ * GroupsSelect — dropdown that ONLY selects which group's leaderboard the
+ * user is looking at. The per-group action buttons live to the side, in
+ * the filter row (see FriendsRanking). Left groups get an inline rejoin.
+ * position:fixed so the menu isn't clipped by the filter row.
+ * =================================================================== */
+function GroupsSelect({
+  groups, leftGroups, selectedId, onSelect, onRejoin,
+}: {
+  groups: any[];
+  leftGroups: any[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onRejoin: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 260 });
+  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const current = groups.find(g => g.id === selectedId);
+
+  function reposition() {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setCoords({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 240) });
+  }
+  useEffect(() => {
+    if (!open) return;
+    reposition();
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onMove() { reposition(); }
+    document.addEventListener("mousedown", onDoc);
+    window.addEventListener("resize", onMove);
+    window.addEventListener("scroll", onMove, true);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("resize", onMove);
+      window.removeEventListener("scroll", onMove, true);
+    };
+  }, [open]);
+
+  return (
+    <div className="groups-dd" ref={ref}>
+      <button
+        ref={btnRef}
+        type="button"
+        className="groups-dd-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+      >
+        👥 {current ? current.name : "בחר קבוצה"}
+        <span className="groups-dd-caret">{open ? "▴" : "▾"}</span>
+      </button>
+      {open && (
+        <div
+          className="groups-dd-menu"
+          role="menu"
+          style={{ top: coords.top, left: coords.left, width: coords.width }}
+        >
+          {groups.length === 0 && leftGroups.length === 0 && (
+            <div className="muted" style={{ padding: 12, fontSize: 13 }}>
+              עוד לא הצטרפת לקבוצה. צור קבוצה חדשה או הצטרף עם קוד הזמנה.
+            </div>
+          )}
+
+          {groups.map(g => (
+            <button
+              key={g.id}
+              role="menuitemradio"
+              aria-checked={g.id === selectedId}
+              className={`groups-dd-item ${g.id === selectedId ? "on" : ""}`}
+              onClick={() => { onSelect(g.id); setOpen(false); }}
+            >
+              <span className="groups-dd-item-name">👥 {g.name}</span>
+              {g.id === selectedId && <span className="groups-dd-check">✓</span>}
+              <span className="muted" style={{ fontSize: 11, marginInlineStart: "auto" }}>
+                {g.memberCount || 1} חברים
+              </span>
+            </button>
+          ))}
+
+          {leftGroups.length > 0 && (
+            <>
+              <div className="groups-dd-sep">📭 קבוצות שעזבת</div>
+              {leftGroups.map(g => (
+                <div key={g.id} className="groups-dd-left-row">
+                  <span className="groups-dd-item-name" style={{ opacity: 0.8 }}>{g.name}</span>
+                  <button
+                    className="btn btn-small btn-primary"
+                    onClick={() => { onRejoin(g.id); setOpen(false); }}
+                  >
+                    ↩ חזור
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CreateGroupBtn({ onCreated }: { onCreated: () => void }) {
   const [busy, setBusy] = useState(false);
   async function create() {
@@ -304,6 +436,7 @@ function JoinGroupBtn({ onJoined }: { onJoined: () => void }) {
  * =================================================================== */
 function GroupLeaderboardCard({
   groupId, groupName, inviteCode, myUid, predictionRows, collapsed = false,
+  memberCount = 1, isOwner = false, onLeave, onDelete,
 }: {
   groupId: string | null;
   groupName: string;
@@ -311,6 +444,10 @@ function GroupLeaderboardCard({
   myUid: string;
   predictionRows: MatchRow[];
   collapsed?: boolean;
+  memberCount?: number;
+  isOwner?: boolean;
+  onLeave?: () => void;
+  onDelete?: () => void;
 }) {
   const [rows, setRows] = useState<LeaderRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -398,6 +535,25 @@ function GroupLeaderboardCard({
                 title="שתף את לוח התוצאות בווטסאפ"
               >
                 💬 שתף טבלה
+              </button>
+            )}
+            {onLeave && (
+              <button
+                className="btn btn-small"
+                disabled={memberCount <= 1}
+                title={memberCount <= 1 ? "אין משתמשים נוספים בקבוצה" : "יציאה מהקבוצה"}
+                onClick={onLeave}
+              >
+                🚪 צא מהקבוצה
+              </button>
+            )}
+            {isOwner && onDelete && (
+              <button
+                className="btn btn-small btn-danger"
+                title={memberCount > 1 ? "לא ניתן למחוק כאשר יש עוד חברים" : "מחיקת הקבוצה"}
+                onClick={onDelete}
+              >
+                🗑️ מחק קבוצה
               </button>
             )}
           </div>

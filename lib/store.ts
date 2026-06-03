@@ -22,7 +22,7 @@ interface Prefs {
   selectedChannel: string | null;
   selectedTeam: string | null;
   statusFilter: "all" | "live" | "upcoming";
-  tab: "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
+  tab: "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 }
 
 export type MatchResult = { home: number; away: number; finishedAt: number };
@@ -47,6 +47,8 @@ interface MondialState {
   clearPrediction: (matchId: string) => Promise<void>;
   clearStagePredictions: (stage: string) => Promise<{ deleted: number; locked: number }>;
   setProfileAvatar: (avatarId: string) => Promise<void>;
+  addTrackedTeam: (teamCode: string) => Promise<void>;
+  removeTrackedTeam: (teamCode: string) => Promise<void>;
   setCurrentGroup: (gid: string | null) => void;
   refreshGroups: () => Promise<void>;
   leaveGroup: (groupId: string) => Promise<void>;
@@ -176,6 +178,24 @@ export const useStore = create<MondialState>()(
         };
         set({ profile: next });
         await setUserDoc(`profiles/${u.uid}`, next);
+      },
+      addTrackedTeam: async (teamCode) => {
+        const u = get().user;
+        const prof = get().profile;
+        if (!u || !prof) return;
+        const cur = prof.trackedTeams || [];
+        if (cur.includes(teamCode)) return;
+        const trackedTeams = [...cur, teamCode];
+        set({ profile: { ...prof, trackedTeams } });
+        try { await setUserDoc(`profiles/${u.uid}`, { trackedTeams }); } catch {}
+      },
+      removeTrackedTeam: async (teamCode) => {
+        const u = get().user;
+        const prof = get().profile;
+        if (!u || !prof) return;
+        const trackedTeams = (prof.trackedTeams || []).filter(c => c !== teamCode);
+        set({ profile: { ...prof, trackedTeams } });
+        try { await setUserDoc(`profiles/${u.uid}`, { trackedTeams }); } catch {}
       },
       setCurrentGroup: (gid) => set({ currentGroupId: gid }),
       refreshMatchResults: async () => {

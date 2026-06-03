@@ -9,9 +9,9 @@ import Bracket from "@/components/Bracket";
 import AdminPanel from "@/components/AdminPanel";
 import ChatAssistant from "@/components/ChatAssistant";
 import TeamsTab from "@/components/TeamsTab";
+import MyTeamsTab from "@/components/MyTeamsTab";
 import ProfileTab from "@/components/ProfileTab";
 import FriendsRanking from "@/components/FriendsRanking";
-import MyGroupsTab from "@/components/MyGroupsTab";
 import Onboarding from "@/components/Onboarding";
 import SimulationBanner from "@/components/SimulationBanner";
 import SimulationPanel from "@/components/SimulationPanel";
@@ -29,8 +29,8 @@ function HomeInner() {
         {tab === "standings"     && <StandingsTab />}
         {tab === "ranking"       && <FriendsRanking />}
         {tab === "teams"      && <TeamsTab />}
+        {tab === "myteams"    && <MyTeamsTab />}
         {tab === "bracket"    && <Bracket />}
-        {tab === "mygroups"   && <MyGroupsTab />}
         {tab === "profile"    && <ProfileTab />}
         {tab === "admin"      && <AdminPanel />}
         {tab === "simulation" && <SimulationPanel />}

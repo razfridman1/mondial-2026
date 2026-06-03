@@ -110,6 +110,7 @@ export interface UserProfile {
   managed?: boolean;      // true if created by admin via username/password flow
   theme?: "dark" | "light"; // synced across devices
   aiBlocked?: boolean;    // super-admin can block a user from using AI features
+  trackedTeams?: string[]; // national teams the user follows in "הנבחרות שלי" (web only)
 }
 
 /* Multi-tenant private group */

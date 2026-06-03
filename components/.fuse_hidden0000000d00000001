@@ -177,7 +177,7 @@ export default function SimulationPanel() {
         </select>
       </div>
 
-      {/* Per-stage restore — recover deleted predictions from the backup */}
+      {/* Per-stage reset — always clickable when a group is selected */}
       <div className="sim-workflow-grid">
         <div className="sim-workflow">
           {STAGE_ORDER.map(s => {

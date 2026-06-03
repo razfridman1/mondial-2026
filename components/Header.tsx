@@ -7,16 +7,17 @@ import { shareToWhatsApp } from "@/lib/share";
 import { AvatarDisplay } from "./AvatarPicker";
 import AvatarPicker from "./AvatarPicker";
 
-type Tab = "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
+type Tab = "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 
-const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: boolean; hideOnDesktop?: boolean }[] = [
+/* "הקבוצות שלי" was removed as its own tab — group management now lives
+ * inside "דירוג חברים" (per-group dropdown). The nav is a flat tab list. */
+const NAV: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: boolean }[] = [
   { id: "schedule",      label: "⚽ משחקים" },
   { id: "ranking",       label: "🏆 דירוג חברים" },
   { id: "mypredictions", label: "🔮 הניחושים שלי" },
-  { id: "standings",     label: "📊 טבלאות",         hideOnMobile: true },
-  /* "🏆 שלב הנוקאאוט" — desktop only (mobile gets "הקבוצות שלי" instead) */
-  { id: "bracket",       label: "🏆 שלב הנוקאאוט",   hideOnMobile: true },
-  { id: "mygroups",      label: "👥 הקבוצות שלי" },
+  { id: "standings",     label: "📊 טבלאות",        hideOnMobile: true },
+  { id: "bracket",       label: "🏆 שלב הנוקאאוט",  hideOnMobile: true },
+  { id: "myteams",       label: "⭐ הנבחרות שלי",   hideOnMobile: true },
   /* Profile tab removed from nav — accessed via username click in header */
   { id: "admin",         label: "👥 ניהול משתמשים", adminOnly: true },
   { id: "simulation",    label: "🎲 ניהול ניחושים", adminOnly: true },
@@ -37,9 +38,11 @@ export default function Header() {
     return () => clearInterval(id);
   }, []);
 
-  /* Legacy guard: removed tabs auto-reset to schedule */
+  /* Legacy guard: removed tabs auto-reset. "mygroups" merged into "ranking". */
   useEffect(() => {
-    if ((tab as string) === "broadcasts" || (tab as string) === "ai" || (tab as string) === "teams") {
+    if ((tab as string) === "mygroups") {
+      setPref("tab", "ranking");
+    } else if ((tab as string) === "broadcasts" || (tab as string) === "ai" || (tab as string) === "teams") {
       setPref("tab", "schedule");
     }
   }, [tab, setPref]);
@@ -48,7 +51,7 @@ export default function Header() {
    * Also re-check when the window resizes (e.g. rotating phone). */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const MOBILE_HIDDEN_TABS: Tab[] = ["standings", "bracket"];
+    const MOBILE_HIDDEN_TABS: Tab[] = ["standings", "bracket", "myteams"];
     const mq = window.matchMedia("(max-width: 720px)");
     const check = () => {
       if (mq.matches && MOBILE_HIDDEN_TABS.includes(tab as Tab)) {
@@ -113,7 +116,7 @@ export default function Header() {
       </div>
       {pickingAvatar && <AvatarPicker onClose={() => setPickingAvatar(false)} />}
       <nav className="tabs">
-        {ALL_TABS.filter(t => !t.adminOnly || user?.isAdmin).map(t => (
+        {NAV.filter(t => !t.adminOnly || user?.isAdmin).map(t => (
           <button
             key={t.id}
             className={`tab-btn ${tab === t.id ? "on" : ""} ${t.hideOnMobile ? "tab-hide-mobile" : ""}`}
