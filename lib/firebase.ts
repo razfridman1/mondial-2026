@@ -8,6 +8,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword,
   createUserWithEmailAndPassword, signOut as fbSignOut, onAuthStateChanged,
   setPersistence, indexedDBLocalPersistence, browserLocalPersistence,
+  signInWithCustomToken,
   type Auth, type User,
 } from "firebase/auth";
 import {
@@ -35,12 +36,13 @@ export function getFirebase() {
     const authInstance = getAuth(app);
     _auth = authInstance;
     _db = getFirestore(app);
-    /* "Remember me": keep the user signed in across page reloads and app
-     * restarts. Prefer IndexedDB; fall back to localStorage for webviews /
-     * privacy modes where IndexedDB may be unavailable. The user stays
+    /* "Remember me": keep the user signed in across page reloads and browser
+     * restarts. On mobile browsers localStorage is restored more reliably than
+     * IndexedDB after the browser is fully closed, so we prefer it here and
+     * fall back to IndexedDB only if localStorage is blocked. The user stays
      * logged in until they explicitly press "יציאה". */
-    setPersistence(authInstance, indexedDBLocalPersistence)
-      .catch(() => setPersistence(authInstance, browserLocalPersistence))
+    setPersistence(authInstance, browserLocalPersistence)
+      .catch(() => setPersistence(authInstance, indexedDBLocalPersistence))
       .catch(() => {});
   }
   return { app, auth: _auth, db: _db };
@@ -88,6 +90,14 @@ export async function signOut(): Promise<void> {
   const { auth } = getFirebase();
   if (!auth) return;
   await fbSignOut(auth);
+}
+
+/* Silently sign the client back in using a custom token minted by the
+ * server from a valid session cookie (see /api/auth/session). */
+export async function signInWithToken(token: string): Promise<void> {
+  const { auth } = getFirebase();
+  if (!auth) throw new Error("Firebase not initialized");
+  await signInWithCustomToken(auth, token);
 }
 
 export function watchAuth(cb: (user: User | null) => void): () => void {

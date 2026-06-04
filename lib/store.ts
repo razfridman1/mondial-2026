@@ -6,7 +6,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { User } from "firebase/auth";
-import { getFirebase, getUserDoc, setUserDoc, subscribeOverrides, subscribeSimConfig, watchAuth, signOut as fbSignOut } from "./firebase";
+import { getFirebase, getUserDoc, setUserDoc, subscribeOverrides, subscribeSimConfig, watchAuth, signOut as fbSignOut, signInWithToken } from "./firebase";
 import type { SimConfig } from "./sim";
 import type {
   BroadcastOverrideDoc, AppUser, Prediction,
@@ -317,6 +317,9 @@ export const useStore = create<MondialState>()(
       },
       signOut: async () => {
         await fbSignOut();
+        /* Drop the server session cookie too, otherwise the next load would
+         * silently restore the user we just signed out. */
+        try { await fetch("/api/auth/session", { method: "DELETE" }); } catch {}
         set({ user: null });
       },
       setOverrides: (o) => set({ overrides: o }),
@@ -333,6 +336,7 @@ export const useStore = create<MondialState>()(
 
 /* Bootstrapper: subscribes to auth + overrides once on the client. */
 let bootstrapped = false;
+let sessionRestoreTried = false;
 export function bootstrap() {
   if (typeof window === "undefined" || bootstrapped) return;
   bootstrapped = true;
@@ -341,12 +345,39 @@ export function bootstrap() {
 
   watchAuth(async (u: User | null) => {
     if (!u) {
+      /* No client-side session. Before showing the login screen, try ONCE to
+       * restore from the server session cookie. This is what keeps users
+       * signed in inside in-app browsers (WhatsApp, Instagram…) where
+       * localStorage/IndexedDB is wiped on close but cookies survive. */
+      if (!sessionRestoreTried) {
+        sessionRestoreTried = true;
+        try {
+          const r = await fetch("/api/auth/session", { method: "GET" });
+          if (r.ok) {
+            const { token } = await r.json();
+            if (token) {
+              /* signInWithToken re-triggers this callback with a real user. */
+              await signInWithToken(token);
+              return;
+            }
+          }
+        } catch {}
+      }
       useStore.getState().setUser(null);
       useStore.getState().setLoadingAuth(false);
       return;
     }
     // Check admin via API (verifies ID token server-side)
     const token = await u.getIdToken();
+    /* Refresh the server session cookie on every authenticated load (and right
+     * after login) so the next open can silently restore the session. */
+    try {
+      await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ idToken: token }),
+      });
+    } catch {}
     let isAdmin = false;
     try {
       const r = await fetch("/api/me", { headers: { authorization: `Bearer ${token}` } });
