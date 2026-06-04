@@ -7,6 +7,7 @@ import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword,
   createUserWithEmailAndPassword, signOut as fbSignOut, onAuthStateChanged,
+  setPersistence, indexedDBLocalPersistence, browserLocalPersistence,
   type Auth, type User,
 } from "firebase/auth";
 import {
@@ -31,8 +32,16 @@ export function getFirebase() {
   if (typeof window === "undefined") return { app: null, auth: null, db: null };
   if (!app) {
     app = getApps()[0] || initializeApp(firebaseConfig);
-    _auth = getAuth(app);
+    const authInstance = getAuth(app);
+    _auth = authInstance;
     _db = getFirestore(app);
+    /* "Remember me": keep the user signed in across page reloads and app
+     * restarts. Prefer IndexedDB; fall back to localStorage for webviews /
+     * privacy modes where IndexedDB may be unavailable. The user stays
+     * logged in until they explicitly press "יציאה". */
+    setPersistence(authInstance, indexedDBLocalPersistence)
+      .catch(() => setPersistence(authInstance, browserLocalPersistence))
+      .catch(() => {});
   }
   return { app, auth: _auth, db: _db };
 }
