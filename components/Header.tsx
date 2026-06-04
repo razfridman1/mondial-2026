@@ -6,7 +6,6 @@ import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { shareToWhatsApp } from "@/lib/share";
 import { AvatarDisplay } from "./AvatarPicker";
 import AvatarPicker from "./AvatarPicker";
-import ThemeToggle from "./ThemeToggle";
 
 type Tab = "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 
@@ -91,7 +90,6 @@ export default function Header() {
         <div id="header-clock">
           <span>🕒 {formatIsraelTime(now)}</span>
           <span className="muted">{formatIsraelDate(now, { short: true })}</span>
-          <ThemeToggle />
           {user ? (
             <>
               <button
