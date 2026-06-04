@@ -231,7 +231,7 @@ export default function FriendsRanking() {
                   groupName={g.name}
                   inviteCode={gAny.inviteCode}
                   myUid={user.uid}
-                  memberCount={gAny.memberCount || 1}
+                  memberCount={groupActiveCount(gAny)}
                   adminView={!isMember}
                   isOwner={isMember && gAny.ownerUid === user.uid}
                   onLeave={isMember ? () => handleLeave(gAny) : undefined}
@@ -313,6 +313,15 @@ function ActivityFeed({ items }: { items: ActivityEvent[] }) {
  * the filter row (see FriendsRanking). Left groups get an inline rejoin.
  * position:fixed so the menu isn't clipped by the filter row.
  * =================================================================== */
+/* Accurate active-member count. The stored `memberCount` field on the group
+ * doc can drift (it isn't always decremented on leave). When the admin groups
+ * endpoint supplies the actual `members` array we count only non-left members;
+ * otherwise we fall back to the stored count. */
+function groupActiveCount(g: any): number {
+  if (Array.isArray(g?.members)) return g.members.filter((m: any) => !m?.left).length;
+  return g?.memberCount || 1;
+}
+
 function GroupsSelect({
   groups, leftGroups, selectedId, memberIds, onSelect, onRejoin,
 }: {
@@ -390,7 +399,7 @@ function GroupsSelect({
                 <span className="chip" style={{ fontSize: 9 }} title="קבוצה שאינך חבר בה — צפייה כאדמין">🛡️ אדמין</span>
               )}
               <span className="muted" style={{ fontSize: 11, marginInlineStart: "auto" }}>
-                {g.memberCount || 1} חברים
+                {groupActiveCount(g)} חברים
               </span>
             </button>
           ))}

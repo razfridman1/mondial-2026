@@ -518,16 +518,17 @@ function GroupAssignModal({
               borderRadius: 10,
             }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
-                ✓ סמן את הקבוצות שהמשתמש חבר בהן
+                ✓ הקבוצות שהמשתמש חבר בהן — הסר או החזר בלחיצה
               </div>
               <div className="muted" style={{ fontSize: 11, marginBottom: 10 }}>
-                💡 משתמש יכול להיות חבר ב‑<strong>כמה קבוצות במקביל</strong> — סמן את כולן. השמירה אוטומטית.
+                💡 משתמש יכול להיות חבר ב‑<strong>כמה קבוצות במקביל</strong>.<br />
+                ✅ <strong>הסרה מקבוצה אינה מוחקת את הדירוג</strong> — הניחושים נשמרים, וכשמחזירים את המשתמש הדירוג חוזר אוטומטית.
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {groups.map(g => {
                   const isMember = memberOf.includes(g.id);
                   return (
-                    <label
+                    <div
                       key={g.id}
                       style={{
                         display: "flex", alignItems: "center", gap: 10,
@@ -535,27 +536,39 @@ function GroupAssignModal({
                         background: isMember ? "rgba(0,212,255,0.12)" : "var(--bg-elev)",
                         border: `1px solid ${isMember ? "var(--accent)" : "var(--border)"}`,
                         borderRadius: 10,
-                        cursor: busy === g.id ? "wait" : "pointer",
-                        transition: "background .15s, border-color .15s",
                       }}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isMember}
-                        disabled={busy !== null}
-                        onChange={() => toggle(g.id, isMember)}
-                        style={{ width: 18, height: 18 }}
-                      />
                       <div style={{ flex: 1 }}>
                         <strong>{g.name}</strong>
+                        {isMember && <span style={{ color: "var(--accent)", fontWeight: 700, marginInlineStart: 8, fontSize: 12 }}>✓ חבר</span>}
                         <span className="muted" style={{ marginInlineStart: 8, fontSize: 11 }}>
                           קוד: <code className="invite-code">{g.inviteCode}</code>
                           {" · "}{g.memberCount || 0} חברים
                         </span>
                       </div>
-                      {busy === g.id && <span className="muted" style={{ fontSize: 11 }}>שומר…</span>}
-                      {isMember && busy === null && <span style={{ color: "var(--accent)", fontWeight: 700 }}>✓</span>}
-                    </label>
+                      {busy === g.id ? (
+                        <span className="muted" style={{ fontSize: 11 }}>שומר…</span>
+                      ) : isMember ? (
+                        <button
+                          className="btn btn-small"
+                          style={{ background: "rgba(239,68,68,0.10)", borderColor: "var(--red)", color: "var(--red)" }}
+                          disabled={busy !== null}
+                          onClick={() => toggle(g.id, true)}
+                          title="הסר את המשתמש מהקבוצה (הדירוג יישמר וניתן להחזיר בכל רגע)"
+                        >
+                          🚪 הסר מהקבוצה
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-small btn-primary"
+                          disabled={busy !== null}
+                          onClick={() => toggle(g.id, false)}
+                          title="החזר/הוסף את המשתמש לקבוצה — הדירוג שלו יחזור"
+                        >
+                          ➕ החזר לקבוצה
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
