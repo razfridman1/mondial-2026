@@ -82,7 +82,8 @@ export default function Header() {
           onClick={() => shareToWhatsApp(
             "🏆 הצטרף לאפליקציית מונדיאל 2026!\n" +
             "ניחושים, דירוג חברים, ולוח תוצאות חי ⚽\n\n" +
-            "https://www.fc26.co.il"
+            "https://www.fc26.co.il\n\n" +
+            "📲 טיפ: פִּתחו בדפדפן (Chrome/Safari) → תפריט → \"הוסף למסך הבית\". כך תישארו מחוברים ולא תתבקשו סיסמה שוב."
           )}
         >
           WWW.FC26.CO.IL
