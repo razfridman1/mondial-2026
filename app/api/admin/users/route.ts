@@ -55,15 +55,23 @@ export async function POST(req: Request) {
   catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.status || 401 }); }
 
   const body = await req.json();
-  const username = normalizeUsername(body.username || "");
+  let username = normalizeUsername(body.username || "");
+  /* No username restrictions: if nothing usable was supplied (e.g. a Hebrew
+   * name that normalizes away, or an empty field), auto-generate a safe login
+   * handle. The only hard rule is that the handle must form a valid email. */
+  if (!username) username = "user" + Math.random().toString(36).slice(2, 7);
+  if (username.length > 30) username = username.slice(0, 30);
+
   const password = (body.password || "").toString();
-  const displayName = (body.displayName || username).toString().slice(0, 60);
+  /* Display name can be anything (Hebrew is fine); only the login handle has
+   * to be email-safe. */
+  const displayName = (body.displayName || body.username || username).toString().trim().slice(0, 60) || username;
   const role = body.role === "admin" ? "admin" : "user";
 
-  if (username.length < 3 || username.length > 30)
-    return NextResponse.json({ error: "username must be 3-30 chars (a-z0-9._-)" }, { status: 400 });
+  /* Firebase Auth requires a password of at least 6 characters — that is the
+   * ONLY restriction (no digits, symbols or uppercase required). */
   if (password.length < 6)
-    return NextResponse.json({ error: "password must be 6+ chars" }, { status: 400 });
+    return NextResponse.json({ error: "הסיסמה חייבת להיות באורך 6 תווים לפחות (ללא צורך במספרים או אותיות גדולות)" }, { status: 400 });
 
   const { auth, db } = getAdmin();
 

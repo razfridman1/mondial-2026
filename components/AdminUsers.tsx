@@ -68,10 +68,10 @@ export default function AdminUsers() {
   useEffect(() => { load(); }, [me?.isAdmin]);
 
   async function createManaged() {
-    const username = prompt("שם משתמש (3-30 תווים, אותיות קטנות, מספרים, ._-):");
-    if (!username) return;
-    const displayName = prompt("שם תצוגה (אופציונלי):") || username;
-    const password = prompt("סיסמה (לפחות 6 תווים):");
+    const username = prompt("שם משתמש לכניסה (אותיות באנגלית/מספרים — או השאר ריק וייווצר אוטומטית):");
+    if (username === null) return;   // בוטל (Cancel). שדה ריק = יווצר שם אוטומטית.
+    const displayName = prompt("שם תצוגה (אפשר בעברית):") || "";
+    const password = prompt("סיסמה (6 תווים לפחות — בלי חובת מספרים):");
     if (!password) return;
     const role = confirm("האם זה משתמש Admin? (אישור = כן, ביטול = משתמש רגיל)") ? "admin" : "user";
 
@@ -84,7 +84,12 @@ export default function AdminUsers() {
       });
       const data = await r.json();
       if (!r.ok) { setError(data.error || "שגיאה ביצירת המשתמש"); return; }
-      alert(`✓ נוצר משתמש "${data.username}"\nניתן להתחבר עם שם המשתמש והסיסמה.`);
+      alert(
+        `✓ נוצר משתמש "${data.username}"\n` +
+        `אימייל כניסה פנימי: ${data.email}\n\n` +
+        `כדי להפוך אותו לאדמין־על: הוסף את האימייל הזה ל‑ADMIN_EMAILS בהגדרות Vercel.\n` +
+        `אפשר להתחבר עם שם המשתמש (או האימייל) והסיסמה.`
+      );
       load();
     } finally { setBusy(false); }
   }

@@ -58,9 +58,18 @@ export default function FriendsRanking() {
    * once `refreshGroups` finishes. */
   const [selectedLb, setSelectedLb] = useState<string>(() => currentGroupId || "");
 
-  /* The user can ONLY ever see groups they are a member of.
-   * No admin override — admins use the SuperAdmin panel for cross-group views. */
-  const leaderboardGroups = groups;
+  /* Admin override: super-admins may additionally view ANY group (even ones
+   * they're not a member of) so they appear in the selector below. Regular
+   * users still only ever see their own groups. The leaderboard API already
+   * permits admins to read any group's board. */
+  const [adminGroups, setAdminGroups] = useState<any[]>([]);
+  const memberIds = useMemo(() => new Set(groups.map(g => g.id)), [groups]);
+  const leaderboardGroups = useMemo(
+    () => user?.isAdmin
+      ? [...groups, ...adminGroups.filter(ag => !memberIds.has(ag.id))]
+      : groups,
+    [user?.isAdmin, groups, adminGroups, memberIds]
+  );
 
   /* Keep selectedLb in sync with the user's actual memberships:
    *   - if no group is selected but the user has groups, pick the first
@@ -82,6 +91,21 @@ export default function FriendsRanking() {
   }, [leaderboardGroups, selectedLb, currentGroupId, setCurrentGroup]);
 
   useEffect(() => { refreshGroups(); }, [refreshGroups]);
+
+  /* Super-admins: pull the full group list so any group (incl. ones they're
+   * not a member of, e.g. "מונדיאל") shows up in the selector. */
+  useEffect(() => {
+    if (!user?.isAdmin) { setAdminGroups([]); return; }
+    (async () => {
+      try {
+        const fb = getFirebase();
+        const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
+        if (!tok) return;
+        const r = await fetch("/api/admin/groups", { headers: { authorization: `Bearer ${tok}` } });
+        if (r.ok) setAdminGroups(await r.json());
+      } catch {}
+    })();
+  }, [user?.isAdmin]);
 
   async function load() {
     if (!user) return;
@@ -179,6 +203,7 @@ export default function FriendsRanking() {
           groups={leaderboardGroups}
           leftGroups={leftGroups}
           selectedId={selectedLb}
+          memberIds={memberIds}
           onSelect={(id) => { setSelectedLb(id); setCurrentGroup(id); }}
           onRejoin={handleRejoin}
         />
@@ -197,18 +222,20 @@ export default function FriendsRanking() {
           {leaderboardGroups
             .filter(g => g.id === selectedLb)
             .map(g => {
-              const fullGroup = groups.find(x => x.id === g.id);
+              const gAny = (groups.find(x => x.id === g.id) || g) as any;
+              const isMember = memberIds.has(g.id);
               return (
                 <GroupLeaderboardCard
                   key={g.id}
                   groupId={g.id}
                   groupName={g.name}
-                  inviteCode={fullGroup?.inviteCode}
+                  inviteCode={gAny.inviteCode}
                   myUid={user.uid}
-                  memberCount={(fullGroup as any)?.memberCount || 1}
-                  isOwner={(fullGroup as any)?.ownerUid === user.uid}
-                  onLeave={() => handleLeave(fullGroup || g)}
-                  onDelete={() => handleDelete(fullGroup || g)}
+                  memberCount={gAny.memberCount || 1}
+                  adminView={!isMember}
+                  isOwner={isMember && gAny.ownerUid === user.uid}
+                  onLeave={isMember ? () => handleLeave(gAny) : undefined}
+                  onDelete={isMember ? () => handleDelete(gAny) : undefined}
                   predictionRows={g.id === currentGroupId ? rows : []}
                 />
               );
@@ -287,11 +314,12 @@ function ActivityFeed({ items }: { items: ActivityEvent[] }) {
  * position:fixed so the menu isn't clipped by the filter row.
  * =================================================================== */
 function GroupsSelect({
-  groups, leftGroups, selectedId, onSelect, onRejoin,
+  groups, leftGroups, selectedId, memberIds, onSelect, onRejoin,
 }: {
   groups: any[];
   leftGroups: any[];
   selectedId: string;
+  memberIds: Set<string>;
   onSelect: (id: string) => void;
   onRejoin: (id: string) => void;
 }) {
@@ -358,6 +386,9 @@ function GroupsSelect({
             >
               <span className="groups-dd-item-name">👥 {g.name}</span>
               {g.id === selectedId && <span className="groups-dd-check">✓</span>}
+              {!memberIds.has(g.id) && (
+                <span className="chip" style={{ fontSize: 9 }} title="קבוצה שאינך חבר בה — צפייה כאדמין">🛡️ אדמין</span>
+              )}
               <span className="muted" style={{ fontSize: 11, marginInlineStart: "auto" }}>
                 {g.memberCount || 1} חברים
               </span>
@@ -436,7 +467,7 @@ function JoinGroupBtn({ onJoined }: { onJoined: () => void }) {
  * =================================================================== */
 function GroupLeaderboardCard({
   groupId, groupName, inviteCode, myUid, predictionRows, collapsed = false,
-  memberCount = 1, isOwner = false, onLeave, onDelete,
+  memberCount = 1, isOwner = false, onLeave, onDelete, adminView = false,
 }: {
   groupId: string | null;
   groupName: string;
@@ -448,6 +479,7 @@ function GroupLeaderboardCard({
   isOwner?: boolean;
   onLeave?: () => void;
   onDelete?: () => void;
+  adminView?: boolean;
 }) {
   const [rows, setRows] = useState<LeaderRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -501,6 +533,7 @@ function GroupLeaderboardCard({
         >
           <span>{open ? "▾" : "▸"}</span>
           <span>{groupName}</span>
+          {adminView && <span className="chip" style={{ fontSize: 10 }} title="קבוצה שאינך חבר בה — צפייה כאדמין">🛡️ צפייה כאדמין</span>}
           {rows.length > 0 && <span className="chip chip-soft" style={{ fontSize: 11 }}>👥 {rows.length}</span>}
         </button>
         {open && (
