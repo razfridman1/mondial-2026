@@ -149,6 +149,22 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
             </div>
             <span className="status-pill pill-locked" style={{ marginTop: 4 }}>🔒 תם הזמן לסמן ניחוש</span>
           </div>
+        ) : !predictionLocked && myPrediction ? (
+          /* Open + has prediction → show it with a change button */
+          <div className="pred-result-stack">
+            <div className="pred-result-row">
+              <span className="pred-result-key">🔮 הניחוש שלי:</span>
+              <span className="pred-result-val">{myPrediction.homeScore} : {myPrediction.awayScore}</span>
+              <button
+                className="btn btn-small"
+                style={{ marginInlineStart: 8, fontSize: 11, padding: "2px 8px" }}
+                onClick={(e) => { e.stopPropagation(); onOpen(match.id); }}
+                title="שנה ניחוש"
+              >
+                ✏️ שינוי
+              </button>
+            </div>
+          </div>
         ) : (
           /* Open (>3 min) or locked w/o prediction */
           <span className={`status-pill ${predictionLocked ? "pill-locked" : "pill-open"}`}>
