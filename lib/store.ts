@@ -22,7 +22,7 @@ interface Prefs {
   selectedChannel: string | null;
   selectedTeam: string | null;
   statusFilter: "all" | "live" | "upcoming";
-  tab: "schedule" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
+  tab: "schedule" | "weekpredictions" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 }
 
 export type MatchResult = { home: number; away: number; finishedAt: number };

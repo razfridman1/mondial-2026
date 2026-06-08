@@ -4,6 +4,7 @@ import AuthProvider from "@/components/AuthProvider";
 import Header from "@/components/Header";
 import MatchesTab from "@/components/MatchesTab";
 import MyPredictionsTab from "@/components/MyPredictionsTab";
+import WeeklyPredictionsTab from "@/components/WeeklyPredictionsTab";
 import StandingsTab from "@/components/StandingsTab";
 import Bracket from "@/components/Bracket";
 import AdminPanel from "@/components/AdminPanel";
@@ -25,6 +26,7 @@ function HomeInner() {
       <SimulationBanner />
       <main className="container">
         {tab === "schedule"      && <MatchesTab />}
+        {tab === "weekpredictions" && <WeeklyPredictionsTab />}
         {tab === "mypredictions" && <MyPredictionsTab />}
         {tab === "standings"     && <StandingsTab />}
         {tab === "ranking"       && <FriendsRanking />}
