@@ -79,10 +79,14 @@ export async function PATCH(req: Request, ctx: { params: { uid: string } }) {
     updates.email = newEmail;
   }
 
-  /* ---------- role (MANAGED ONLY — Google admins go via ADMIN_EMAILS) ---------- */
+  /* ---------- role (MANAGED ONLY — super-admin only) ---------- */
   if (body.role === "admin" || body.role === "user") {
     if (!isManaged) {
       return NextResponse.json({ error: "role change only available for managed users" }, { status: 400 });
+    }
+    /* Only raz.fridman1@gmail.com may grant/revoke admin */
+    if ((admin.email || "").toLowerCase() !== "raz.fridman1@gmail.com") {
+      return NextResponse.json({ error: "רק האדמין-על יכול לשנות הרשאות אדמין" }, { status: 403 });
     }
     updates.role = body.role;
     const username = updates.username || existing.username;

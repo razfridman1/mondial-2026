@@ -209,6 +209,9 @@ export default function AdminUsers() {
   if (!me) return null;
   if (!me.isAdmin) return null;
 
+  /* Only the owner can grant / revoke admin */
+  const isSuperAdmin = me.email === "raz.fridman1@gmail.com";
+
   const filtered = users.filter(u => {
     const userGroups = u.groupIds || [];
     if (onlyUnassigned && userGroups.length > 0) return false;
@@ -322,11 +325,27 @@ export default function AdminUsers() {
                 {users.length === 0 ? "אין משתמשים במערכת." : "אין תוצאות מתאימות לחיפוש."}
               </td></tr>
             )}
-            {filtered.map(u => (
-              <tr key={u.uid} style={u.uid === me.uid ? { background: "rgba(0,212,255,0.06)" } : {}}>
+            {filtered.map(u => {
+              const isAdmin = u.role === "admin";
+              return (
+              <tr key={u.uid} style={{
+                ...(isAdmin ? { background: "rgba(255,200,0,0.07)", outline: "1px solid rgba(245,158,11,0.35)" } : {}),
+                ...(u.uid === me.uid ? { background: "rgba(0,212,255,0.06)" } : {}),
+              }}>
                 <td>
-                  <strong>{u.displayName || "—"}</strong>
-                  {u.uid === me.uid && <span className="chip chip-strong" style={{ marginInlineStart: 6, fontSize: 10 }}>אתה</span>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <strong>{u.displayName || "—"}</strong>
+                    {isAdmin && (
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", gap: 3,
+                        padding: "2px 8px", borderRadius: 999,
+                        background: "rgba(245,158,11,0.22)",
+                        border: "1px solid #f59e0b",
+                        color: "#f59e0b", fontSize: 11, fontWeight: 800,
+                      }}>🛡️ אדמין</span>
+                    )}
+                    {u.uid === me.uid && <span className="chip chip-strong" style={{ fontSize: 10 }}>אתה</span>}
+                  </div>
                 </td>
                 <td style={{ fontSize: 12 }}>
                   {u.username && <><strong>@{u.username}</strong><br /></>}
@@ -336,10 +355,6 @@ export default function AdminUsers() {
                   {u.isManaged
                     ? <span className="chip">פנימי</span>
                     : <span className="chip chip-soft">{u.provider === "google.com" ? "🌐 Google" : "🌐 חיצוני"}</span>}
-                  <br/>
-                  <span className={`chip ${u.role === "admin" ? "chip-strong" : ""}`} style={{ fontSize: 10, marginTop: 3 }}>
-                    {u.role === "admin" ? "🛡️ Admin" : "👤 User"}
-                  </span>
                 </td>
                 <td>
                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -385,10 +400,13 @@ export default function AdminUsers() {
                           style={{ background: u.aiBlocked ? "rgba(239,68,68,0.15)" : "transparent" }}>
                     {u.aiBlocked ? "🤖🚫" : "🤖"}
                   </button>
-                  {u.isManaged && (
+                  {u.isManaged && isSuperAdmin && (
                     <button className="btn btn-small" onClick={() => toggleRole(u)} disabled={busy}
-                            title={u.role === "admin" ? "הפוך למשתמש רגיל" : "הפוך לאדמין"}>
-                      {u.role === "admin" ? "⬇" : "⬆"}
+                            title={u.role === "admin" ? "הסר הרשאות אדמין" : "הענק הרשאות אדמין"}
+                            style={u.role === "admin"
+                              ? { background: "rgba(245,158,11,0.15)", borderColor: "#f59e0b", color: "#f59e0b" }
+                              : {}}>
+                      {u.role === "admin" ? "🛡️⬇" : "🛡️⬆"}
                     </button>
                   )}
                   <button className="btn btn-small" onClick={() => toggleDisable(u)} disabled={busy}
@@ -404,7 +422,8 @@ export default function AdminUsers() {
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
