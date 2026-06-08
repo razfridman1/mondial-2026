@@ -3,6 +3,13 @@ import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
 
+function formatJoinDate(raw?: string): string {
+  if (!raw) return "—";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 interface UserRow {
   uid: string;
   email?: string;
@@ -315,13 +322,14 @@ export default function AdminUsers() {
               <th>אימייל / שם משתמש</th>
               <th>סוג</th>
               <th>סטטוס</th>
+              <th>הצטרפות</th>
               <th>קבוצות</th>
               <th>פעולות</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && !busy && (
-              <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 20 }}>
+              <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 20 }}>
                 {users.length === 0 ? "אין משתמשים במערכת." : "אין תוצאות מתאימות לחיפוש."}
               </td></tr>
             )}
@@ -334,7 +342,7 @@ export default function AdminUsers() {
               }}>
                 <td>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <strong>{u.displayName || "—"}</strong>
+                    <strong style={u.email === "raz.fridman1@gmail.com" ? { textDecoration: "underline double", textDecorationColor: "#f59e0b", textUnderlineOffset: 3 } : {}}>{u.displayName || "—"}</strong>
                     {isAdmin && (
                       <span style={{
                         display: "inline-flex", alignItems: "center", gap: 3,
@@ -363,6 +371,9 @@ export default function AdminUsers() {
                       : <span className="status-pill pill-open">✓ פעיל</span>}
                     {u.aiBlocked && <span className="badge badge-finished" style={{ background: "rgba(239,68,68,0.18)" }}>🤖 AI חסום</span>}
                   </div>
+                </td>
+                <td style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                  {formatJoinDate(u.createdAt)}
                 </td>
                 <td style={{ minWidth: 130 }}>
                   {(u.groupIds || []).length === 0 ? (
