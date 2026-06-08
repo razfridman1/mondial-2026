@@ -4936,4 +4936,31 @@ html[data-theme="light"] .chat-panel {
 
 /* upcoming lineups */
 .dossier-upcoming { display: flex; flex-direction: column; gap: 8px; }
-.dossier-upcoming-item { border: 1px solid var(--border); border
+.dossier-upcoming-item { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.dossier-upcoming-head {
+  width: 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--bg-elev); border: none; cursor: pointer;
+  padding: 10px 12px; text-align: start; color: var(--text); font-size: 13px;
+}
+.dossier-upcoming-caret { font-size: 11px; opacity: 0.8; }
+.dossier-upcoming-stage { font-size: 11px; color: var(--text-muted); }
+.dossier-upcoming-opp { font-weight: 700; }
+.dossier-upcoming-date { margin-inline-start: auto; font-size: 11px; }
+.dossier-upcoming-body { padding: 12px; }
+
+/* squad */
+.dossier-squad { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.dossier-pos-title { margin: 0 0 8px; font-size: 13px; font-weight: 800; }
+.dossier-pos-grid { display: flex; flex-direction: column; gap: 6px; }
+.dossier-player {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px;
+  padding: 8px 10px; background: var(--bg-elev); border-radius: 8px; font-size: 13px;
+}
+.dossier-player-jersey {
+  grid-row: span 2; width: 30px; height: 30px; border-radius: 8px;
+  background: var(--bg-card); display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 12px; color: var(--accent);
+}
+.dossier-player-name { font-weight: 700; }
+.dossier-player-club { font-size: 11px; grid-column: 2; }
+.dossier-cap { color: var(--accent); font-weight: 800; }
