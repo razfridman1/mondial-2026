@@ -1,13 +1,15 @@
 "use client";
 import { useMemo, useState } from "react";
 import { TEAMS } from "@/lib/data";
-import { teamsByGroup, squadFor, hasVerifiedSquad } from "@/lib/players";
+import { teamsByGroup, squadFor, hasVerifiedSquad, squadStatus } from "@/lib/players";
+import { useStore } from "@/lib/store";
 import TeamDetail from "./TeamDetail";
 import type { Team } from "@/lib/types";
 
 export default function TeamsTab() {
   const groups = useMemo(() => teamsByGroup(), []);
   const [activeTeam, setActiveTeam] = useState<Team | null>(null);
+  const liveSquads = useStore(s => s.liveSquads);
 
   return (
     <section>
@@ -20,15 +22,17 @@ export default function TeamsTab() {
                 <h3 className="group-title">בית {letter}</h3>
                 <div className="group-teams">
                   {teams.map(t => {
-                    const verified = hasVerifiedSquad(t.code);
+                    const verified = hasVerifiedSquad(t.code, liveSquads);
+                    const status = squadStatus(t.code, liveSquads);
+                    const count = squadFor(t.code, liveSquads).length;
                     return (
                       <button key={t.code} className="team-row" onClick={() => setActiveTeam(t)}>
                         <span className="flag">{t.flag}</span>
                         <span className="team-row-name">{t.name}</span>
                         <span className={`muted team-row-count ${verified ? "" : "team-pending"}`}>
-                          {verified
-                            ? `${squadFor(t.code).length} שחקנים · ראשוני`
-                            : "סגל מורחב בקרוב"}
+                          {status === "preliminary" && `${count} שחקנים · ראשוני`}
+                          {status === "live" && `${count} שחקנים · רשמי 🔴`}
+                          {status === "not-announced" && "סגל מורחב בקרוב"}
                         </span>
                         <span className="muted">→</span>
                       </button>

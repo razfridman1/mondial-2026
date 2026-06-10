@@ -19,6 +19,10 @@
     {
       "path": "/api/admin/simulation/tick",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/sync-squads",
+      "schedule": "0 4 * * *"
     }
   ],
   "headers": [

@@ -56,6 +56,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------- Live squads/coaches cache (server-only writes, public read) ----------
+    match /live_data/{docId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
     // ---------- Managed users (admin-only writes via API) ----------
     // Owner can read own record; admins read all. Writes always via Admin SDK.
     match /managed_users/{uid} {

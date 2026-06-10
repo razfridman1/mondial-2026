@@ -12,6 +12,7 @@ import type {
   BroadcastOverrideDoc, AppUser, Prediction,
   UserProfile, Group, ActivityEvent, AchievementUnlock,
 } from "./types";
+import type { Player, Coach } from "./players";
 import { defaultAvatarId } from "./avatars";
 
 interface Prefs {
@@ -40,6 +41,9 @@ interface MondialState {
   achievements: AchievementUnlock[];
   recentActivity: ActivityEvent[];
   simConfig: SimConfig | null;
+  liveSquads: Record<string, Player[]>;   // teamCode → squad, pulled live from football-data.org
+  liveCoaches: Record<string, Coach>;     // teamCode → coach, pulled live from football-data.org
+  liveSquadsLoaded: boolean;
   prefs: Prefs;
   setUser: (u: AppUser | null) => void;
   setLoadingAuth: (b: boolean) => void;
@@ -60,6 +64,7 @@ interface MondialState {
   signOut: () => Promise<void>;
   setOverrides: (o: Record<string, BroadcastOverrideDoc>) => void;
   setSimConfig: (c: SimConfig | null) => void;
+  loadLiveSquads: () => Promise<void>;
 }
 
 export const useStore = create<MondialState>()(
@@ -77,6 +82,9 @@ export const useStore = create<MondialState>()(
       achievements: [],
       recentActivity: [],
       simConfig: null,
+      liveSquads: {},
+      liveCoaches: {},
+      liveSquadsLoaded: false,
       prefs: {
         view: "card",
         selectedDay: null,
@@ -324,11 +332,24 @@ export const useStore = create<MondialState>()(
       },
       setOverrides: (o) => set({ overrides: o }),
       setSimConfig: (c) => set({ simConfig: c }),
+      loadLiveSquads: async () => {
+        if (get().liveSquadsLoaded) return;
+        try {
+          const r = await fetch("/api/squads");
+          if (r.ok) {
+            const data = await r.json();
+            set({ liveSquads: data.squads || {}, liveCoaches: data.coaches || {}, liveSquadsLoaded: true });
+          }
+        } catch {}
+      },
     }),
     {
       name: "mondial26-store",
+      /* Persist all prefs EXCEPT the active tab — every fresh visit/launch
+       * should land on "⚽ משחקים" (schedule), regardless of which tab the
+       * user was last on. Other prefs (view, filters, etc.) still persist. */
       partialize: (state) => ({
-        prefs: state.prefs,
+        prefs: { ...state.prefs, tab: "schedule" as const },
       }),
     }
   )
@@ -400,4 +421,8 @@ export function bootstrap() {
   subscribeSimConfig((cfg) => {
     useStore.getState().setSimConfig(cfg as SimConfig | null);
   });
+
+  /* Load live (football-data.org) squads/coaches once — used to fill in
+   * the 35 teams without hand-curated Hebrew squad data. */
+  useStore.getState().loadLiveSquads();
 }

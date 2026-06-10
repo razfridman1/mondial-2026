@@ -14,11 +14,12 @@ export interface Player {
   name: string;
   nameEn: string;
   position: Position;
-  jersey: number;
-  club: string;          // their club in regular league
+  jersey?: number;       // not provided by live (football-data.org) squads
+  club?: string;         // their club in regular league — not provided live
   age: number;
   captain?: boolean;
   description?: string;  // short Hebrew bio
+  live?: boolean;        // true = pulled live from football-data.org (official, English-only)
 }
 
 /* ---------- Curated squads (real stars from public knowledge) ---------- */
@@ -201,19 +202,29 @@ export const SQUADS: Record<string, Player[]> = (() => {
   return out;
 })();
 
-/* ---------- Public API ---------- */
-export function squadFor(teamCode: string): Player[] {
-  return SQUADS[teamCode] || [];
+/* ---------- Public API ----------
+ * `liveSquads` (when provided) holds official 26-man rosters pulled live
+ * from football-data.org for teams without hand-curated Hebrew data.
+ * Curated data always wins — it's richer (Hebrew names, jerseys, clubs). */
+export function squadFor(teamCode: string, liveSquads?: Record<string, Player[]>): Player[] {
+  const curated = SQUADS[teamCode];
+  if (curated && curated.length) return curated;
+  return liveSquads?.[teamCode] || [];
 }
 
-export function hasVerifiedSquad(teamCode: string): boolean {
-  return VERIFIED_TEAMS.has(teamCode);
+export function hasVerifiedSquad(teamCode: string, liveSquads?: Record<string, Player[]>): boolean {
+  return VERIFIED_TEAMS.has(teamCode) || !!(liveSquads?.[teamCode]?.length);
 }
 
-/** Status of the squad data for a given team. */
-export type SquadStatus = "preliminary" | "not-announced";
-export function squadStatus(teamCode: string): SquadStatus {
-  return VERIFIED_TEAMS.has(teamCode) ? "preliminary" : "not-announced";
+/** Status of the squad data for a given team.
+ *  - "preliminary": hand-curated Hebrew data (top teams)
+ *  - "live": official roster pulled live from football-data.org
+ *  - "not-announced": no data available yet */
+export type SquadStatus = "preliminary" | "live" | "not-announced";
+export function squadStatus(teamCode: string, liveSquads?: Record<string, Player[]>): SquadStatus {
+  if (VERIFIED_TEAMS.has(teamCode)) return "preliminary";
+  if (liveSquads?.[teamCode]?.length) return "live";
+  return "not-announced";
 }
 
 export function playerById(id: string): Player | undefined {
@@ -251,8 +262,8 @@ const COACHES: Record<string, Coach> = {
   RSA: { name: "הוגו ברוס",           nameEn: "Hugo Broos",          nationality: "בלגיה",    flag: "🇧🇪" },
 };
 
-export function coachFor(teamCode: string): Coach | null {
-  return COACHES[teamCode] || null;
+export function coachFor(teamCode: string, liveCoaches?: Record<string, Coach>): Coach | null {
+  return COACHES[teamCode] || liveCoaches?.[teamCode] || null;
 }
 
 export function teamsByGroup(): Record<string, Team[]> {

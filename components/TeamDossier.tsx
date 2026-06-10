@@ -7,10 +7,11 @@
  * ===================================================================*/
 import { useMemo, useState } from "react";
 import { STAGES } from "@/lib/data";
-import { squadFor, hasVerifiedSquad, coachFor } from "@/lib/players";
+import { squadFor, hasVerifiedSquad, squadStatus, coachFor } from "@/lib/players";
 import { buildMatchLineups, defaultLineup, pickFormation } from "@/lib/lineups";
 import { teamMatches, teamStatus, type TeamStatusKind } from "@/lib/team-dossier";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
+import { useStore } from "@/lib/store";
 import type { MatchResult, ResolvedBracket } from "@/lib/standings";
 import type { Team } from "@/lib/types";
 import Pitch from "./Pitch";
@@ -34,9 +35,13 @@ export default function TeamDossier({
   resolved: ResolvedBracket;
   headerAction?: React.ReactNode;
 }) {
-  const squad     = useMemo(() => squadFor(team.code), [team.code]);
-  const verified  = hasVerifiedSquad(team.code);
-  const coach     = coachFor(team.code);
+  const liveSquads  = useStore(s => s.liveSquads);
+  const liveCoaches = useStore(s => s.liveCoaches);
+  const squad     = useMemo(() => squadFor(team.code, liveSquads), [team.code, liveSquads]);
+  const verified  = hasVerifiedSquad(team.code, liveSquads);
+  const status    = squadStatus(team.code, liveSquads);
+  const isLive    = status === "live";
+  const coach     = coachFor(team.code, liveCoaches);
   const formation = useMemo(() => pickFormation(team.code), [team.code]);
 
   const allMatches = useMemo(
@@ -133,20 +138,23 @@ export default function TeamDossier({
                 stageLabel={STAGES[m.stage].name + (m.group ? ` · בית ${m.group}` : "")}
                 utc={m.utc}
                 isHome={m.isHome}
+                liveSquads={liveSquads}
               />
             ))}
           </div>
         )}
         {verified && (
           <p className="muted dossier-note">
-            ⚠️ ההרכב מבוסס על סגל ראשוני ופורמציה משוערת ({formation}); ההרכב הסופי יתעדכן סמוך למשחק.
+            {isLive
+              ? `🔴 ההרכב מבוסס על הסגל הרשמי (ללא מספרי חולצה) ופורמציה משוערת (${formation}); ההרכב הסופי יתעדכן סמוך למשחק.`
+              : `⚠️ ההרכב מבוסס על סגל ראשוני ופורמציה משוערת (${formation}); ההרכב הסופי יתעדכן סמוך למשחק.`}
           </p>
         )}
       </section>
 
       {/* ---------- Squad by position ---------- */}
       <section className="dossier-block">
-        <h4 className="dossier-block-title">👥 כל השחקנים לפי מיקומים</h4>
+        <h4 className="dossier-block-title">👥 כל השחקנים לפי מיקומים{isLive && " · רשמי 🔴"}</h4>
         {!verified ? (
           <div className="muted dossier-empty">
             עדיין לא הוזן במערכת סגל מפורט עבור נבחרת זו. הנתונים יתעדכנו בקרוב.
@@ -165,12 +173,14 @@ export default function TeamDossier({
                 <div className="dossier-pos-grid">
                   {byPos[pos].map(p => (
                     <div key={p.id} className="dossier-player">
-                      <span className="dossier-player-jersey">#{p.jersey}</span>
+                      {p.jersey != null && <span className="dossier-player-jersey">#{p.jersey}</span>}
                       <span className="dossier-player-name">
                         {p.name}
                         {p.captain && <span title="קפטן" className="dossier-cap"> (C)</span>}
                       </span>
-                      <span className="muted dossier-player-club">🏟️ {p.club} · גיל {p.age}</span>
+                      <span className="muted dossier-player-club">
+                        {p.club ? `🏟️ ${p.club} · ` : ""}גיל {p.age}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -186,7 +196,7 @@ export default function TeamDossier({
 /* Per-match expandable expected lineup. Renders both teams on the pitch
  * (home/away orientation preserved). */
 function UpcomingLineup({
-  teamCode, opponentCode, opponentName, opponentFlag, stageLabel, utc, isHome,
+  teamCode, opponentCode, opponentName, opponentFlag, stageLabel, utc, isHome, liveSquads,
 }: {
   teamCode: string;
   opponentCode: string | null;
@@ -195,17 +205,18 @@ function UpcomingLineup({
   stageLabel: string;
   utc: string;
   isHome: boolean;
+  liveSquads: Record<string, import("@/lib/players").Player[]>;
 }) {
   const [open, setOpen] = useState(false);
   const lineups = useMemo(() => {
     if (!opponentCode) {
-      const self = defaultLineup(teamCode, pickFormation(teamCode));
+      const self = defaultLineup(teamCode, pickFormation(teamCode), liveSquads);
       return { home: self, away: self, soloOnly: true };
     }
     const homeCode = isHome ? teamCode : opponentCode;
     const awayCode = isHome ? opponentCode : teamCode;
-    return { ...buildMatchLineups(homeCode, awayCode), soloOnly: false };
-  }, [teamCode, opponentCode, isHome]);
+    return { ...buildMatchLineups(homeCode, awayCode, liveSquads), soloOnly: false };
+  }, [teamCode, opponentCode, isHome, liveSquads]);
 
   return (
     <div className="dossier-upcoming-item">

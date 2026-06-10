@@ -102,14 +102,14 @@ export default function Pitch({
         {/* Home players occupy bottom half (y: 50-100 in our 0-100 coords) */}
         {home.slots.map(slot => dot(
           slot.x, 50 + slot.y * 0.5, "#2e6bff",
-          String(slot.player.jersey),
+          slot.player.jersey != null ? String(slot.player.jersey) : (slot.role || slot.pos),
           slot.player.name.split(" ").slice(-1)[0],
         ))}
 
         {/* Away players occupy top half (mirror: y: 0-50) */}
         {away.slots.map(slot => dot(
           100 - slot.x, 50 - slot.y * 0.5, "#dc2626",
-          String(slot.player.jersey),
+          slot.player.jersey != null ? String(slot.player.jersey) : (slot.role || slot.pos),
           slot.player.name.split(" ").slice(-1)[0],
           { isAway: true }
         ))}

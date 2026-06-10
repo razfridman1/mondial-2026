@@ -24,10 +24,16 @@ export async function GET(req: Request) {
 
   /* Apply any admin override (e.g. time changes don't affect lineups but be consistent) */
   let m = base;
+  let liveSquads: Record<string, any> | undefined;
   try {
     const { db } = getAdmin();
     const ov = await db.collection("broadcast_overrides").doc(matchId).get();
     if (ov.exists) m = applyOverride(base, ov.data() as any);
+
+    /* Cached official squads (football-data.org) — fills in default
+     * lineups for the 35 teams without curated Hebrew data. */
+    const sq = await db.collection("live_data").doc("squads").get();
+    if (sq.exists) liveSquads = (sq.data() as any)?.squads || undefined;
   } catch {}
 
   if (m.homeIsPlaceholder || m.awayIsPlaceholder) {
@@ -38,6 +44,6 @@ export async function GET(req: Request) {
   const live = await fetchLiveLineups(matchId, m.utc, m.home, m.away);
   if (live) return NextResponse.json({ source: "live", lineups: live });
 
-  const fallback = buildMatchLineups(m.home, m.away);
+  const fallback = buildMatchLineups(m.home, m.away, liveSquads);
   return NextResponse.json({ source: "default", lineups: fallback });
 }

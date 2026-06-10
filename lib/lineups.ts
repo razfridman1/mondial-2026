@@ -98,8 +98,8 @@ export interface TeamLineup {
 /* Default lineup builder — picks best-jersey players for each position.
  * Returns an empty `slots` array when no verified squad is available
  * (rather than fabricating players). Callers should handle empty lineups. */
-export function defaultLineup(teamCode: string, formation: Formation = "4-3-3"): TeamLineup {
-  const squad = squadFor(teamCode);
+export function defaultLineup(teamCode: string, formation: Formation = "4-3-3", liveSquads?: Record<string, Player[]>): TeamLineup {
+  const squad = squadFor(teamCode, liveSquads);
   const layout = FORMATIONS[formation];
   const slots: LineupSlot[] = [];
 
@@ -108,7 +108,8 @@ export function defaultLineup(teamCode: string, formation: Formation = "4-3-3"):
   const used = new Set<string>();
   const byPos: Record<Position, Player[]> = { GK: [], DEF: [], MID: [], FWD: [] };
   squad.forEach(p => byPos[p.position].push(p));
-  Object.values(byPos).forEach(arr => arr.sort((a, b) => a.jersey - b.jersey));
+  /* Live squads don't include jersey numbers — fall back to original order. */
+  Object.values(byPos).forEach(arr => arr.sort((a, b) => (a.jersey ?? 999) - (b.jersey ?? 999)));
 
   for (const slot of layout) {
     const pool = byPos[slot.pos];
@@ -133,9 +134,9 @@ export function pickFormation(teamCode: string): Formation {
   return FORMATION_BY_TEAM[teamCode] || "4-3-3";
 }
 
-export function buildMatchLineups(homeTeam: string, awayTeam: string): { home: TeamLineup; away: TeamLineup } {
+export function buildMatchLineups(homeTeam: string, awayTeam: string, liveSquads?: Record<string, Player[]>): { home: TeamLineup; away: TeamLineup } {
   return {
-    home: defaultLineup(homeTeam, pickFormation(homeTeam)),
-    away: defaultLineup(awayTeam, pickFormation(awayTeam)),
+    home: defaultLineup(homeTeam, pickFormation(homeTeam), liveSquads),
+    away: defaultLineup(awayTeam, pickFormation(awayTeam), liveSquads),
   };
 }

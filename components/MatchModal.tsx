@@ -14,6 +14,7 @@ import Pitch from "./Pitch";
 export default function MatchModal({ matchId, onClose }: { matchId: string; onClose: () => void }) {
   const overrides = useStore(s => s.overrides);
   const simConfig = useStore(s => s.simConfig);
+  const liveSquads = useStore(s => s.liveSquads);
   const [lineups, setLineups] = useState<{ home: TeamLineup; away: TeamLineup } | null>(null);
   const [lineupSource, setLineupSource] = useState<"default" | "live" | "placeholder">("default");
 
@@ -29,13 +30,13 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
       } catch {
         const base = MATCHES.find(x => x.id === matchId);
         if (base && !base.homeIsPlaceholder && !base.awayIsPlaceholder) {
-          setLineups(buildMatchLineups(base.home, base.away));
+          setLineups(buildMatchLineups(base.home, base.away, liveSquads));
           setLineupSource("default");
         }
       }
     })();
     return () => { cancelled = true; };
-  }, [matchId]);
+  }, [matchId, liveSquads]);
 
   const base = MATCHES.find(m => m.id === matchId);
   if (!base) return null;
