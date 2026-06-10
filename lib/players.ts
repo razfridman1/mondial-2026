@@ -161,13 +161,28 @@ const CAN: Omit<Player, "teamCode" | "id">[] = [
   { name: "טייסון דייוויס",          nameEn: "Tajon Buchanan",        position: "FWD", jersey: 11, club: "אינטר",         age: 26, description: "כנף ימני מהיר." },
 ];
 
+const RSA: Omit<Player, "teamCode" | "id">[] = [
+  { name: "רונוון וויליאמס",     nameEn: "Ronwen Williams",     position: "GK",  jersey: 1,  club: "מאמלודי סנדאונס", age: 34, captain: true, description: "קפטן הנבחרת ושוער-על, גיבור חטיפת הפנדלים באפקון 2023." },
+  { name: "חוליסו מודאו",        nameEn: "Khuliso Mudau",       position: "DEF", jersey: 20, club: "מאמלודי סנדאונס", age: 29, description: "מגן ימני יציב, אלוף אפריקה עם סנדאונס." },
+  { name: "אובריי מודיבה",       nameEn: "Aubrey Modiba",       position: "DEF", jersey: 6,  club: "מאמלודי סנדאונס", age: 31, description: "מגן שמאלי מנוסה ועולה היטב." },
+  { name: "חולומאני נדמאנה",     nameEn: "Khulumani Ndamane",   position: "DEF", jersey: 3,  club: "מאמלודי סנדאונס", age: 27, description: "מגן מרכזי חזק באוויר." },
+  { name: "מבקזלי מבוקאזי",      nameEn: "Mbekezeli Mbokazi",   position: "DEF", jersey: 14, club: "שיקגו פייר",      age: 19, description: "מגן צעיר ומבטיח, עבר ל-MLS." },
+  { name: "טבוהו מוקואנה",       nameEn: "Teboho Mokoena",      position: "MID", jersey: 4,  club: "מאמלודי סנדאונס", age: 29, description: "המנוע של קו האמצע, אנרגטי ומבקיע." },
+  { name: "תלנטה מבאטה",         nameEn: "Thalente Mbatha",     position: "MID", jersey: 5,  club: "אורלנדו פיירטס",  age: 26, description: "קשר יצירתי עם מסירות מדויקות." },
+  { name: "ג׳יידן אדמס",         nameEn: "Jayden Adams",        position: "MID", jersey: 23, club: "מאמלודי סנדאונס", age: 24, description: "קשר צעיר, טכני ונע היטב בין הקווים." },
+  { name: "לייל פוסטר",          nameEn: "Lyle Foster",         position: "FWD", jersey: 9,  club: "ברנלי",           age: 26, description: "החלוץ היחיד מליגה מובילה באירופה, חזק במשחק גב לשער." },
+  { name: "רלבוהילה מופוקנג",    nameEn: "Relebohile Mofokeng", position: "FWD", jersey: 10, club: "אורלנדו פיירטס",  age: 21, description: "כשרון צעיר ומסוכן, עיטור מספר 10." },
+  { name: "אוסווין אפוליס",      nameEn: "Oswin Appollis",      position: "FWD", jersey: 7,  club: "אורלנדו פיירטס",  age: 24, description: "כנף מהיר ועקבי, מאיים על הביצועים." },
+  { name: "תמבה זוואנה",         nameEn: "Themba Zwane",        position: "FWD", jersey: 11, club: "מאמלודי סנדאונס", age: 37, description: "ותיק הסגל, יצירתי וטכני." },
+];
+
 /* NOTE: NO template/fake players. Teams without a curated squad get an empty list,
  * and the UI shows "הסגל הסופי טרם פורסם".
  * All squads are PRELIMINARY — FIFA's official 26-man rosters are announced ~יוני 2026. */
 
 /* ---------- Build squads (only curated/verified teams have entries) ---------- */
 const CURATED: Record<string, Omit<Player, "teamCode" | "id">[]> = {
-  ARG, BRA, FRA, ENG, ESP, GER, POR, NED, ITA, MEX, USA, CAN,
+  ARG, BRA, FRA, ENG, ESP, GER, POR, NED, ITA, MEX, USA, CAN, RSA,
 };
 
 export const VERIFIED_TEAMS = new Set(Object.keys(CURATED));
@@ -233,6 +248,7 @@ const COACHES: Record<string, Coach> = {
   MEX: { name: "חאבייר אגירה",        nameEn: "Javier Aguirre",      nationality: "מקסיקו",   flag: "🇲🇽" },
   USA: { name: "מאוריסיו פוצ׳טינו",   nameEn: "Mauricio Pochettino", nationality: "ארגנטינה", flag: "🇦🇷" },
   CAN: { name: "ג׳סי מארש",           nameEn: "Jesse Marsch",        nationality: "ארה״ב",    flag: "🇺🇸" },
+  RSA: { name: "הוגו ברוס",           nameEn: "Hugo Broos",          nationality: "בלגיה",    flag: "🇧🇪" },
 };
 
 export function coachFor(teamCode: string): Coach | null {

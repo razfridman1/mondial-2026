@@ -149,7 +149,7 @@ export default function TeamDossier({
         <h4 className="dossier-block-title">👥 כל השחקנים לפי מיקומים</h4>
         {!verified ? (
           <div className="muted dossier-empty">
-            הסגל הסופי טרם פורסם רשמית. FIFA מפרסמת רשימת 26 שחקנים לכל נבחרת כשבועיים לפני המונדיאל.
+            עדיין לא הוזן במערכת סגל מפורט עבור נבחרת זו. הנתונים יתעדכנו בקרוב.
           </div>
         ) : (
           <div className="dossier-squad">

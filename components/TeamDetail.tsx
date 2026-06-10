@@ -47,10 +47,10 @@ export default function TeamDetail({ team, onBack, backLabel = "← חזרה" }:
 
       {!verified && (
         <div className="empty-state" style={{ marginTop: 16 }}>
-          <strong>⚠️ הסגל הסופי טרם פורסם</strong><br />
+          <strong>👥 סגל מורחב יתעדכן בקרוב</strong><br />
           <span className="muted">
-            FIFA מפרסמת רשימה רשמית של 26 שחקנים לכל נבחרת כשבועיים לפני פתיחת המונדיאל (~יוני 2026).
-            כדי לא להציג מידע שגוי, סגל זה יוצג רק לאחר הפרסום הרשמי.<br />
+            עדיין לא הוזן במערכת סגל מפורט עבור נבחרת זו.
+            כדי לא להציג מידע שגוי, ההרכב יוצג רק לאחר עדכון הנתונים.<br />
             לחלופין, ניתן לחבר את האפליקציה ל-API-Football כדי לקבל סגלים אמיתיים בזמן אמת.
           </span>
         </div>

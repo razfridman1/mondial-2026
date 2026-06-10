@@ -6,6 +6,7 @@ import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { shareToWhatsApp } from "@/lib/share";
 import { AvatarDisplay } from "./AvatarPicker";
 import AvatarPicker from "./AvatarPicker";
+import FifaNewsTicker from "./FifaNewsTicker";
 
 type Tab = "schedule" | "weekpredictions" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 
@@ -117,6 +118,7 @@ export default function Header() {
         </div>
       </div>
       {pickingAvatar && <AvatarPicker onClose={() => setPickingAvatar(false)} />}
+      <FifaNewsTicker />
       <nav className="tabs">
         {NAV.filter(t => !t.adminOnly || user?.isAdmin).map(t => (
           <button

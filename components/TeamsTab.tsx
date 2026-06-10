@@ -28,7 +28,7 @@ export default function TeamsTab() {
                         <span className={`muted team-row-count ${verified ? "" : "team-pending"}`}>
                           {verified
                             ? `${squadFor(t.code).length} שחקנים · ראשוני`
-                            : "סגל טרם פורסם"}
+                            : "סגל מורחב בקרוב"}
                         </span>
                         <span className="muted">→</span>
                       </button>

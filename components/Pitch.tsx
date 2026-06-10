@@ -23,11 +23,10 @@ export default function Pitch({
     if (!away.slots.length) missing.push(awayTeam?.name || away.teamCode);
     return (
       <div className="pitch-wrap pitch-empty">
-        <div className="pitch-empty-title">⚠️ ההרכבים יוצגו לאחר פרסום הסגלים</div>
+        <div className="pitch-empty-title">⚽ ההרכב הצפוי יתעדכן בקרוב</div>
         <div className="pitch-empty-body">
-          הסגל הסופי של {missing.join(" ו-")} טרם פורסם רשמית.
-          FIFA מפרסמת רשימת 26 שחקנים לכל נבחרת כשבועיים לפני פתיחת המונדיאל.
-          לאחר הפרסום ההרכב יופיע אוטומטית כאן.
+          טרם הוזן במערכת הרכב משוער עבור {missing.join(" ו-")}.
+          ברגע שהנתונים יעודכנו, ההרכב יופיע כאן אוטומטית.
         </div>
       </div>
     );
