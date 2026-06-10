@@ -1585,11 +1585,12 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 /* ====================================================================
-   MOBILE-ONLY HIDDEN TABS / CHAT FAB / GENERIC HIDE + LAYOUT
+   MOBILE-ONLY HIDDEN TABS / GENERIC HIDE + LAYOUT
+   (Chat FAB used to be hidden on mobile here — now shown on all sizes,
+   see .chat-fab / .chat-panel rules above for responsive sizing.)
    ==================================================================== */
 @media (max-width: 720px) {
   .tab-hide-mobile { display: none !important; }
-  .chat-fab { display: none !important; }
   .hide-on-mobile { display: none !important; }
 
   /* Nav tabs: 2-column grid with big tap targets on mobile */
