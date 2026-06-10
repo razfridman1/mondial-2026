@@ -4,7 +4,7 @@ import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
 import { TEAMS, STAGES } from "@/lib/data";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
-import { shareToWhatsApp, leaderboardShareText } from "@/lib/share";
+import { shareToWhatsApp, leaderboardShareText, weeklyReminderShareText } from "@/lib/share";
 import { getUserDoc } from "@/lib/firebase";
 import { AVATARS } from "@/lib/avatars";
 import { AvatarDisplay } from "./AvatarPicker";
@@ -580,6 +580,13 @@ function GroupLeaderboardCard({
                 💬 שתף טבלה
               </button>
             )}
+            <button
+              className="btn btn-small wa-btn"
+              onClick={() => shareToWhatsApp(weeklyReminderShareText(groupId ? groupName : null))}
+              title="שלח לקבוצה תזכורת בווטסאפ למלא ניחושים לשבוע"
+            >
+              ⏰ תזכורת ניחושים
+            </button>
             {onLeave && (
               <button
                 className="btn btn-small"

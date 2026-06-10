@@ -76,6 +76,19 @@ export function leaderboardShareText(args: {
   return lines.join("\n");
 }
 
+export function weeklyReminderShareText(groupName?: string | null): string {
+  const cleanGroupName = groupName ? groupName.replace(/^[🌍🏆📊]+\s*/, "") : null;
+  return [
+    `⏰ *תזכורת ניחושים שבועית* ⏰`,
+    cleanGroupName ? `קבוצת "${cleanGroupName}" במונדיאל 2026 ⚽` : `מונדיאל 2026 ⚽`,
+    ``,
+    `מי עוד לא ניחש את משחקי השבוע? 👀`,
+    `אל תפספסו נקודות — תכנסו ותמלאו ניחושים לפני שריקת הפתיחה! 🔮`,
+    ``,
+    `🔗 ${appUrl()}`,
+  ].join("\n");
+}
+
 export function whatsappUrl(text: string): string {
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
