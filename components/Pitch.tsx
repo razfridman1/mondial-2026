@@ -44,11 +44,11 @@ export default function Pitch({
           {label}
         </text>
         {sub && (
-          <text x={px} y={py + (compact ? 28 : 36)} textAnchor="middle"
-                fill="#fff" fontWeight="700" fontSize={compact ? 10 : 12}
+          <text x={px} y={py + (compact ? 30 : 40)} textAnchor="middle"
+                fill="#fff" fontWeight="800" fontSize={compact ? 14 : 18}
                 fontFamily="Heebo, sans-serif"
                 style={{ paintOrder: "stroke" }}
-                stroke="#0a4d2a" strokeWidth={3}>
+                stroke="#0a4d2a" strokeWidth={4}>
             {sub}
           </text>
         )}
