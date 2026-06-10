@@ -39,8 +39,8 @@ export default function TeamDossier({
   const liveCoaches = useStore(s => s.liveCoaches);
   const squad     = useMemo(() => squadFor(team.code, liveSquads), [team.code, liveSquads]);
   const verified  = hasVerifiedSquad(team.code, liveSquads);
-  const status    = squadStatus(team.code, liveSquads);
-  const isLive    = status === "live";
+  const sqStatus  = squadStatus(team.code, liveSquads);
+  const isLive    = sqStatus === "live";
   const coach     = coachFor(team.code, liveCoaches);
   const formation = useMemo(() => pickFormation(team.code), [team.code]);
 
