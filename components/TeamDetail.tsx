@@ -96,7 +96,7 @@ export default function TeamDetail({ team, onBack, backLabel = "← חזרה" }:
                 {byPos[pos].map(p => (
                   <div key={p.id} className="player-card">
                     {p.jersey != null && <div className="player-jersey">#{p.jersey}</div>}
-                    <div>
+                    <div className="player-info">
                       <div className="player-name">
                         {p.name} {p.captain && <span title="קפטן" style={{ color: "var(--accent)" }}>(C)</span>}
                       </div>
