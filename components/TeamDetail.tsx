@@ -101,7 +101,7 @@ export default function TeamDetail({ team, onBack, backLabel = "← חזרה" }:
                         {p.name} {p.captain && <span title="קפטן" style={{ color: "var(--accent)" }}>(C)</span>}
                       </div>
                       <div className="muted player-meta">
-                        {p.position} · גיל {p.age}{p.club ? ` · 🏟️ ${p.club}` : ""}
+                        {p.position}{p.age > 0 ? ` · גיל ${p.age}` : ""}{p.club ? ` · 🏟️ ${p.club}` : ""}
                       </div>
                       {p.description && <div className="player-desc">{p.description}</div>}
                     </div>

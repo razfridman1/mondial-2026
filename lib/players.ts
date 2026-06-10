@@ -202,14 +202,35 @@ export const SQUADS: Record<string, Player[]> = (() => {
   return out;
 })();
 
+/* Normalize a player name for de-duplication when merging curated Hebrew
+ * star data with the live football-data.org roster: strip diacritics,
+ * lowercase, drop common suffixes (Jr., Júnior…), and collapse whitespace. */
+function normalizeName(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\b(jr\.?|junior|i{2,3})\b/g, "")
+    .replace(/[^a-z\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /* ---------- Public API ----------
- * `liveSquads` (when provided) holds official 26-man rosters pulled live
- * from football-data.org for teams without hand-curated Hebrew data.
- * Curated data always wins — it's richer (Hebrew names, jerseys, clubs). */
+ * `liveSquads` (when provided) holds official ~26-man rosters pulled live
+ * from football-data.org for ALL 48 teams. For teams without hand-curated
+ * Hebrew data, this IS the squad. For curated teams, the curated stars
+ * (richer: Hebrew names, jerseys, clubs, bios) are shown first, and any
+ * live-roster players not already covered are appended — so the full
+ * squad is visible even though only a handful of stars have curated bios. */
 export function squadFor(teamCode: string, liveSquads?: Record<string, Player[]>): Player[] {
-  const curated = SQUADS[teamCode];
-  if (curated && curated.length) return curated;
-  return liveSquads?.[teamCode] || [];
+  const curated = SQUADS[teamCode] || [];
+  const live = liveSquads?.[teamCode] || [];
+  if (!curated.length) return live;
+  if (!live.length) return curated;
+  const curatedNames = new Set(curated.map(p => normalizeName(p.nameEn)));
+  const extra = live.filter(p => !curatedNames.has(normalizeName(p.nameEn)));
+  return [...curated, ...extra];
 }
 
 export function hasVerifiedSquad(teamCode: string, liveSquads?: Record<string, Player[]>): boolean {

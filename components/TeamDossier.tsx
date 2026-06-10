@@ -179,7 +179,7 @@ export default function TeamDossier({
                         {p.captain && <span title="קפטן" className="dossier-cap"> (C)</span>}
                       </span>
                       <span className="muted dossier-player-club">
-                        {p.club ? `🏟️ ${p.club} · ` : ""}גיל {p.age}
+                        {p.club ? `🏟️ ${p.club} · ` : ""}{p.age > 0 ? `גיל ${p.age}` : ""}
                       </span>
                     </div>
                   ))}
