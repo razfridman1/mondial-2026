@@ -14,8 +14,8 @@ export interface Player {
   name: string;
   nameEn: string;
   position: Position;
-  jersey?: number;       // not provided by live (football-data.org) squads
-  club?: string;         // their club in regular league — not provided live
+  jersey?: number;       // for live players, filled in gradually via /api/cron/sync-player-details
+  club?: string;         // their club in regular league — same enrichment for live players
   age: number;
   captain?: boolean;
   description?: string;  // short Hebrew bio

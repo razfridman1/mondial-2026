@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { bootstrap, useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
 import NameSetupModal from "./NameSetupModal";
@@ -33,7 +33,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const user = useStore(s => s.user);
   const refreshGroups = useStore(s => s.refreshGroups);
   const setCurrentGroup = useStore(s => s.setCurrentGroup);
-  const initialTabRef = useRef(false);
   const [askName, setAskName] = useState(false);
 
   // 1. Capture invite code from URL on mount (before anything else).
@@ -51,16 +50,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     const id = setInterval(() => { refresh?.(); }, 60_000);
     return () => clearInterval(id);
   }, []);
-
-  // 2.5. On every fresh app load: once the user is identified (logged in),
-  // land on the Friends Ranking tab as the default landing screen.
-  // Fires only once per mount; subsequent in-app tab clicks are respected.
-  useEffect(() => {
-    if (initialTabRef.current) return;
-    if (!user) return;
-    initialTabRef.current = true;
-    useStore.getState().setPref("tab", "ranking");
-  }, [user]);
 
   // 3. After login, if there's a pending invite code, auto-join the group.
   useEffect(() => {

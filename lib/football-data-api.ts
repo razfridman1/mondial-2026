@@ -45,6 +45,43 @@ function flagForNationality(nationality: string | undefined | null): string {
 export type LiveSquads = Record<string, Player[]>;
 export type LiveCoaches = Record<string, Coach>;
 
+/* ---------------------------------------------------------------------
+ * Per-player enrichment — jersey number & current club.
+ *
+ * The bulk `/competitions/WC/teams` endpoint above does NOT include
+ * `shirtNumber` or `currentTeam` for squad members. football-data.org's
+ * `/persons/{id}` endpoint DOES provide both, but it's one call per
+ * player — with the free tier's 10 req/min limit, all ~1,200 WC players
+ * must be enriched gradually via a dedicated cron
+ * (see /api/cron/sync-player-details), cached in Firestore, and merged
+ * into the live squads by /api/squads.
+ * ------------------------------------------------------------------- */
+export interface PersonDetails {
+  shirtNumber?: number;
+  club?: string;
+}
+
+/** Fetch a single player's shirt number + current club from
+ * football-data.org's /persons/{id} endpoint. Returns null on any
+ * failure (missing key, network error, bad response, not found). */
+export async function fetchPersonDetails(personId: string | number, apiKey: string, baseUrl?: string): Promise<PersonDetails | null> {
+  if (!apiKey) return null;
+  const url = baseUrl || process.env.FOOTBALL_API_URL || "https://api.football-data.org/v4";
+  try {
+    const r = await fetch(`${url}/persons/${personId}`, {
+      headers: { "X-Auth-Token": apiKey },
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const out: PersonDetails = {};
+    if (typeof data.shirtNumber === "number") out.shirtNumber = data.shirtNumber;
+    if (data.currentTeam?.name) out.club = data.currentTeam.name;
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 /** Fetch & map the live WC2026 squads/coaches for all 48 teams in ONE
  * football-data.org request. Returns null on any failure (missing key,
  * network error, bad response) so callers can fall back gracefully. */

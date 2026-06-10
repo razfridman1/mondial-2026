@@ -108,7 +108,8 @@ export function defaultLineup(teamCode: string, formation: Formation = "4-3-3", 
   const used = new Set<string>();
   const byPos: Record<Position, Player[]> = { GK: [], DEF: [], MID: [], FWD: [] };
   squad.forEach(p => byPos[p.position].push(p));
-  /* Live squads don't include jersey numbers — fall back to original order. */
+  /* Live squads may not have jersey numbers yet (gradually enriched via
+   * /api/cron/sync-player-details) — fall back to original order. */
   Object.values(byPos).forEach(arr => arr.sort((a, b) => (a.jersey ?? 999) - (b.jersey ?? 999)));
 
   for (const slot of layout) {

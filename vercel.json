@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/sync-squads",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/sync-player-details",
+      "schedule": "* * * * *"
     }
   ],
   "headers": [
