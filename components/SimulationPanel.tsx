@@ -137,6 +137,42 @@ export default function SimulationPanel() {
     }
   }
 
+  /* Restore deleted predictions for a single user from the backup collection.
+   * Scoped to the currently selected stage filter, or all stages if "ALL".
+   * `onlyIfMissing: true` means we won't overwrite predictions that already
+   * exist live — restore is purely additive. */
+  async function restoreUserPredictions(uid: string, displayName: string) {
+    const stageLabel = memberStageFilter === "ALL" ? "כל השלבים" : STAGE_NAMES[memberStageFilter];
+    if (!confirm(
+      `לשחזר ניחושים שנמחקו של "${displayName}" (${stageLabel})?\n\n` +
+      `נשחזרו רק ניחושים שנמחקו (לא נדרסים ניחושים קיימים).`
+    )) return;
+    setBusy(true);
+    try {
+      const body: any = { uid, onlyIfMissing: true };
+      if (memberStageFilter !== "ALL") body.stage = memberStageFilter;
+      const r = await fetch("/api/admin/restore-predictions", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify(body),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        alert(`שגיאה: ${data.error || r.status}`);
+        return;
+      }
+      alert(
+        `✓ שוחזרו ${data.restored || 0} ניחושים עבור ${displayName}.\n` +
+        `דולגו (קיימים כבר): ${data.skippedExisting || 0}.`
+      );
+    } catch (e: any) {
+      alert(`שגיאה: ${e?.message || e}`);
+    } finally {
+      setBusy(false);
+      await reloadStatus();
+    }
+  }
+
   /* ---- guards ---- */
   if (!user) return (
     <div className="admin-locked">
@@ -318,6 +354,7 @@ export default function SimulationPanel() {
                       </>
                     )}
                     <th style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>עדכון אחרון</th>
+                    <th style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>פעולות</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -411,6 +448,21 @@ export default function SimulationPanel() {
 
                         <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
                           <span className="muted" style={{ fontSize: 12 }}>{last}</span>
+                        </td>
+                        <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                          <button
+                            className="btn btn-small"
+                            style={{
+                              background: "rgba(80,180,255,0.12)",
+                              borderColor: "var(--accent)",
+                              color: "var(--accent)",
+                            }}
+                            disabled={busy}
+                            onClick={() => restoreUserPredictions(m.uid, m.displayName)}
+                            title="שחזר ניחושים שנמחקו של המשתמש מהגיבוי"
+                          >
+                            🔄 שחזור
+                          </button>
                         </td>
                       </tr>
                     );
