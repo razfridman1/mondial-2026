@@ -82,6 +82,117 @@ export async function fetchPersonDetails(personId: string | number, apiKey: stri
   }
 }
 
+/* ---------------------------------------------------------------------
+ * Full player profile (used by the on-demand player card in the
+ * "הנבחרות שלי" tab — /api/players/[id]).
+ * ------------------------------------------------------------------- */
+export interface PersonProfile {
+  id: number;
+  name: string;
+  dateOfBirth?: string;
+  nationality?: string;
+  position?: string;
+  shirtNumber?: number;
+  currentTeam?: {
+    name: string;
+    crest?: string;
+    venue?: string;
+    competitions?: string[];
+  };
+}
+
+export interface PersonRecentMatch {
+  date: string;
+  competition: string;
+  home: string;
+  away: string;
+  score: string;
+  scored: boolean;
+  assisted: boolean;
+}
+
+export interface PersonSeasonStats {
+  matches: number;
+  goals: number;
+  assists: number;
+  minutes: number;
+  yellowCards: number;
+  redCards: number;
+  recent: PersonRecentMatch[];
+}
+
+/** Fetch a player's full bio/profile from /persons/{id}. Returns null on
+ * any failure (missing key, network error, bad response, not found). */
+export async function fetchPersonProfile(personId: string | number, apiKey: string, baseUrl?: string): Promise<PersonProfile | null> {
+  if (!apiKey) return null;
+  const url = baseUrl || process.env.FOOTBALL_API_URL || "https://api.football-data.org/v4";
+  try {
+    const r = await fetch(`${url}/persons/${personId}`, {
+      headers: { "X-Auth-Token": apiKey },
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const out: PersonProfile = { id: data.id, name: data.name };
+    if (data.dateOfBirth) out.dateOfBirth = data.dateOfBirth;
+    if (data.nationality) out.nationality = data.nationality;
+    if (data.position) out.position = data.position;
+    if (typeof data.shirtNumber === "number") out.shirtNumber = data.shirtNumber;
+    if (data.currentTeam) {
+      out.currentTeam = {
+        name: data.currentTeam.name,
+        crest: data.currentTeam.crest,
+        venue: data.currentTeam.venue,
+        competitions: (data.currentTeam.runningCompetitions || []).map((c: any) => c.name).filter(Boolean),
+      };
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch a player's current-season match log + aggregated stats (goals,
+ * assists, minutes, cards) from /persons/{id}/matches. Returns null on
+ * any failure. */
+export async function fetchPersonSeasonStats(personId: string | number, apiKey: string, baseUrl?: string): Promise<PersonSeasonStats | null> {
+  if (!apiKey) return null;
+  const url = baseUrl || process.env.FOOTBALL_API_URL || "https://api.football-data.org/v4";
+  try {
+    const r = await fetch(`${url}/persons/${personId}/matches?limit=10`, {
+      headers: { "X-Auth-Token": apiKey },
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const agg = data.aggregations || {};
+    const matches: any[] = data.matches || [];
+    const recent: PersonRecentMatch[] = matches.slice(0, 8).map((m: any) => {
+      const scorerIds = (m.goals || []).map((g: any) => g?.scorer?.id);
+      const assistIds = (m.goals || []).map((g: any) => g?.assist?.id);
+      const pid = Number(personId);
+      return {
+        date: m.utcDate,
+        competition: m.competition?.name || "",
+        home: m.homeTeam?.shortName || m.homeTeam?.name || "",
+        away: m.awayTeam?.shortName || m.awayTeam?.name || "",
+        score: `${m.score?.fullTime?.home ?? "-"}:${m.score?.fullTime?.away ?? "-"}`,
+        scored: scorerIds.includes(pid),
+        assisted: assistIds.includes(pid),
+      };
+    });
+    return {
+      matches: agg.matchesOnPitch ?? 0,
+      goals: agg.goals ?? 0,
+      assists: agg.assists ?? 0,
+      minutes: agg.minutesPlayed ?? 0,
+      yellowCards: agg.yellowCards ?? 0,
+      redCards: (agg.redCards ?? 0) + (agg.yellowRedCards ?? 0),
+      recent,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Fetch & map the live WC2026 squads/coaches for all 48 teams in ONE
  * football-data.org request. Returns null on any failure (missing key,
  * network error, bad response) so callers can fall back gracefully. */

@@ -4532,6 +4532,33 @@ html[data-theme="light"] .chat-panel {
   .team-detail-modal { padding: 14px; max-height: 95vh; }
 }
 
+/* ---- Player card modal (TeamDossier squad list) ---- */
+.player-card-modal { max-width: 520px; }
+.player-card-head { display: flex; align-items: center; gap: 12px; }
+.player-card-crest { width: 48px; height: 48px; object-fit: contain; flex-shrink: 0; }
+.player-card-name { margin: 0; font-size: 19px; display: flex; align-items: center; gap: 8px; }
+.player-card-jersey {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 8px; background: var(--bg-elev);
+  font-weight: 900; font-size: 13px; color: var(--accent);
+}
+.player-card-sub { margin-top: 4px; font-size: 12px; }
+.player-card-stats { display: flex; flex-wrap: wrap; gap: 10px; }
+.player-card-stat {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--bg-elev); border-radius: 8px; padding: 8px 14px; min-width: 64px;
+}
+.player-card-stat strong { font-size: 18px; }
+.player-card-stat span { font-size: 11px; }
+.player-card-matches { display: flex; flex-direction: column; gap: 6px; }
+.player-card-match {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--bg-elev); border-radius: 8px; padding: 6px 10px; font-size: 12px;
+}
+.player-card-match-date { min-width: 90px; }
+.player-card-match-teams { font-weight: 700; }
+.player-card-match-comp { margin-inline-start: auto; font-size: 11px; }
+
 /* ---- Per-stage reset row in SimulationPanel ---- */
 .sim-step-reset {
   margin-top: 4px;
@@ -4992,6 +5019,13 @@ html[data-theme="light"] .chat-panel {
 .dossier-player {
   display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px;
   padding: 8px 10px; background: var(--bg-elev); border-radius: 8px; font-size: 13px;
+}
+.dossier-player-btn {
+  width: 100%; text-align: start; border: 1px solid transparent; cursor: pointer;
+  font-family: inherit; color: inherit; transition: border-color .15s, background .15s;
+}
+.dossier-player-btn:hover, .dossier-player-btn:focus-visible {
+  border-color: var(--accent); background: var(--bg-card);
 }
 .dossier-player-jersey {
   grid-row: span 2; width: 30px; height: 30px; border-radius: 8px;

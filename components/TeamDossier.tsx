@@ -14,7 +14,9 @@ import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import type { MatchResult, ResolvedBracket } from "@/lib/standings";
 import type { Team } from "@/lib/types";
+import type { Player } from "@/lib/players";
 import Pitch from "./Pitch";
+import PlayerCard from "./PlayerCard";
 
 const STATUS_TONE: Record<TeamStatusKind, string> = {
   pending:    "dossier-status-pending",
@@ -43,6 +45,7 @@ export default function TeamDossier({
   const isLive    = sqStatus === "live";
   const coach     = coachFor(team.code, liveCoaches);
   const formation = useMemo(() => pickFormation(team.code), [team.code]);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   const allMatches = useMemo(
     () => teamMatches(team.code, results, resolved),
@@ -172,7 +175,12 @@ export default function TeamDossier({
                 </h5>
                 <div className="dossier-pos-grid">
                   {byPos[pos].map(p => (
-                    <div key={p.id} className="dossier-player">
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="dossier-player dossier-player-btn"
+                      onClick={() => setSelectedPlayer(p)}
+                    >
                       {p.jersey != null && <span className="dossier-player-jersey">#{p.jersey}</span>}
                       <span className="dossier-player-name">
                         {p.name}
@@ -181,7 +189,7 @@ export default function TeamDossier({
                       <span className="muted dossier-player-club">
                         {p.club ? `🏟️ ${p.club} · ` : ""}{p.age > 0 ? `גיל ${p.age}` : ""}
                       </span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -189,6 +197,10 @@ export default function TeamDossier({
           </div>
         )}
       </section>
+
+      {selectedPlayer && (
+        <PlayerCard player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />
+      )}
     </div>
   );
 }
