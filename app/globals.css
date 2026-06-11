@@ -4777,18 +4777,28 @@ html[data-theme="light"] .chat-panel {
 @media (max-width: 720px) {
   /* FriendsRanking: hide the global leaderboard option, force group pick */
   .fr-lb-global { display: none !important; }
-  /* MatchCard: shrink overall card to ~2/3 of current height by trimming
-   * the heavier internal blocks. Stage chip + teams + score + prediction
-   * status remain visible; venue/broadcast/odds hide. */
+  /* MatchCard: keep all sections visible on mobile (venue/broadcast/odds/
+   * group-table), but compact them so the card stays reasonably sized. */
   .match-card { padding: 10px !important; gap: 8px !important; }
-  .match-card .mc-venue,
-  .match-card .mc-broadcast,
-  .match-card .odds,
-  .match-card .mc-group-table { display: none !important; }
   .match-card .mc-actions { padding-top: 4px; }
   .match-card .mc-date-mobile { font-size: 13px !important; padding: 4px 8px !important; }
   .match-card .team-name { font-size: 14px !important; }
   .match-card .flag { font-size: 24px !important; }
+  /* Compact venue/broadcast/odds/group-table blocks on mobile */
+  .match-card .mc-venue { font-size: 11px !important; padding: 6px 8px !important; gap: 4px !important; }
+  .match-card .mc-broadcast { padding: 6px 8px !important; }
+  .match-card .mc-broadcast .bc-label { font-size: 11px !important; }
+  .match-card .mc-broadcast .channel-chip { font-size: 11px !important; padding: 2px 6px !important; }
+  .match-card .odds.hide-on-mobile { display: flex !important; padding: 6px 8px !important; }
+  .match-card .odds .odd-k { font-size: 11px !important; }
+  .match-card .odds .odd-v { font-size: 13px !important; }
+  .match-card .mc-group-table { padding: 6px 8px !important; }
+  .match-card .mc-group-table-title { font-size: 11px !important; margin-bottom: 4px !important; }
+  .match-card .mc-mini-table { font-size: 11px !important; }
+  .match-card .mc-mini-table th { font-size: 9px !important; padding: 2px !important; }
+  .match-card .mc-mini-table td { padding: 2px !important; }
+  .match-card .mmt-flag { font-size: 14px !important; }
+  .match-card .mmt-name { font-size: 11px !important; }
   /* Ensure card starts from its top edge cleanly — no negative top margin,
    * and scroll-margin so anchors land on the header, not mid-card. */
   .match-card { scroll-margin-top: 100px; }
