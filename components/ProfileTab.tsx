@@ -27,6 +27,7 @@ export default function ProfileTab() {
   const [nameDraft, setNameDraft] = useState("");
   const [myRow, setMyRow] = useState<LeaderRow | null>(null);
   const [busyGroup, setBusyGroup] = useState<string | null>(null);
+  const [loginStats, setLoginStats] = useState<{ total: number; today: number } | null>(null);
 
   /* "Leave" only allowed if user has >1 active group (so they always have at least one). */
   const canLeave = groups.length > 1;
@@ -75,6 +76,21 @@ export default function ProfileTab() {
       } catch {}
     })();
   }, [user?.uid, groups]);
+
+  /* Admin-only: number of user logins (today / all-time), excluding the
+   * admin's own logins. See /api/auth/log-login + /api/admin/login-stats. */
+  useEffect(() => {
+    if (!user?.isAdmin) { setLoginStats(null); return; }
+    (async () => {
+      try {
+        const fb = getFirebase();
+        const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
+        if (!tok) return;
+        const r = await fetch("/api/admin/login-stats", { headers: { authorization: `Bearer ${tok}` } });
+        if (r.ok) setLoginStats(await r.json());
+      } catch {}
+    })();
+  }, [user?.isAdmin]);
 
   if (!user) {
     return (
@@ -144,6 +160,21 @@ export default function ProfileTab() {
           {/* Scoring legend — how points are awarded */}
           <ScoringLegend />
         </div>
+
+        {/* Admin-only: live login stats (excludes the admin's own logins) */}
+        {user.isAdmin && loginStats && (
+          <div className="admin-login-stats">
+            <span className="chip chip-strong">📈 כניסות משתמשים</span>
+            <span className="admin-login-stat">
+              <strong>{loginStats.today}</strong>
+              <span className="muted"> היום</span>
+            </span>
+            <span className="admin-login-stat">
+              <strong>{loginStats.total}</strong>
+              <span className="muted"> סה״כ</span>
+            </span>
+          </div>
+        )}
 
         {/* Stats */}
         <h3 className="sec-title">📊 הסטטיסטיקה שלי</h3>

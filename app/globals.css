@@ -2238,6 +2238,16 @@ button { font-family: inherit; cursor: pointer; }
   .scoring-legend { flex: 1 1 100%; }
 }
 
+/* ---------- Admin-only login stats (ProfileTab) ---------- */
+.admin-login-stats {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
+  margin: 10px 0 4px; padding: 10px 14px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-elev);
+}
+.admin-login-stat { font-size: 14px; }
+.admin-login-stat strong { font-size: 17px; margin-inline-end: 4px; }
+
 /* Stats grid */
 .profile-stats {
   display: grid; gap: 10px;

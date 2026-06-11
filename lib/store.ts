@@ -404,6 +404,16 @@ export function bootstrap() {
       const r = await fetch("/api/me", { headers: { authorization: `Bearer ${token}` } });
       if (r.ok) { const j = await r.json(); isAdmin = !!j.isAdmin; }
     } catch {}
+    /* Log this app entry for the admin-only login-stats widget. Every
+     * entry counts (even repeat visits by the same user); the admin's
+     * own logins are excluded server-side, but skip the call entirely
+     * here once we already know the caller is the admin. */
+    if (!isAdmin) {
+      fetch("/api/auth/log-login", {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
     useStore.getState().setUser({
       uid: u.uid,
       email: u.email,
