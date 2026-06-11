@@ -1,7 +1,8 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { TEAMS, VENUES, CHANNELS, STAGES } from "@/lib/data";
 import { useStore } from "@/lib/store";
+import { getFirebase } from "@/lib/firebase";
 import {
   formatIsraelDate, formatIsraelTime, matchLiveStatus, relativeLabel, oddsToProbabilities,
 } from "@/lib/utils";
@@ -24,6 +25,80 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
   const myPrediction = useStore(s => s.predictions[match.id]);
   const matchResult  = useStore(s => s.matchResults[match.id]);
   const matchResults = useStore(s => s.matchResults);
+  const user = useStore(s => s.user);
+  const refreshMatchResults = useStore(s => s.refreshMatchResults);
+
+  /* Admin-only inline "set final result" editor — lets the admin record
+   * the final score directly from the match card the moment a match ends,
+   * without going to the Super-Admin panel. Writes to match_results via
+   * /api/admin/results, which immediately updates this card + the
+   * leaderboard for everyone (no fictional data — only what the admin
+   * enters as the real final result). */
+  const [editingResult, setEditingResult] = useState(false);
+  const [resultHome, setResultHome] = useState("");
+  const [resultAway, setResultAway] = useState("");
+  const [savingResult, setSavingResult] = useState(false);
+  const [resultError, setResultError] = useState<string | null>(null);
+
+  function openResultEditor(e: React.MouseEvent) {
+    e.stopPropagation();
+    setResultHome(matchResult ? String(matchResult.home) : "");
+    setResultAway(matchResult ? String(matchResult.away) : "");
+    setResultError(null);
+    setEditingResult(true);
+  }
+  function closeResultEditor(e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditingResult(false);
+    setResultError(null);
+  }
+  async function saveResult(e: React.MouseEvent) {
+    e.stopPropagation();
+    const home = Number(resultHome);
+    const away = Number(resultAway);
+    if (!Number.isFinite(home) || !Number.isFinite(away) || home < 0 || away < 0) {
+      setResultError("הזן תוצאה תקינה");
+      return;
+    }
+    setSavingResult(true);
+    setResultError(null);
+    try {
+      const token = await getFirebase().auth!.currentUser!.getIdToken();
+      const r = await fetch("/api/admin/results", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ matchId: match.id, home, away }),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        setResultError(data.error || "שגיאה בשמירה");
+        return;
+      }
+      await refreshMatchResults();
+      setEditingResult(false);
+    } catch {
+      setResultError("שגיאה בשמירה");
+    } finally {
+      setSavingResult(false);
+    }
+  }
+  async function deleteResult(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm("למחוק את התוצאה הסופית של המשחק?")) return;
+    setSavingResult(true);
+    try {
+      const token = await getFirebase().auth!.currentUser!.getIdToken();
+      await fetch("/api/admin/results", {
+        method: "DELETE",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ matchId: match.id }),
+      });
+      await refreshMatchResults();
+      setEditingResult(false);
+    } finally {
+      setSavingResult(false);
+    }
+  }
 
   /* Mini group-standings table (real data via lib/standings.ts, computed
    * from match_results). Only shown for group-stage matches. The home
@@ -190,6 +265,44 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
           </span>
         )}
       </div>
+
+      {/* Admin-only: set/edit/clear the real final result directly on the card. */}
+      {user?.isAdmin && (
+        <div className="mc-admin-result" onClick={stop} style={{ marginTop: 8 }}>
+          {editingResult ? (
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+              <span className="muted" style={{ fontSize: 12 }}>🏁 תוצאה סופית:</span>
+              <input
+                type="number" min={0} max={30} value={resultHome}
+                onChange={e => setResultHome(e.target.value)}
+                style={{ width: 50, padding: "2px 4px" }}
+                disabled={savingResult}
+              />
+              <span className="muted">:</span>
+              <input
+                type="number" min={0} max={30} value={resultAway}
+                onChange={e => setResultAway(e.target.value)}
+                style={{ width: 50, padding: "2px 4px" }}
+                disabled={savingResult}
+              />
+              <button className="btn btn-small btn-primary" onClick={saveResult} disabled={savingResult}>
+                {savingResult ? "…שומר" : "💾 שמור"}
+              </button>
+              {matchResult && (
+                <button className="btn btn-small" onClick={deleteResult} disabled={savingResult} style={{ color: "var(--red)" }}>
+                  🗑️ מחק
+                </button>
+              )}
+              <button className="btn btn-small" onClick={closeResultEditor} disabled={savingResult}>ביטול</button>
+              {resultError && <span style={{ color: "var(--red)", fontSize: 12 }}>{resultError}</span>}
+            </div>
+          ) : (
+            <button className="btn btn-small" onClick={openResultEditor} title="הזן/עדכן את התוצאה הסופית האמיתית של המשחק">
+              {isFinished ? "✏️ ערוך תוצאה (אדמין)" : "🏁 הזן תוצאה סופית (אדמין)"}
+            </button>
+          )}
+        </div>
+      )}
 
       {(() => {
         const p = oddsToProbabilities(match.odds);
