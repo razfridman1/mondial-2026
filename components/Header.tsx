@@ -19,7 +19,7 @@ const NAV: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: boolean
   { id: "mypredictions",    label: "🔮 הניחושים שלי" },
   { id: "standings",     label: "📊 טבלאות",        hideOnMobile: true },
   { id: "bracket",       label: "🏆 שלב הנוקאאוט",  hideOnMobile: true },
-  { id: "myteams",       label: "⭐ הנבחרות שלי",   hideOnMobile: true },
+  { id: "myteams",       label: "⭐ הנבחרות שלי" },
   /* Profile tab removed from nav — accessed via username click in header */
   { id: "admin",         label: "👥 ניהול משתמשים", adminOnly: true },
   { id: "simulation",    label: "🎲 ניהול ניחושים", adminOnly: true },
@@ -53,7 +53,7 @@ export default function Header() {
    * Also re-check when the window resizes (e.g. rotating phone). */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const MOBILE_HIDDEN_TABS: Tab[] = ["standings", "bracket", "myteams"];
+    const MOBILE_HIDDEN_TABS: Tab[] = ["standings", "bracket"];
     const mq = window.matchMedia("(max-width: 720px)");
     const check = () => {
       if (mq.matches && MOBILE_HIDDEN_TABS.includes(tab as Tab)) {

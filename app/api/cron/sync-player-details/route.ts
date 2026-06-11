@@ -76,11 +76,18 @@ export async function GET(req: Request) {
     }
 
     const batch = candidates.slice(0, BATCH_SIZE);
-    let updated = 0;
+    let updated = 0, failed = 0;
     for (const c of batch) {
       const info = await fetchPersonDetails(c.personId, apiKey, baseUrl);
-      details[c.id] = { ...(info || {}), fetchedAt: now };
-      if (info && (info.shirtNumber != null || info.club)) updated++;
+      /* Only cache (and stop retrying) on a successful response — a null
+       * result usually means a transient error (e.g. rate limit), so leave
+       * it out of `details` entirely and it'll be retried next run. */
+      if (info) {
+        details[c.id] = { ...info, fetchedAt: now };
+        if (info.shirtNumber != null || info.club) updated++;
+      } else {
+        failed++;
+      }
     }
 
     await detailsRef.set({ players: details, updatedAt: now }, { merge: true });
@@ -89,6 +96,7 @@ export async function GET(req: Request) {
       ok: true,
       processed: batch.length,
       updated,
+      failed,
       remaining: candidates.length - batch.length,
       cached: Object.keys(details).length,
     });
