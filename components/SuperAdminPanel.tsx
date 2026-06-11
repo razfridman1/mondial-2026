@@ -107,6 +107,11 @@ export default function SuperAdminPanel() {
       </details>
 
       <details className="adm-section">
+        <summary>🗄️ גיבוי יומי אוטומטי — שחזור</summary>
+        <FullBackupAdmin />
+      </details>
+
+      <details className="adm-section">
         <summary>📅 גיבוי תוצאות יומי</summary>
         <LeaderboardSnapshots />
       </details>
@@ -176,7 +181,7 @@ function ResultsAdmin() {
           <tbody>
             {matchesFiltered.slice(0, 80).map(m => {
               const r = byMatchId[m.id];
-              return <ResultRowEditor key={m.id} match={m} result={r} onSave={saveResult} onDelete={deleteResult} />;
+              return <ResultRowEditor key={m.id} match={m} result={r} onSave={saveResult} onDelete={deleteResult} onRestored={load} />;
             })}
           </tbody>
         </table>
@@ -1107,6 +1112,215 @@ function BackupAdmin() {
           </details>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================ 7b. FULL SITE BACKUP ============================ */
+const FULL_BACKUP_COLLECTIONS = [
+  "profiles", "managed_users", "username_lookup", "predictions", "predictions_backup",
+  "match_results", "match_results_history", "groups", "group_memberships", "deleted_groups",
+  "joker_usage", "broadcast_overrides", "sim_config", "activity", "roasts", "bonus_awards",
+  "leaderboard_snapshots", "live_data", "stats", "user_favorites",
+];
+
+interface FullBackupSummary {
+  dateKey: string;
+  exportedAt: number;
+  exportedBy: string | null;
+  version: number;
+  counts: Record<string, number>;
+  chunkCounts: Record<string, number>;
+}
+
+function FullBackupAdmin() {
+  const [list, setList] = useState<FullBackupSummary[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [openDate, setOpenDate] = useState<string | null>(null);
+  const [restoreColl, setRestoreColl] = useState<Record<string, string>>({});
+  const [restoreExact, setRestoreExact] = useState<Record<string, boolean>>({});
+  const [restoreBusy, setRestoreBusy] = useState<string | null>(null);
+  const [restoreMsg, setRestoreMsg] = useState<Record<string, string>>({});
+
+  async function load() {
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch("/api/admin/backups", { headers: await adminAuthHeaders() });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setError(d.error || "שגיאה בטעינת רשימת הגיבויים");
+        return;
+      }
+      setList(await r.json());
+    } catch (e: any) {
+      setError(e.message || "שגיאה");
+    } finally { setBusy(false); }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function runNow() {
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch("/api/cron/daily-backup", { method: "POST", headers: await adminAuthHeaders() });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setError(d.error || "שגיאה בביצוע הגיבוי");
+        return;
+      }
+      await load();
+    } catch (e: any) {
+      setError(e.message || "שגיאה");
+    } finally { setBusy(false); }
+  }
+
+  async function downloadDate(dateKey: string) {
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch(`/api/admin/backups/${dateKey}`, { headers: await adminAuthHeaders() });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setError(d.error || "שגיאה בהורדה");
+        return;
+      }
+      const data = await r.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mondial-2026-full-backup-${dateKey}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch (e: any) {
+      setError(e.message || "שגיאה");
+    } finally { setBusy(false); }
+  }
+
+  async function restore(dateKey: string) {
+    const coll = restoreColl[dateKey] || FULL_BACKUP_COLLECTIONS[0];
+    const exact = !!restoreExact[dateKey];
+    const warn = exact
+      ? `לשחזר את "${coll}" מהגיבוי מתאריך ${dateKey}?\n\n⚠️ שחזור מדויק: כל רשומה ב-${coll} שלא הייתה קיימת בגיבוי הזה — תימחק לצמיתות!\n\n(המצב הנוכחי יישמר אוטומטית כגיבוי-לפני-שחזור, אך מומלץ לוודא שזה באמת מה שרוצים.)`
+      : `לשחזר את "${coll}" מהגיבוי מתאריך ${dateKey}?\n\nרשומות שקיימות כרגע ולא היו בגיבוי הזה יישארו ללא שינוי.`;
+    if (!confirm(warn)) return;
+
+    setRestoreBusy(dateKey);
+    setRestoreMsg(m => ({ ...m, [dateKey]: "" }));
+    try {
+      const r = await fetch("/api/admin/backups/restore", {
+        method: "POST", headers: await adminAuthHeaders(),
+        body: JSON.stringify({ dateKey, collection: coll, exact }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setRestoreMsg(m => ({ ...m, [dateKey]: `⚠ ${d.error || "שגיאה בשחזור"}` }));
+        return;
+      }
+      setRestoreMsg(m => ({
+        ...m,
+        [dateKey]: `✓ שוחזרו ${d.restored ?? 0} רשומות ב-${coll}${d.deleted ? `, נמחקו ${d.deleted}` : ""}`,
+      }));
+    } catch (e: any) {
+      setRestoreMsg(m => ({ ...m, [dateKey]: `⚠ ${e.message || "שגיאה"}` }));
+    } finally {
+      setRestoreBusy(null);
+    }
+  }
+
+  return (
+    <div className="adm-body">
+      <p className="muted" style={{ marginBottom: 10, fontSize: 13, lineHeight: 1.6 }}>
+        גיבוי יומי אוטומטי (כל לילה ב-01:00) של <strong>כל הנתונים</strong> באתר —
+        משתמשים, ניחושים, תוצאות, קבוצות חברים, סימולציה, פעילות ועוד —
+        נשמר ישירות ב-Firestore ונשמר 21 יום אחורה.
+        אפשר להוריד כל גיבוי כקובץ JSON, או לשחזר קולקציה ספציפית מתאריך מסוים
+        אם נמחק או נפגם משהו בטעות.
+      </p>
+
+      <div className="mc-actions">
+        <button className="btn btn-primary" onClick={runNow} disabled={busy}>
+          {busy ? "…מבצע" : "🔄 גיבוי עכשיו"}
+        </button>
+        <button className="btn btn-small" onClick={load} disabled={busy}>↻ רענן רשימה</button>
+      </div>
+
+      {error && <p className="pred-msg is-locked" style={{ marginTop: 10 }}>⚠ {error}</p>}
+
+      {list && list.length === 0 && (
+        <p className="muted" style={{ marginTop: 10 }}>אין עדיין גיבויים שמורים.</p>
+      )}
+
+      {list && list.map(b => (
+        <div
+          key={b.dateKey}
+          style={{ marginTop: 10, padding: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10 }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+            <div>
+              <strong>{b.dateKey}</strong>
+              <span className="muted" style={{ fontSize: 12, marginInlineStart: 8 }}>
+                {new Date(b.exportedAt).toLocaleString("he-IL")} · {b.exportedBy || "—"}
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button className="btn btn-small" onClick={() => downloadDate(b.dateKey)} disabled={busy}>⬇️ JSON</button>
+              <button className="btn btn-small" onClick={() => setOpenDate(openDate === b.dateKey ? null : b.dateKey)}>
+                {openDate === b.dateKey ? "סגור" : "פרטים ושחזור"}
+              </button>
+            </div>
+          </div>
+
+          {openDate === b.dateKey && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+              <div
+                style={{
+                  fontFamily: "monospace", fontSize: 12, marginBottom: 10,
+                  display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 4,
+                }}
+              >
+                {FULL_BACKUP_COLLECTIONS.map(coll => (
+                  <div key={coll}>{coll}: {b.counts?.[coll] ?? 0}</div>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                <span className="muted" style={{ fontSize: 13 }}>♻️ שחזר קולקציה:</span>
+                <select
+                  value={restoreColl[b.dateKey] || FULL_BACKUP_COLLECTIONS[0]}
+                  onChange={e => setRestoreColl(m => ({ ...m, [b.dateKey]: e.target.value }))}
+                  style={{ padding: "2px 4px" }}
+                >
+                  {FULL_BACKUP_COLLECTIONS.map(coll => (
+                    <option key={coll} value={coll}>{coll} ({b.counts?.[coll] ?? 0})</option>
+                  ))}
+                </select>
+                <label className="muted" style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!restoreExact[b.dateKey]}
+                    onChange={e => setRestoreExact(m => ({ ...m, [b.dateKey]: e.target.checked }))}
+                  />
+                  שחזור מדויק (מוחק רשומות שלא היו בגיבוי)
+                </label>
+                <button
+                  className="btn btn-small"
+                  style={{ color: "var(--red)" }}
+                  onClick={() => restore(b.dateKey)}
+                  disabled={restoreBusy === b.dateKey}
+                >
+                  {restoreBusy === b.dateKey ? "…משחזר" : "♻️ שחזר"}
+                </button>
+              </div>
+              {restoreMsg[b.dateKey] && (
+                <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{restoreMsg[b.dateKey]}</p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
