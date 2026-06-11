@@ -3,11 +3,12 @@
  * PlayerCard — modal opened by clicking a player in TeamDossier's
  * "כל השחקנים לפי מיקומים" squad list.
  *
- * For "live" players (id "${teamCode}_${footballDataPersonId}") fetches
- * /api/players/[id], which pulls bio + current-season stats + recent
- * matches from football-data.org (cached server-side). For curated
- * (hand-written) players we already have everything we need locally —
- * no fetch needed.
+ * Always shows the curated/local info immediately (name, jersey, club,
+ * age, bio), and in the background fetches /api/players/[id] which pulls
+ * current-season stats + recent matches from football-data.org (cached
+ * server-side). For curated stars (e.g. Messi) the API route matches them
+ * against the live official roster by name to find their football-data
+ * person id, so season stats appear for them too when available.
  * ===================================================================*/
 import { useEffect, useState } from "react";
 import { teamCodeFromApiName } from "@/lib/team-name-mapper";
@@ -54,17 +55,17 @@ export default function PlayerCard({ player, onClose }: { player: Player; onClos
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!player.live) return;
     let cancelled = false;
     setLoading(true);
     setErr(null);
-    fetch(`/api/players/${encodeURIComponent(player.id)}`)
+    const qs = new URLSearchParams({ teamCode: player.teamCode, nameEn: player.nameEn });
+    fetch(`/api/players/${encodeURIComponent(player.id)}?${qs.toString()}`)
       .then(r => r.json())
       .then((d: ApiResponse) => { if (!cancelled) setData(d); })
       .catch(() => { if (!cancelled) setErr("שגיאה בטעינת המידע"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [player.id, player.live]);
+  }, [player.id, player.teamCode, player.nameEn]);
 
   const profile = data?.profile;
   const stats = data?.stats;
@@ -128,21 +129,26 @@ export default function PlayerCard({ player, onClose }: { player: Player; onClos
           </div>
         )}
 
-        {/* ---------- Live-only sections ---------- */}
-        {player.live && (
+        {/* ---------- Season stats / recent matches (when available) ---------- */}
+        {loading && (
+          <div className="modal-section muted">⏳ טוען נתוני עונה...</div>
+        )}
+        {!loading && err && (
+          <div className="modal-section muted">{err}</div>
+        )}
+        {!loading && !err && data?.ok && data.live === false && (
+          <p className="muted dossier-note" style={{ marginTop: 4 }}>
+            לא נמצאו נתוני עונה חיים עבור שחקן זה.
+          </p>
+        )}
+        {!loading && !err && data && !data.ok && (
+          <div className="modal-section muted">
+            המידע המורחב על השחקן אינו זמין כרגע.
+          </div>
+        )}
+        {!loading && data?.live && (
           <>
-            {loading && (
-              <div className="modal-section muted">⏳ טוען נתוני עונה...</div>
-            )}
-            {!loading && err && (
-              <div className="modal-section muted">{err}</div>
-            )}
-            {!loading && !err && data && !data.ok && (
-              <div className="modal-section muted">
-                המידע המורחב על השחקן אינו זמין כרגע.
-              </div>
-            )}
-            {!loading && stats && (
+            {stats && (
               <div className="modal-section">
                 <h3>📊 העונה הנוכחית</h3>
                 <div className="player-card-stats">
@@ -159,7 +165,7 @@ export default function PlayerCard({ player, onClose }: { player: Player; onClos
                 </div>
               </div>
             )}
-            {!loading && stats?.recent?.length ? (
+            {stats?.recent?.length ? (
               <div className="modal-section">
                 <h3>📅 משחקים אחרונים</h3>
                 <div className="player-card-matches">
@@ -176,12 +182,6 @@ export default function PlayerCard({ player, onClose }: { player: Player; onClos
               </div>
             ) : null}
           </>
-        )}
-
-        {!player.live && (
-          <p className="muted dossier-note" style={{ marginTop: 4 }}>
-            מידע מורחב (סטטיסטיקות עונה, משחקים אחרונים) זמין כרגע עבור שחקנים שמגיעים מהנתונים הרשמיים בלבד.
-          </p>
         )}
       </div>
     </div>

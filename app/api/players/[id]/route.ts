@@ -2,26 +2,32 @@ import { NextResponse } from "next/server";
 import type { Firestore } from "firebase-admin/firestore";
 import { getAdmin } from "@/lib/firebase-admin";
 import { fetchPersonProfile, fetchPersonSeasonStats } from "@/lib/football-data-api";
+import { normalizeName } from "@/lib/players";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /* =====================================================================
- * GET /api/players/[id]
+ * GET /api/players/[id]?teamCode=ARG&nameEn=Lionel%20Messi
  *
  * On-demand player detail card — used by the "הנבחרות שלי" tab when a
  * user clicks a player in TeamDossier's squad list.
  *
- * Only "live" players (id format `${teamCode}_${footballDataPersonId}`,
- * e.g. "BEL_98765") have a football-data.org person id; curated/hand-
- * written stars don't, and the frontend shows their existing curated
- * info directly without calling this route.
+ * "Live" players have an id of the form `${teamCode}_${footballDataPersonId}`
+ * (e.g. "BEL_98765") — the personId is taken straight from the id.
+ *
+ * Curated/hand-written stars (e.g. "ARG10_0" for Messi) don't carry a
+ * football-data.org person id directly. For these we look up the live
+ * WC squad cache (`live_data/squads`, populated by /api/cron/sync-squads)
+ * for the same team and match by normalized English name — football-data's
+ * official roster includes Messi etc. too, just without the curated Hebrew
+ * bio. If a match is found we use ITS person id to fetch full stats.
  *
  * Fetches /persons/{id} (bio + current club) and /persons/{id}/matches
  * (this season's aggregated stats + recent match log) and merges them.
- * Cached in Firestore (`live_data/player_profiles`) for 12h to stay
- * within football-data.org's free-tier rate limit (10 req/min, shared
- * with the live-score and squad-enrichment crons).
+ * Cached in Firestore (`live_data/player_profiles`, keyed by OUR id) for
+ * 12h to stay within football-data.org's free-tier rate limit
+ * (10 req/min, shared with the live-score and squad-enrichment crons).
  * ===================================================================*/
 
 const TTL_MS = 12 * 60 * 60 * 1000; // 12h
@@ -30,10 +36,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params;
   if (!id) return NextResponse.json({ ok: false, error: "missing id" }, { status: 400 });
 
-  const personId = id.includes("_") ? id.split("_").pop()! : "";
-  if (!/^\d+$/.test(personId)) {
-    return NextResponse.json({ ok: false, error: "not a live player", live: false }, { status: 404 });
-  }
+  const { searchParams } = new URL(req.url);
+  const teamCode = searchParams.get("teamCode") || "";
+  const nameEn = searchParams.get("nameEn") || "";
 
   const apiKey = process.env.FOOTBALL_API_KEY;
   const baseUrl = process.env.FOOTBALL_API_URL || "https://api.football-data.org/v4";
@@ -43,6 +48,28 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     db = getAdmin().db;
   } catch {
     db = null;
+  }
+
+  // 1. Resolve the football-data.org person id for this player.
+  let personId = id.includes("_") ? id.split("_").pop()! : "";
+  if (!/^\d+$/.test(personId)) personId = "";
+
+  if (!personId && teamCode && nameEn && db) {
+    // Curated star — try to find the matching official-roster entry.
+    try {
+      const squadsSnap = await db.collection("live_data").doc("squads").get();
+      const squads: Record<string, any[]> = (squadsSnap.exists ? (squadsSnap.data() as any)?.squads : null) || {};
+      const target = normalizeName(nameEn);
+      const match = (squads[teamCode] || []).find((p: any) => p?.live && p?.id && normalizeName(p.name || "") === target);
+      if (match) {
+        const candidate = String(match.id).split("_").pop();
+        if (candidate && /^\d+$/.test(candidate)) personId = candidate;
+      }
+    } catch {}
+  }
+
+  if (!personId) {
+    return NextResponse.json({ ok: true, live: false });
   }
 
   const docRef = db?.collection("live_data").doc("player_profiles");

@@ -205,7 +205,7 @@ export const SQUADS: Record<string, Player[]> = (() => {
 /* Normalize a player name for de-duplication when merging curated Hebrew
  * star data with the live football-data.org roster: strip diacritics,
  * lowercase, drop common suffixes (Jr., Júnior…), and collapse whitespace. */
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   return name
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
