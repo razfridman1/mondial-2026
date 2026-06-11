@@ -51,8 +51,28 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   // 1. Resolve the football-data.org person id for this player.
-  let personId = id.includes("_") ? id.split("_").pop()! : "";
-  if (!/^\d+$/.test(personId)) personId = "";
+  //
+  // "Live" ids are exactly `${3-letter team code}_${footballDataPersonId}`
+  // (e.g. "BEL_98765"), produced by fetchLiveWcSquads — the part before
+  // "_" is the team code itself.
+  //
+  // "Curated" star ids are `${teamCode}${jersey}_${arrayIndex}` (e.g.
+  // "ARG10_0" for Messi) — the suffix there is just a small array index,
+  // NOT a football-data person id, even though it happens to be
+  // all-digits. Treating it as one (the previous bug) caused curated
+  // players to fetch a RANDOM unrelated football-data person (whichever
+  // person happens to have that small numeric id) — e.g. Messi (id
+  // "ARG10_0") fetched person id "0", showing a Brazilian club player's
+  // nationality/club/stats instead of his own.
+  let personId = "";
+  const underscore = id.indexOf("_");
+  if (underscore > 0) {
+    const prefix = id.slice(0, underscore);
+    const suffix = id.slice(underscore + 1);
+    if (/^[A-Z]{3}$/.test(prefix) && /^\d+$/.test(suffix)) {
+      personId = suffix;
+    }
+  }
 
   if (!personId && teamCode && nameEn && db) {
     // Curated star — try to find the matching official-roster entry.
@@ -78,6 +98,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     try {
       const snap = await docRef.get();
       cached = snap.exists ? (snap.data() as any)?.players?.[id] : null;
+      // Discard cache entries written under the old bug (or for a since-
+      // re-resolved personId) — they belong to a different person.
+      if (cached && cached.personId !== personId) cached = null;
     } catch {}
   }
 
@@ -112,7 +135,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (docRef) {
     try {
       await docRef.set({
-        players: { [id]: { profile: finalProfile, stats: finalStats, fetchedAt: now } },
+        players: { [id]: { profile: finalProfile, stats: finalStats, fetchedAt: now, personId } },
         updatedAt: now,
       }, { merge: true });
     } catch {}

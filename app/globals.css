@@ -1004,6 +1004,40 @@ button { font-family: inherit; cursor: pointer; }
 .odd-k { font-size: 10px; color: var(--text-muted); }
 .odd-v { font-size: 15px; font-weight: 800; color: var(--accent); }
 
+/* Per-match mini group-standings table (real data, computeGroupStandings) */
+.mc-group-table {
+  background: var(--bg-elev);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.mc-group-table-title {
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.mc-mini-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mc-mini-table th {
+  font-size: 10px; font-weight: 700; color: var(--text-muted);
+  padding: 2px 4px; border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.mmt-th-team { text-align: start !important; padding-inline-start: 6px !important; }
+.mc-mini-table td { padding: 4px; text-align: center; }
+.mmt-row { border-bottom: 1px solid var(--border-soft); }
+.mmt-row:last-child { border-bottom: none; }
+.mmt-row.is-home { background: rgba(0,212,255,0.06); }
+.mmt-team {
+  display: flex; align-items: center; gap: 6px;
+  white-space: nowrap; text-align: start !important;
+  padding-inline-start: 6px !important;
+}
+.mmt-flag { font-size: 16px; }
+.mmt-name {
+  font-weight: 600; font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.mmt-pos { font-weight: 800; width: 22px; }
+
 .mc-broadcast {
   display: flex; flex-direction: column; gap: 6px;
   background: rgba(0,212,255,0.04);
@@ -2250,8 +2284,8 @@ button { font-family: inherit; cursor: pointer; }
 .admin-login-stats {
   display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
   margin: 10px 0 4px; padding: 10px 14px;
-  border: 1px solid var(--border); border-radius: 10px;
-  background: var(--bg-elev);
+  border: 1px solid rgba(34,197,94,0.4); border-radius: 10px;
+  background: rgba(34,197,94,0.18);
 }
 .admin-login-stat { font-size: 14px; }
 .admin-login-stat strong { font-size: 17px; margin-inline-end: 4px; }
@@ -4749,7 +4783,8 @@ html[data-theme="light"] .chat-panel {
   .match-card { padding: 10px !important; gap: 8px !important; }
   .match-card .mc-venue,
   .match-card .mc-broadcast,
-  .match-card .odds { display: none !important; }
+  .match-card .odds,
+  .match-card .mc-group-table { display: none !important; }
   .match-card .mc-actions { padding-top: 4px; }
   .match-card .mc-date-mobile { font-size: 13px !important; padding: 4px 8px !important; }
   .match-card .team-name { font-size: 14px !important; }

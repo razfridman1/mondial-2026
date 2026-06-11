@@ -11,12 +11,45 @@ import Countdown from "./Countdown";
 import PredictionForm from "./PredictionForm";
 import Pitch from "./Pitch";
 
+interface PreviewEntry { text: string; generatedAt: number; matchUtc: string }
+interface SummaryEntry { text: string; generatedAt: number }
+
 export default function MatchModal({ matchId, onClose }: { matchId: string; onClose: () => void }) {
   const overrides = useStore(s => s.overrides);
   const simConfig = useStore(s => s.simConfig);
   const liveSquads = useStore(s => s.liveSquads);
+  const matchResults = useStore(s => s.matchResults);
+  const predictions = useStore(s => s.predictions);
   const [lineups, setLineups] = useState<{ home: TeamLineup; away: TeamLineup } | null>(null);
   const [lineupSource, setLineupSource] = useState<"default" | "live" | "placeholder">("default");
+  const [preview, setPreview] = useState<PreviewEntry | null>(null);
+  const [summary, setSummary] = useState<SummaryEntry | null>(null);
+
+  const hasResult = !!matchResults[matchId];
+  const hasPrediction = !!predictions[matchId];
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/match-previews")
+      .then(r => r.ok ? r.json() : {})
+      .then((data: Record<string, PreviewEntry>) => {
+        if (!cancelled && data?.[matchId]) setPreview(data[matchId]);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [matchId]);
+
+  useEffect(() => {
+    if (!hasResult || !hasPrediction) return;
+    let cancelled = false;
+    fetch("/api/match-summaries")
+      .then(r => r.ok ? r.json() : {})
+      .then((data: Record<string, SummaryEntry>) => {
+        if (!cancelled && data?.[matchId]) setSummary(data[matchId]);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [matchId, hasResult, hasPrediction]);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +100,20 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
             👥 קיבולת: {venue.capacity ? venue.capacity.toLocaleString("he-IL") : "—"}
           </div>
         </section>
+        {summary && (
+          <section className="modal-section">
+            <h3>📊 סיכום וסטטיסטיקות</h3>
+            <p style={{ margin: 0, lineHeight: 1.7, whiteSpace: "pre-line" }}>{summary.text}</p>
+          </section>
+        )}
+
+        {!summary && preview && (
+          <section className="modal-section">
+            <h3>🔮 סקירת המשחק</h3>
+            <p style={{ margin: 0, lineHeight: 1.7, whiteSpace: "pre-line" }}>{preview.text}</p>
+          </section>
+        )}
+
         {(() => {
           const p = oddsToProbabilities(m.odds);
           if (!p) return null;

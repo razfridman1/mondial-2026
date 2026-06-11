@@ -384,6 +384,10 @@ export function bootstrap() {
           }
         } catch {}
       }
+      /* No session at all (anonymous visitor). Count this as a site
+       * entry for the admin-only login-stats widget — see
+       * /api/auth/log-visit + /api/auth/log-login. */
+      fetch("/api/auth/log-visit", { method: "POST" }).catch(() => {});
       useStore.getState().setUser(null);
       useStore.getState().setLoadingAuth(false);
       return;

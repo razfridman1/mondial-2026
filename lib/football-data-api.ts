@@ -151,20 +151,27 @@ export async function fetchPersonProfile(personId: string | number, apiKey: stri
   }
 }
 
-/** Fetch a player's current-season match log + aggregated stats (goals,
- * assists, minutes, cards) from /persons/{id}/matches. Returns null on
- * any failure. */
+/** Fetch a player's WORLD CUP 2026 match log + aggregated stats (goals,
+ * assists, minutes, cards) from /persons/{id}/matches, filtered to the
+ * "WC" competition only. Returns null on any failure. Naturally returns
+ * all-zero aggregations + an empty match log for players whose team
+ * hasn't played yet (or who haven't featured). */
 export async function fetchPersonSeasonStats(personId: string | number, apiKey: string, baseUrl?: string): Promise<PersonSeasonStats | null> {
   if (!apiKey) return null;
   const url = baseUrl || process.env.FOOTBALL_API_URL || "https://api.football-data.org/v4";
   try {
-    const r = await fetch(`${url}/persons/${personId}/matches?limit=10`, {
+    const r = await fetch(`${url}/persons/${personId}/matches?competitions=WC&limit=10`, {
       headers: { "X-Auth-Token": apiKey },
     });
     if (!r.ok) return null;
     const data = await r.json();
     const agg = data.aggregations || {};
-    const matches: any[] = data.matches || [];
+    // Defensive filter — only ever show World Cup matches, even if the
+    // API ever returns extra context matches despite the `competitions`
+    // param.
+    const matches: any[] = (data.matches || []).filter((m: any) =>
+      m?.competition?.code === "WC" || /world cup/i.test(m?.competition?.name || "")
+    );
     const recent: PersonRecentMatch[] = matches.slice(0, 8).map((m: any) => {
       const scorerIds = (m.goals || []).map((g: any) => g?.scorer?.id);
       const assistIds = (m.goals || []).map((g: any) => g?.assist?.id);
@@ -244,6 +251,101 @@ export async function fetchLiveWcSquads(): Promise<{ squads: LiveSquads; coaches
     }
 
     return { squads, coaches };
+  } catch {
+    return null;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * Full match details — final score, goalscorers, cards, referee — used
+ * to build the post-match "summary & stats" shown for finished matches
+ * (see lib/matchSummary.ts). Pulled from football-data.org's
+ * /v4/matches/{id} endpoint, which is one call per match (only made once
+ * per finished match, when sync-results detects a FINISHED status).
+ * ------------------------------------------------------------------- */
+export interface ExternalGoal {
+  minute: number | null;
+  teamCode: string | null;
+  scorer: string;
+  assist?: string;
+  type?: string; // e.g. "REGULAR", "PENALTY", "OWN"
+}
+
+export interface ExternalBooking {
+  minute: number | null;
+  teamCode: string | null;
+  player: string;
+  card: string; // "YELLOW_CARD" | "RED_CARD" | "YELLOW_RED_CARD"
+}
+
+export interface ExternalMatchDetails {
+  homeCode: string | null;
+  awayCode: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  halfTimeHomeScore: number | null;
+  halfTimeAwayScore: number | null;
+  goals: ExternalGoal[];
+  bookings: ExternalBooking[];
+  referee?: string;
+  venue?: string;
+}
+
+/** Fetch full details for a single finished match from
+ * /v4/matches/{externalId}. Returns null on any failure (missing key,
+ * network error, bad response). Never fabricates — every field is
+ * directly from the API or omitted. */
+export async function fetchExternalMatchDetails(externalId: string | number, apiKey: string, baseUrl?: string): Promise<ExternalMatchDetails | null> {
+  if (!apiKey) return null;
+  const url = baseUrl || process.env.FOOTBALL_API_URL || "https://api.football-data.org/v4";
+  try {
+    const r = await fetch(`${url}/matches/${externalId}`, {
+      headers: { "X-Auth-Token": apiKey },
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+
+    const homeId = data.homeTeam?.id;
+    const awayId = data.awayTeam?.id;
+    const homeCode = teamCodeFromApiName(data.homeTeam?.name) || teamCodeFromApiName(data.homeTeam?.shortName);
+    const awayCode = teamCodeFromApiName(data.awayTeam?.name) || teamCodeFromApiName(data.awayTeam?.shortName);
+
+    const codeForTeamId = (teamId: number | undefined): string | null => {
+      if (teamId == null) return null;
+      if (teamId === homeId) return homeCode;
+      if (teamId === awayId) return awayCode;
+      return null;
+    };
+
+    const goals: ExternalGoal[] = (data.goals || []).map((g: any): ExternalGoal => ({
+      minute: typeof g.minute === "number" ? g.minute : null,
+      teamCode: codeForTeamId(g.team?.id),
+      scorer: g.scorer?.name || "",
+      assist: g.assist?.name || undefined,
+      type: g.type || undefined,
+    })).filter((g: ExternalGoal) => g.scorer);
+
+    const bookings: ExternalBooking[] = (data.bookings || []).map((b: any): ExternalBooking => ({
+      minute: typeof b.minute === "number" ? b.minute : null,
+      teamCode: codeForTeamId(b.team?.id),
+      player: b.player?.name || "",
+      card: b.card || "",
+    })).filter((b: ExternalBooking) => b.player && b.card);
+
+    const referee = (data.referees || []).find((r: any) => r.type === "REFEREE")?.name || data.referees?.[0]?.name || undefined;
+
+    return {
+      homeCode,
+      awayCode,
+      homeScore: data.score?.fullTime?.home ?? null,
+      awayScore: data.score?.fullTime?.away ?? null,
+      halfTimeHomeScore: data.score?.halfTime?.home ?? null,
+      halfTimeAwayScore: data.score?.halfTime?.away ?? null,
+      goals,
+      bookings,
+      referee,
+      venue: data.venue || undefined,
+    };
   } catch {
     return null;
   }

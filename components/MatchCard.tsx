@@ -7,6 +7,7 @@ import {
 } from "@/lib/utils";
 import { shareToWhatsApp, matchShareText } from "@/lib/share";
 import { scorePrediction } from "@/lib/scoring";
+import { computeGroupStandings } from "@/lib/standings";
 import type { Match } from "@/lib/types";
 import Countdown from "./Countdown";
 
@@ -22,6 +23,23 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
   /* Pull user's prediction + actual result for this match (if any) */
   const myPrediction = useStore(s => s.predictions[match.id]);
   const matchResult  = useStore(s => s.matchResults[match.id]);
+  const matchResults = useStore(s => s.matchResults);
+
+  /* Mini group-standings table (real data via lib/standings.ts, computed
+   * from match_results). Only shown for group-stage matches. The home
+   * team's row is shown last regardless of its table position, per
+   * request — the "#" column still reflects its real standing. */
+  const groupStandings = useMemo(() => {
+    if (match.stage !== "GROUP" || !match.group) return null;
+    return computeGroupStandings(match.group, matchResults);
+  }, [match.stage, match.group, matchResults]);
+
+  const displayStandings = useMemo(() => {
+    if (!groupStandings) return null;
+    const homeRow = groupStandings.filter(s => s.teamCode === match.home);
+    const otherRows = groupStandings.filter(s => s.teamCode !== match.home);
+    return [...otherRows, ...homeRow];
+  }, [groupStandings, match.home]);
 
   const minutesToKick = useMemo(
     () => Math.round((new Date(match.utc).getTime() - Date.now()) / 60000),
@@ -184,6 +202,35 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
           </div>
         );
       })()}
+
+      {displayStandings && (
+        <div className="mc-group-table">
+          <div className="mc-group-table-title">📋 טבלת בית {match.group}</div>
+          <table className="mc-mini-table">
+            <thead>
+              <tr>
+                <th className="mmt-th-pos">#</th>
+                <th className="mmt-th-team">נבחרת</th>
+                <th>מ</th>
+                <th>נק&apos;</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayStandings.map(s => (
+                <tr key={s.teamCode} className={`mmt-row ${s.teamCode === match.home ? "is-home" : ""}`}>
+                  <td className="mmt-pos">{s.position}</td>
+                  <td className="mmt-team">
+                    <span className="mmt-flag">{s.teamFlag}</span>
+                    <span className="mmt-name">{s.teamName}</span>
+                  </td>
+                  <td>{s.played}</td>
+                  <td><strong>{s.points}</strong></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="mc-broadcast">
         <div className="bc-label">שידור בישראל:</div>

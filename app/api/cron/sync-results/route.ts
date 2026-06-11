@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
-import { MATCHES } from "@/lib/data";
+import { MATCHES, TEAMS } from "@/lib/data";
 import { resolveAllStages } from "@/lib/bracket";
 import { teamCodeFromApiName } from "@/lib/team-name-mapper";
 import type { MatchResult } from "@/lib/standings";
+import { fetchExternalMatchDetails } from "@/lib/football-data-api";
+import { generateMatchSummaryNarrative } from "@/lib/matchSummary";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -101,6 +103,13 @@ export async function GET(req: Request) {
     });
     const resolved = resolveAllStages(existingResults);
 
+    /* Existing post-match summaries — used to avoid regenerating (and
+     * re-calling the AI / external API) for matches we've already
+     * summarized. */
+    const summariesSnap = await db.collection("live_data").doc("match_summaries").get();
+    const existingSummaries: Record<string, any> = summariesSnap.exists ? (summariesSnap.data() || {}) : {};
+    const summaryCandidates: Array<{ matchId: string; externalId: any; homeCode: string; awayCode: string; homeScore: number; awayScore: number }> = [];
+
     let inserted = 0, updated = 0, skipped = 0;
     let batch = db.batch();
     let ops = 0;
@@ -148,11 +157,61 @@ export async function GET(req: Request) {
       if (existing.exists) updated++;
       else inserted++;
 
+      /* Queue a post-match summary for newly-finished matches we haven't
+       * summarized yet (see lib/matchSummary.ts). */
+      if (ext.status === "FINISHED" && !existingSummaries[ourMatch.id]) {
+        let homeCode = ourMatchRecord?.home;
+        let awayCode = ourMatchRecord?.away;
+        if (isKO) {
+          const r = resolved[ourMatch.id];
+          if (r?.home && r?.away) { homeCode = r.home; awayCode = r.away; }
+        }
+        if (homeCode && awayCode) {
+          summaryCandidates.push({
+            matchId: ourMatch.id,
+            externalId: ext.id,
+            homeCode,
+            awayCode,
+            homeScore: ext.score.fullTime.home,
+            awayScore: ext.score.fullTime.away,
+          });
+        }
+      }
+
       if (ops >= 450) { await batch.commit(); batch = db.batch(); ops = 0; }
     }
     if (ops > 0) await batch.commit();
 
-    return NextResponse.json({ ok: true, inserted, updated, skipped, total: externalMatches.length });
+    /* Generate post-match summaries (real data + AI narrative) for any
+     * newly-finished matches. Limited per run to avoid timeouts/rate
+     * limits — at most one match normally finishes per minute anyway. */
+    let summariesGenerated = 0;
+    if (summaryCandidates.length) {
+      const summaryUpdates: Record<string, any> = {};
+      for (const cand of summaryCandidates.slice(0, 2)) {
+        try {
+          const details = await fetchExternalMatchDetails(cand.externalId, apiKey, baseUrl);
+          if (!details) continue;
+          const text = await generateMatchSummaryNarrative({
+            matchId: cand.matchId,
+            homeName: TEAMS[cand.homeCode]?.name || cand.homeCode,
+            awayName: TEAMS[cand.awayCode]?.name || cand.awayCode,
+            homeScore: cand.homeScore,
+            awayScore: cand.awayScore,
+            details,
+          });
+          summaryUpdates[cand.matchId] = { text, generatedAt: Date.now() };
+          summariesGenerated++;
+        } catch {
+          // skip — will retry on a later run since existingSummaries won't have it
+        }
+      }
+      if (Object.keys(summaryUpdates).length) {
+        await db.collection("live_data").doc("match_summaries").set(summaryUpdates, { merge: true });
+      }
+    }
+
+    return NextResponse.json({ ok: true, inserted, updated, skipped, total: externalMatches.length, summariesGenerated });
   } catch (e: any) {
     return NextResponse.json({ error: "sync_failed", message: e?.message || String(e) }, { status: 500 });
   }

@@ -150,7 +150,7 @@ export default function PlayerCard({ player, onClose }: { player: Player; onClos
           <>
             {stats && (
               <div className="modal-section">
-                <h3>📊 העונה הנוכחית</h3>
+                <h3>🌍 עד כה במונדיאל</h3>
                 <div className="player-card-stats">
                   <div className="player-card-stat"><strong>{stats.matches}</strong><span className="muted">משחקים</span></div>
                   <div className="player-card-stat"><strong>{stats.goals}</strong><span className="muted">⚽ שערים</span></div>
@@ -163,11 +163,16 @@ export default function PlayerCard({ player, onClose }: { player: Player; onClos
                     <div className="player-card-stat"><strong>{stats.redCards}</strong><span className="muted">🟥 אדומים</span></div>
                   )}
                 </div>
+                {stats.matches === 0 && (
+                  <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                    עדיין לא שיחק במונדיאל 2026.
+                  </p>
+                )}
               </div>
             )}
             {stats?.recent?.length ? (
               <div className="modal-section">
-                <h3>📅 משחקים אחרונים</h3>
+                <h3>📅 משחקי המונדיאל האחרונים</h3>
                 <div className="player-card-matches">
                   {stats.recent.map((m, i) => (
                     <div key={i} className="player-card-match">
