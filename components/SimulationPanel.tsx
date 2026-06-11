@@ -11,9 +11,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
-import { MATCHES } from "@/lib/data";
+import { MATCHES, TEAMS } from "@/lib/data";
+import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { AvatarDisplay } from "./AvatarPicker";
 import type { StageId } from "@/lib/types";
+
+interface PredictionRow {
+  id: string; uid: string; matchId: string;
+  homeScore: number; awayScore: number; joker?: boolean; auto?: boolean;
+  updatedAt?: number;
+}
 
 interface GroupRow { id: string; name: string; memberCount?: number; }
 interface StageStatus {
@@ -62,6 +69,7 @@ export default function SimulationPanel() {
   const [members, setMembers]   = useState<MemberStatus[]>([]);
   const [memberStageFilter, setMemberStageFilter] = useState<StageId | "ALL">("ALL");
   const [busy, setBusy]         = useState(false);
+  const [userModal, setUserModal] = useState<{ uid: string; displayName: string } | null>(null);
 
   async function authHeaders() {
     const token = await getFirebase().auth!.currentUser!.getIdToken();
@@ -368,15 +376,19 @@ export default function SimulationPanel() {
                     return (
                       <tr key={m.uid} style={{ borderTop: "1px solid var(--border-soft)" }}>
                         <td style={{ padding: "8px 10px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <button
+                            onClick={() => setUserModal({ uid: m.uid, displayName: m.displayName })}
+                            title="הצג את 4 המשחקים הקרובים של המשתמש"
+                            style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", color: "inherit", textAlign: "start" }}
+                          >
                             <AvatarDisplay avatarId={m.avatarId} size={28} />
                             <div style={{ minWidth: 0 }}>
-                              <div style={{ fontWeight: 700 }}>{m.displayName}</div>
+                              <div style={{ fontWeight: 700, textDecoration: "underline", textUnderlineOffset: 2 }}>{m.displayName}</div>
                               <div className="muted" style={{ fontSize: 11 }}>
                                 סך הניחושים: {m.totalFilled}/{m.totalMatches}
                               </div>
                             </div>
-                          </div>
+                          </button>
                         </td>
 
                         {memberStageFilter === "ALL" ? (
@@ -477,6 +489,118 @@ export default function SimulationPanel() {
           </p>
         </section>
       )}
+
+      {userModal && (
+        <MemberPredictionDeepView
+          uid={userModal.uid}
+          displayName={userModal.displayName}
+          onClose={() => setUserModal(null)}
+        />
+      )}
     </section>
+  );
+}
+
+/* User "deep view" — opened by clicking a username in the per-user
+ * predictions table. Shows the 4 nearest upcoming matches and, for each,
+ * whether the user filled it in themselves, whether it was auto-filled by
+ * the system (because they didn't), or whether it's still empty. */
+function MemberPredictionDeepView({ uid, displayName, onClose }: {
+  uid: string;
+  displayName: string;
+  onClose: () => void;
+}) {
+  const [rows, setRows] = useState<PredictionRow[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getFirebase().auth!.currentUser!.getIdToken();
+        const r = await fetch(`/api/admin/predictions?uid=${encodeURIComponent(uid)}`, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        if (!cancelled) setRows(r.ok ? await r.json() : []);
+      } catch {
+        if (!cancelled) setRows([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [uid]);
+
+  const upcoming = useMemo(() => {
+    const now = Date.now();
+    return MATCHES
+      .filter(m => new Date(m.utc).getTime() >= now)
+      .sort((a, b) => +new Date(a.utc) - +new Date(b.utc))
+      .slice(0, 4);
+  }, []);
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog" style={{ maxWidth: 600 }}>
+        <button className="modal-close" onClick={onClose} aria-label="סגור">✕</button>
+        <header className="modal-header">
+          <h2>🔍 {displayName}</h2>
+          <div className="muted">4 המשחקים הקרובים — האם המשתמש מילא בעצמו?</div>
+        </header>
+
+        {rows === null ? (
+          <p className="muted" style={{ marginTop: 14 }}>טוען…</p>
+        ) : upcoming.length === 0 ? (
+          <p className="muted" style={{ marginTop: 14 }}>אין משחקים קרובים.</p>
+        ) : (
+          <div className="adm-table-wrap" style={{ marginTop: 14 }}>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>משחק</th>
+                  <th>מועד</th>
+                  <th>ניחוש</th>
+                  <th>מצב</th>
+                </tr>
+              </thead>
+              <tbody>
+                {upcoming.map(m => {
+                  const p = rows.find(r => r.matchId === m.id);
+                  return (
+                    <tr key={m.id}>
+                      <td style={{ fontSize: 12 }}>
+                        <span>{TEAMS[m.home]?.flag || ""} {TEAMS[m.home]?.name || m.home}</span>
+                        <span className="muted"> נגד </span>
+                        <span>{TEAMS[m.away]?.name || m.away} {TEAMS[m.away]?.flag || ""}</span>
+                        <br />
+                        <span className="muted" style={{ fontSize: 10 }}>{m.id}</span>
+                      </td>
+                      <td style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                        {formatIsraelDate(m.utc, { short: true })} {formatIsraelTime(m.utc)}
+                      </td>
+                      <td>
+                        {p
+                          ? <strong style={{ fontVariantNumeric: "tabular-nums" }}>{p.homeScore} : {p.awayScore}</strong>
+                          : <span className="muted">—</span>}
+                      </td>
+                      <td>
+                        {!p ? (
+                          <span className="badge badge-finished" style={{ background: "rgba(239,68,68,0.18)" }}>❌ לא מילא</span>
+                        ) : p.auto ? (
+                          <span className="badge badge-finished" style={{ background: "rgba(245,158,11,0.18)", color: "var(--orange)" }}>🤖 מולא אוטומטית</span>
+                        ) : (
+                          <span className="status-pill pill-open">✅ מילא ידנית</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="mc-actions" style={{ marginTop: 16 }}>
+          <button className="btn btn-primary" onClick={onClose}>סגור</button>
+        </div>
+      </div>
+    </div>
   );
 }
