@@ -14,7 +14,9 @@
  *   correct winner only         : 3 pts
  *   wrong winner                : 0 pts
  *
- * Streak: every consecutive match with any correct prediction +1 bonus.
+ * Streak: starting from the 2nd consecutive match with a correct
+ *         prediction, every additional one in the streak adds +1 bonus
+ *         (a single correct guess is not yet a "streak").
  * ===================================================================*/
 
 export interface ScoreInput {
@@ -147,7 +149,9 @@ export function userTotals(
     if (sc.resultCorrect) result++;
     if (pts > 0) {
       currentStreak++;
-      total += 1; // streak bonus per match
+      // Streak bonus only kicks in from the 2nd consecutive correct guess
+      // onward — a single correct prediction is not yet a "streak".
+      if (currentStreak >= 2) total += 1;
       if (currentStreak > streak) streak = currentStreak;
     } else {
       currentStreak = 0;

@@ -362,7 +362,7 @@ function ScoringLegend() {
 
       <div className="scoring-legend-bonus">
         <span className="pts pts-fire">🔥 +1</span>
-        בונוס על כל ניחוש נכון ברצף
+        בונוס מהניחוש הנכון השני ברצף ואילך
       </div>
     </aside>
   );
