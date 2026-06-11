@@ -137,11 +137,22 @@ const ITA: Omit<Player, "teamCode" | "id">[] = [
 ];
 
 const MEX: Omit<Player, "teamCode" | "id">[] = [
+  { name: "ראול רנחל",           nameEn: "Raúl Rangel",          position: "GK",  jersey: 1,  club: "צ׳יבאס",       age: 25, description: "השוער הצעיר, אופציה ראשונה של המאמן אגירה." },
+  { name: "גיירמו אוצ׳ואה",      nameEn: "Guillermo Ochoa",      position: "GK",  jersey: 13, club: "ללא מועדון",   age: 40, description: "אגדה — מונדיאל שישי בקריירה, שיא מקסיקני." },
+  { name: "חורחה סאנצ׳ס",        nameEn: "Jorge Sánchez",        position: "DEF", jersey: 2,  club: "פורטו",        age: 28, description: "מגן ימני מנוסה מהליגה הפורטוגזית." },
   { name: "סזאר מונטס",          nameEn: "César Montes",         position: "DEF", jersey: 3,  club: "אלמרייה",      age: 28, description: "מגן מרכזי גבוה." },
+  { name: "חסוס גיארדו",         nameEn: "Jesús Gallardo",       position: "DEF", jersey: 23, club: "מונטריי",      age: 30, description: "מגן שמאלי תוקפני, ותיק הסגל." },
+  { name: "חוליאן אראוחו",       nameEn: "Julián Araujo",        position: "DEF", jersey: 15, club: "בורנמות׳",     age: 22, description: "מגן ימני צעיר מהליגה האנגלית." },
   { name: "אדסון אלוורז",         nameEn: "Edson Álvarez",        position: "MID", jersey: 4,  club: "ווסטהאם",      age: 28, captain: true, description: "קפטן הנבחרת." },
   { name: "אורבליס פינדה",        nameEn: "Orbelín Pineda",       position: "MID", jersey: 8,  club: "אאק אתונה",   age: 30, description: "קשר טכני." },
-  { name: "אנטוני מרטיאל",        nameEn: "Henry Martín",         position: "FWD", jersey: 21, club: "אמריקה",       age: 33, description: "תשע פורה." },
+  { name: "אריק גוטיירס",        nameEn: "Erick Gutiérrez",      position: "MID", jersey: 18, club: "פצ׳וקה",      age: 30, description: "קשר מנוסה עם ראייה טובה למסירה." },
+  { name: "חילברטו מורה",        nameEn: "Gilberto Mora",        position: "MID", jersey: 11, club: "טיחואנה",      age: 18, description: "כשרון פורץ צעיר, מהמבטיחים בליגה המקסיקנית." },
+  { name: "מרסל רואיס",          nameEn: "Marcel Ruiz",          position: "MID", jersey: 6,  club: "טולוקה",       age: 26, description: "קשר יצירתי ומדויק במסירות." },
+  { name: "הנרי מרטין",          nameEn: "Henry Martín",         position: "FWD", jersey: 21, club: "אמריקה",       age: 33, description: "תשע פורה." },
   { name: "סנטיאגו חימנס",        nameEn: "Santiago Giménez",     position: "FWD", jersey: 9,  club: "פיינורד",      age: 25, description: "חלוץ צעיר ובוקע." },
+  { name: "ראול חימנס",          nameEn: "Raúl Jiménez",         position: "FWD", jersey: 19, club: "פולהאם",       age: 35, description: "חלוץ ותיק ומנוסה מהליגה האנגלית." },
+  { name: "אלכסיס וגה",          nameEn: "Alexis Vega",          position: "FWD", jersey: 10, club: "טולוקה",       age: 26, description: "כנף שמאל יצירתי." },
+  { name: "אוריאל אנטונה",       nameEn: "Uriel Antuna",         position: "FWD", jersey: 17, club: "קרוס אזול",    age: 28, description: "כנף ימין מהיר." },
 ];
 
 const USA: Omit<Player, "teamCode" | "id">[] = [
