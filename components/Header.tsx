@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { shareToWhatsApp } from "@/lib/share";
+import { getFirebase } from "@/lib/firebase";
 import { AvatarDisplay } from "./AvatarPicker";
 import AvatarPicker from "./AvatarPicker";
 import FifaNewsTicker from "./FifaNewsTicker";
@@ -34,11 +35,38 @@ export default function Header() {
   const signOut = useStore(s => s.signOut);
   const [pickingAvatar, setPickingAvatar] = useState(false);
   const [now, setNow] = useState(() => new Date().toISOString());
+  const [loginStats, setLoginStats] = useState<{ total: number; today: number } | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date().toISOString()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  /* Admin-only: live "logins" counter shown right next to the profile
+   * name in the header (excludes the admin's own logins — see
+   * /api/auth/log-login + /api/admin/login-stats). Always shows at
+   * least 0/0 immediately. */
+  useEffect(() => {
+    if (!user?.isAdmin) { setLoginStats(null); return; }
+    setLoginStats({ total: 0, today: 0 });
+    let cancelled = false;
+    (async () => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const fb = getFirebase();
+          const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
+          if (!tok) { await new Promise(res => setTimeout(res, 300)); continue; }
+          const r = await fetch("/api/admin/login-stats", { headers: { authorization: `Bearer ${tok}` } });
+          if (r.ok) {
+            const j = await r.json();
+            if (!cancelled) setLoginStats({ total: j.total ?? 0, today: j.today ?? 0 });
+          }
+          return;
+        } catch {}
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.isAdmin]);
 
   /* Legacy guard: removed tabs auto-reset. "mygroups" merged into "ranking". */
   useEffect(() => {
@@ -110,6 +138,11 @@ export default function Header() {
               >
                 {profile?.displayName || user.email}
               </button>
+              {user.isAdmin && loginStats && (
+                <span className="chip chip-strong header-login-stats" title="כניסות משתמשים (לא כולל אותך)">
+                  📈 {loginStats.today} היום · {loginStats.total} סה״כ
+                </span>
+              )}
               <button className="btn btn-small" onClick={signOut}>יציאה</button>
             </>
           ) : (
