@@ -7,7 +7,7 @@ import { effMatch } from "@/lib/sim";
 import { useOddsMap } from "@/lib/useOddsMap";
 import { MATCHES } from "@/lib/data";
 import { shareToWhatsApp, matchShareText } from "@/lib/share";
-import { buildMatchLineups, type TeamLineup } from "@/lib/lineups";
+import type { TeamLineup } from "@/lib/lineups";
 import Countdown from "./Countdown";
 import PredictionForm from "./PredictionForm";
 import Pitch from "./Pitch";
@@ -18,11 +18,10 @@ interface SummaryEntry { text: string; generatedAt: number }
 export default function MatchModal({ matchId, onClose }: { matchId: string; onClose: () => void }) {
   const overrides = useStore(s => s.overrides);
   const simConfig = useStore(s => s.simConfig);
-  const liveSquads = useStore(s => s.liveSquads);
   const matchResults = useStore(s => s.matchResults);
   const predictions = useStore(s => s.predictions);
   const [lineups, setLineups] = useState<{ home: TeamLineup; away: TeamLineup } | null>(null);
-  const [lineupSource, setLineupSource] = useState<"default" | "live" | "placeholder">("default");
+  const [lineupSource, setLineupSource] = useState<"not_published" | "live" | "placeholder">("not_published");
   const [preview, setPreview] = useState<PreviewEntry | null>(null);
   const [summary, setSummary] = useState<SummaryEntry | null>(null);
 
@@ -60,17 +59,14 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
         if (!r.ok) throw new Error();
         const data = await r.json();
         if (cancelled) return;
-        if (data.lineups) { setLineups(data.lineups); setLineupSource(data.source); }
+        setLineups(data.lineups || null);
+        setLineupSource(data.source);
       } catch {
-        const base = MATCHES.find(x => x.id === matchId);
-        if (base && !base.homeIsPlaceholder && !base.awayIsPlaceholder) {
-          setLineups(buildMatchLineups(base.home, base.away, liveSquads));
-          setLineupSource("default");
-        }
+        if (!cancelled) { setLineups(null); setLineupSource("not_published"); }
       }
     })();
     return () => { cancelled = true; };
-  }, [matchId, liveSquads]);
+  }, [matchId]);
 
   const oddsMap = useOddsMap();
   const base = MATCHES.find(m => m.id === matchId);
@@ -140,16 +136,20 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
           </section>
         )}
 
-        {!m.homeIsPlaceholder && !m.awayIsPlaceholder && lineups && (
+        {!m.homeIsPlaceholder && !m.awayIsPlaceholder && (
           <section className="modal-section">
             <h3>⚽ הרכבים על המגרש
-              <span className="muted" style={{ fontSize: 12, marginRight: 8 }}>
-                {lineupSource === "live"    ? "(זמן אמת)"
-                 : lineupSource === "default"? "(הרכב ברירת מחדל — יתעדכן ביום המשחק)"
-                 :                              ""}
-              </span>
+              {lineupSource === "live" && (
+                <span className="muted" style={{ fontSize: 12, marginRight: 8 }}>(הרכב רשמי שפורסם)</span>
+              )}
             </h3>
-            <Pitch home={lineups.home} away={lineups.away} />
+            {lineupSource === "live" && lineups ? (
+              <Pitch home={lineups.home} away={lineups.away} />
+            ) : (
+              <p className="muted" style={{ margin: 0 }}>
+                ⏳ ההרכבים הרשמיים טרם פורסמו. הם יוצגו כאן ברגע שיתפרסמו רשמית, בדרך כלל כשעה לפני תחילת המשחק.
+              </p>
+            )}
           </section>
         )}
 
