@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { MATCHES, TEAMS } from "@/lib/data";
+import { MATCHES, TEAMS, STAGES } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { AVATARS } from "@/lib/avatars";
+import { scorePrediction, userTotals } from "@/lib/scoring";
 
 /* God-mode admin panel — full control over every piece of user data.
  * Sections (collapsible):
@@ -30,7 +31,7 @@ interface ProfileRow {
 interface PredictionRow {
   id: string; uid: string; matchId: string;
   homeScore: number; awayScore: number; joker?: boolean; auto?: boolean;
-  updatedAt?: number;
+  updatedAt?: number; predictedWinner?: string;
 }
 interface GroupRow {
   id: string; name: string; inviteCode: string; description?: string;
@@ -392,7 +393,7 @@ function readSeenAt(key: string): number {
 function PredictionsAdmin() {
   const [rows, setRows] = useState<PredictionRow[]>([]);
   const [profilesByUid, setProfilesByUid] = useState<Record<string, { displayName: string; avatarId: string }>>({});
-  const [resultsByMatch, setResultsByMatch] = useState<Record<string, { home: number; away: number }>>({});
+  const [resultsByMatch, setResultsByMatch] = useState<Record<string, { home: number; away: number; finishedAt?: number; winner?: string; isKnockout?: boolean }>>({});
   const [busy, setBusy] = useState(false);
   const [userModal, setUserModal] = useState<string | null>(null);
 
@@ -544,7 +545,7 @@ function PredictionsAdmin() {
       <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
         💡 כל הניחושים של כל המשתמשים מוצגים. השתמש בפילטרים כדי לצמצם תצוגה.
         בעמודה "נקודות" — חישוב לפי תוצאות שכבר קיימות (משחקים שלא הסתיימו = 0).
-        לחץ על שם משתמש כדי לראות את 4 המשחקים הקרובים שלו ואיזה ניחושים הוא מילא בעצמו.
+        לחץ על שם משתמש כדי לראות את כל הניחושים שלו — גם משחקים שהסתיימו (עם תוצאה ונקודות) וגם עתידיים.
       </p>
 
       <div className="filter-row" style={{ flexWrap: "wrap" }}>
@@ -621,6 +622,7 @@ function PredictionsAdmin() {
           uid={userModal}
           profile={profilesByUid[userModal]}
           rows={rows}
+          resultsByMatch={resultsByMatch}
           onClose={() => setUserModal(null)}
         />
       )}
@@ -713,33 +715,117 @@ function PredictionRowEditor({ pred, profile, result, onPatch, onDelete, onUserC
  * table. Shows the 4 nearest upcoming matches and, for each, whether the
  * user filled it in themselves, whether it was auto-filled by the system
  * (because they didn't), or whether it's still empty. */
-function UserPredictionDeepView({ uid, profile, rows, onClose }: {
+function UserPredictionDeepView({ uid, profile, rows, resultsByMatch, onClose }: {
   uid: string;
   profile?: { displayName: string };
   rows: PredictionRow[];
+  resultsByMatch: Record<string, { home: number; away: number; finishedAt?: number; winner?: string; isKnockout?: boolean }>;
   onClose: () => void;
 }) {
-  const upcoming = useMemo(() => {
-    const now = Date.now();
-    return MATCHES
-      .filter(m => new Date(m.utc).getTime() >= now)
-      .sort((a, b) => +new Date(a.utc) - +new Date(b.utc))
-      .slice(0, 4);
-  }, []);
+  const { finished, upcoming, totals } = useMemo(() => {
+    const userPreds = rows.filter(r => r.uid === uid);
+    const predByMatch = new Map(userPreds.map(p => [p.matchId, p]));
+
+    const sorted = [...MATCHES].sort((a, b) => +new Date(a.utc) - +new Date(b.utc));
+    const finishedList: Array<{ m: typeof MATCHES[number]; p?: PredictionRow; r: { home: number; away: number }; sc: ReturnType<typeof scorePrediction> | null }> = [];
+    const upcomingList: Array<{ m: typeof MATCHES[number]; p?: PredictionRow }> = [];
+
+    for (const m of sorted) {
+      const p = predByMatch.get(m.id);
+      const r = resultsByMatch[m.id];
+      if (r) {
+        const isKO = m.stage !== "GROUP";
+        const sc = p ? scorePrediction({
+          predictedHome: p.homeScore, predictedAway: p.awayScore,
+          actualHome: r.home, actualAway: r.away,
+          predictedWinner: p.predictedWinner ?? null,
+          actualWinner: r.winner ?? null,
+          isKnockout: isKO,
+        }) : null;
+        finishedList.push({ m, p, r, sc });
+      } else {
+        upcomingList.push({ m, p });
+      }
+    }
+    finishedList.reverse(); // most recent first
+
+    /* Accurate totals (incl. streak bonus), same engine as the leaderboard. */
+    const predsForTotals = userPreds.map(p => ({
+      matchId: p.matchId, homeScore: p.homeScore, awayScore: p.awayScore,
+      predictedWinner: p.predictedWinner,
+    }));
+    const resultsForTotals: Record<string, any> = {};
+    for (const [id, r] of Object.entries(resultsByMatch)) {
+      const m = MATCHES.find(x => x.id === id);
+      resultsForTotals[id] = { ...r, finishedAt: r.finishedAt || 0, isKnockout: r.isKnockout ?? (m ? m.stage !== "GROUP" : false) };
+    }
+    const totals = userTotals(predsForTotals, resultsForTotals);
+
+    return { finished: finishedList, upcoming: upcomingList, totals };
+  }, [rows, uid, resultsByMatch]);
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" style={{ maxWidth: 600 }}>
+      <div className="modal" role="dialog" style={{ maxWidth: 680 }}>
         <button className="modal-close" onClick={onClose} aria-label="סגור">✕</button>
         <header className="modal-header">
           <h2>🔍 {profile?.displayName || uid.slice(0, 10)}</h2>
-          <div className="muted">4 המשחקים הקרובים — האם המשתמש מילא בעצמו?</div>
+          <div className="muted">
+            סה״כ <strong>{totals.totalPoints}</strong> נק׳ · 🎯 {totals.exactCount} מדויקים · ✅ {totals.resultCount}/{totals.predictionsCount} ניחושים · 🔥 סטריק {totals.streak}
+          </div>
         </header>
 
-        {upcoming.length === 0 ? (
-          <p className="muted" style={{ marginTop: 14 }}>אין משחקים קרובים.</p>
+        <h3 style={{ marginTop: 14, fontSize: 14 }}>✅ משחקים שהסתיימו ({finished.length})</h3>
+        {finished.length === 0 ? (
+          <p className="muted" style={{ marginTop: 6 }}>אין עדיין משחקים שהסתיימו.</p>
         ) : (
-          <div className="adm-table-wrap" style={{ marginTop: 14 }}>
+          <div className="adm-table-wrap" style={{ marginTop: 6, maxHeight: 260, overflowY: "auto" }}>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>משחק</th>
+                  <th>מועד</th>
+                  <th>ניחוש</th>
+                  <th>תוצאה</th>
+                  <th>נק׳</th>
+                </tr>
+              </thead>
+              <tbody>
+                {finished.map(({ m, p, r, sc }) => (
+                  <tr key={m.id}>
+                    <td style={{ fontSize: 12 }}>
+                      <span>{TEAMS[m.home]?.flag || ""} {TEAMS[m.home]?.name || m.home}</span>
+                      <span className="muted"> נגד </span>
+                      <span>{TEAMS[m.away]?.name || m.away} {TEAMS[m.away]?.flag || ""}</span>
+                      <br />
+                      <span className="muted" style={{ fontSize: 10 }}>{m.id} · {STAGES[m.stage]?.name || m.stage}</span>
+                    </td>
+                    <td style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                      {formatIsraelDate(m.utc, { short: true })} {formatIsraelTime(m.utc)}
+                    </td>
+                    <td>
+                      {p
+                        ? <span style={{ fontVariantNumeric: "tabular-nums" }}>{p.homeScore} : {p.awayScore}</span>
+                        : <span className="muted">לא ניחש</span>}
+                    </td>
+                    <td style={{ fontVariantNumeric: "tabular-nums" }}>{r.home} : {r.away}</td>
+                    <td>
+                      {sc
+                        ? <strong style={{ color: sc.points > 0 ? "var(--green)" : "var(--muted, #888)" }}>{sc.points}{sc.exact ? " 🎯" : ""}</strong>
+                        : <span className="muted">0</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <h3 style={{ marginTop: 14, fontSize: 14 }}>🔮 משחקים עתידיים / טרם הסתיימו ({upcoming.length})</h3>
+        {upcoming.length === 0 ? (
+          <p className="muted" style={{ marginTop: 6 }}>אין משחקים נוספים.</p>
+        ) : (
+          <div className="adm-table-wrap" style={{ marginTop: 6, maxHeight: 260, overflowY: "auto" }}>
             <table className="admin-table">
               <thead>
                 <tr>
@@ -750,37 +836,34 @@ function UserPredictionDeepView({ uid, profile, rows, onClose }: {
                 </tr>
               </thead>
               <tbody>
-                {upcoming.map(m => {
-                  const p = rows.find(r => r.uid === uid && r.matchId === m.id);
-                  return (
-                    <tr key={m.id}>
-                      <td style={{ fontSize: 12 }}>
-                        <span>{TEAMS[m.home]?.flag || ""} {TEAMS[m.home]?.name || m.home}</span>
-                        <span className="muted"> נגד </span>
-                        <span>{TEAMS[m.away]?.name || m.away} {TEAMS[m.away]?.flag || ""}</span>
-                        <br />
-                        <span className="muted" style={{ fontSize: 10 }}>{m.id}</span>
-                      </td>
-                      <td style={{ fontSize: 11, whiteSpace: "nowrap" }}>
-                        {formatIsraelDate(m.utc, { short: true })} {formatIsraelTime(m.utc)}
-                      </td>
-                      <td>
-                        {p
-                          ? <strong style={{ fontVariantNumeric: "tabular-nums" }}>{p.homeScore} : {p.awayScore}</strong>
-                          : <span className="muted">—</span>}
-                      </td>
-                      <td>
-                        {!p ? (
-                          <span className="badge badge-finished" style={{ background: "rgba(239,68,68,0.18)" }}>❌ לא מילא</span>
-                        ) : p.auto ? (
-                          <span className="badge badge-finished" style={{ background: "rgba(245,158,11,0.18)", color: "var(--orange)" }}>🤖 מולא אוטומטית</span>
-                        ) : (
-                          <span className="status-pill pill-open">✅ מילא ידנית</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {upcoming.map(({ m, p }) => (
+                  <tr key={m.id}>
+                    <td style={{ fontSize: 12 }}>
+                      <span>{TEAMS[m.home]?.flag || ""} {TEAMS[m.home]?.name || m.home}</span>
+                      <span className="muted"> נגד </span>
+                      <span>{TEAMS[m.away]?.name || m.away} {TEAMS[m.away]?.flag || ""}</span>
+                      <br />
+                      <span className="muted" style={{ fontSize: 10 }}>{m.id} · {STAGES[m.stage]?.name || m.stage}</span>
+                    </td>
+                    <td style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                      {formatIsraelDate(m.utc, { short: true })} {formatIsraelTime(m.utc)}
+                    </td>
+                    <td>
+                      {p
+                        ? <strong style={{ fontVariantNumeric: "tabular-nums" }}>{p.homeScore} : {p.awayScore}</strong>
+                        : <span className="muted">—</span>}
+                    </td>
+                    <td>
+                      {!p ? (
+                        <span className="badge badge-finished" style={{ background: "rgba(239,68,68,0.18)" }}>❌ לא מילא</span>
+                      ) : p.auto ? (
+                        <span className="badge badge-finished" style={{ background: "rgba(245,158,11,0.18)", color: "var(--orange)" }}>🤖 מולא אוטומטית</span>
+                      ) : (
+                        <span className="status-pill pill-open">✅ מילא ידנית</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
