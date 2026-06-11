@@ -58,11 +58,17 @@ export async function PATCH(req: Request) {
 }
 
 /* DELETE /api/admin/groups
- *   { id }                        — nuke group + memberships
+ *   { id }                        — nuke group + memberships (even if it has members)
  *   { id, removeMemberUid }       — remove one member from the group
+ *
+ * Full deletion is Super-Admin only (enforced by authedAdmin above) and is
+ * NOT blocked by remaining members. Before deleting, a complete snapshot of
+ * the group doc + all its membership docs is saved to deleted_groups/{id}
+ * so it can be restored exactly as it was via POST /api/admin/groups/deleted.
  */
 export async function DELETE(req: Request) {
-  try { await authedAdmin(req); }
+  let admin;
+  try { admin = await authedAdmin(req); }
   catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.status || 401 }); }
   const body = await req.json();
   const id = body.id;
@@ -85,9 +91,21 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ ok: true, removedMember: body.removeMemberUid });
   }
 
-  /* Full group deletion */
-  await db.collection("groups").doc(id).delete();
+  /* Full group deletion — snapshot first so it can be restored later */
+  const gRef = db.collection("groups").doc(id);
+  const gSnap = await gRef.get();
+  if (!gSnap.exists) return NextResponse.json({ error: "group not found" }, { status: 404 });
   const mems = await db.collection("group_memberships").where("groupId", "==", id).get();
+
+  await db.collection("deleted_groups").doc(id).set({
+    id,
+    group: gSnap.data(),
+    memberships: mems.docs.map(d => ({ docId: d.id, ...d.data() })),
+    deletedAt: Date.now(),
+    deletedBy: admin.email,
+  });
+
+  await gRef.delete();
   await Promise.all(mems.docs.map(d => d.ref.delete()));
   return NextResponse.json({ ok: true, removedMembers: mems.size });
 }

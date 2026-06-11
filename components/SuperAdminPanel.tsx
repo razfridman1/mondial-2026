@@ -36,6 +36,13 @@ interface GroupRow {
   id: string; name: string; inviteCode: string; description?: string;
   memberCount?: number; members?: any[];
 }
+interface DeletedGroupRow {
+  id: string;
+  group: { name?: string; description?: string; inviteCode?: string; memberCount?: number };
+  memberships: any[];
+  deletedAt: number;
+  deletedBy?: string;
+}
 interface ResultRow {
   id: string; matchId: string; home: number; away: number; sim?: boolean;
 }
@@ -720,12 +727,17 @@ function UserPredictionDeepView({ uid, profile, rows, onClose }: {
 /* ============================ 4. GROUPS ============================ */
 function GroupsAdmin() {
   const [groups, setGroups] = useState<GroupRow[]>([]);
+  const [deleted, setDeleted] = useState<DeletedGroupRow[]>([]);
   const [busy, setBusy] = useState(false);
   async function load() {
     setBusy(true);
     try {
-      const r = await fetch("/api/admin/groups", { headers: await adminAuthHeaders() });
+      const [r, rd] = await Promise.all([
+        fetch("/api/admin/groups", { headers: await adminAuthHeaders() }),
+        fetch("/api/admin/groups/deleted", { headers: await adminAuthHeaders() }),
+      ]);
       if (r.ok) setGroups(await r.json());
+      if (rd.ok) setDeleted(await rd.json());
     } finally { setBusy(false); }
   }
   useEffect(() => { load(); }, []);
@@ -744,16 +756,36 @@ function GroupsAdmin() {
     load();
     return true;
   }
-  async function nuke(id: string) {
-    if (!confirm("למחוק את הקבוצה לצמיתות? כל החברויות יוסרו.")) return;
-    await fetch("/api/admin/groups", { method: "DELETE", headers: await adminAuthHeaders(), body: JSON.stringify({ id }) });
+  async function nuke(id: string, memberCount: number) {
+    const warn = memberCount > 0
+      ? `הקבוצה הזו כוללת ${memberCount} חברים. למחוק אותה לצמיתות בכל זאת?\n(ניתן לשחזר אותה במדויק מתוך "קבוצות שנמחקו" למטה אם צריך)`
+      : "למחוק את הקבוצה לצמיתות? כל החברויות יוסרו.";
+    if (!confirm(warn)) return;
+    const r = await fetch("/api/admin/groups", { method: "DELETE", headers: await adminAuthHeaders(), body: JSON.stringify({ id }) });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      alert(d.error || "שגיאה במחיקה");
+      return;
+    }
+    load();
+  }
+  async function restore(id: string) {
+    if (!confirm("לשחזר את הקבוצה הזו בדיוק כפי שהייתה לפני המחיקה?")) return;
+    const r = await fetch("/api/admin/groups/deleted", { method: "POST", headers: await adminAuthHeaders(), body: JSON.stringify({ id }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { alert(d.error || "שגיאה בשחזור"); return; }
+    load();
+  }
+  async function purge(id: string) {
+    if (!confirm("למחוק את הגיבוי הזה לצמיתות? לא ניתן יהיה לשחזר אותו לאחר מכן.")) return;
+    await fetch("/api/admin/groups/deleted", { method: "DELETE", headers: await adminAuthHeaders(), body: JSON.stringify({ id }) });
     load();
   }
 
   return (
     <div className="adm-body">
       <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-        💡 לחץ <strong>✏️ ערוך</strong> כדי לשנות את שם הקבוצה, התיאור, או קוד ההזמנה.
+        💡 לחץ <strong>✏️ ערוך</strong> כדי לשנות את שם הקבוצה, התיאור, או קוד ההזמנה. מחיקה אפשרית גם לקבוצות עם חברים — תמיד נשמר גיבוי לשחזור.
       </p>
       <div className="adm-table-wrap" style={{ maxHeight: 480, overflowY: "auto" }}>
         <table className="admin-table">
@@ -763,6 +795,37 @@ function GroupsAdmin() {
               <GroupRowEditor key={g.id} g={g} onPatch={patch} onDelete={nuke} />
             ))}
             {!groups.length && !busy && <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: 20 }}>אין קבוצות עדיין.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <h4 style={{ marginTop: 20, marginBottom: 8 }}>🗑️ קבוצות שנמחקו — שחזור</h4>
+      <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+        קבוצות שנמחקו על ידי אדמין נשמרות כאן בדיוק כפי שהיו (כולל כל החברויות). אפשר לשחזר אותן במלואן.
+      </p>
+      <div className="adm-table-wrap" style={{ maxHeight: 360, overflowY: "auto" }}>
+        <table className="admin-table">
+          <thead><tr><th>שם / תיאור</th><th>קוד הזמנה</th><th>חברים</th><th>נמחקה</th><th>פעולות</th></tr></thead>
+          <tbody>
+            {deleted.map(d => (
+              <tr key={d.id}>
+                <td>
+                  <strong>{d.group?.name || "(ללא שם)"}</strong>
+                  {d.group?.description && <><br /><span className="muted" style={{ fontSize: 11 }}>{d.group.description}</span></>}
+                </td>
+                <td><code className="invite-code">{d.group?.inviteCode || "—"}</code></td>
+                <td>{d.memberships?.length ?? d.group?.memberCount ?? 0}</td>
+                <td className="muted" style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                  {formatIsraelDate(new Date(d.deletedAt).toISOString(), { short: true })} {formatIsraelTime(new Date(d.deletedAt).toISOString())}
+                  {d.deletedBy && <><br />ע"י {d.deletedBy}</>}
+                </td>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <button className="btn btn-small btn-primary" onClick={() => restore(d.id)}>↩️ שחזר</button>
+                  <button className="btn btn-small" onClick={() => purge(d.id)} style={{ color: "var(--red)", marginInlineStart: 4 }}>מחק לצמיתות</button>
+                </td>
+              </tr>
+            ))}
+            {!deleted.length && !busy && <tr><td colSpan={5} className="muted" style={{ textAlign: "center", padding: 20 }}>אין קבוצות מחוקות.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -842,7 +905,7 @@ function GroupRowEditor({ g, onPatch, onDelete }: any) {
       <td>{g.members?.length || 0}</td>
       <td style={{ whiteSpace: "nowrap" }}>
         <button className="btn btn-small btn-primary" onClick={() => setEditing(true)}>✏️ ערוך</button>
-        <button className="btn btn-small" onClick={() => onDelete(g.id)} style={{ color: "var(--red)", marginInlineStart: 4 }}>🗑️ מחק</button>
+        <button className="btn btn-small" onClick={() => onDelete(g.id, g.members?.length || 0)} style={{ color: "var(--red)", marginInlineStart: 4 }}>🗑️ מחק</button>
       </td>
     </tr>
   );
