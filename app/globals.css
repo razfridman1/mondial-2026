@@ -1323,6 +1323,14 @@ button { font-family: inherit; cursor: pointer; }
 }
 .admin-bar h3 { margin: 0; font-size: 16px; }
 .admin-bar > div { display: flex; gap: 6px; }
+.admin-new-badge {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(0,212,255,0.10); border: 1px solid var(--accent);
+  border-radius: var(--radius); padding: 10px 14px; margin-bottom: 12px;
+  font-size: 13px;
+}
+.btn-link:hover { opacity: 0.8; }
 .admin-table-wrap { overflow-x: auto; background: var(--bg-card); border-radius: var(--radius); padding: 8px; }
 .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .admin-table th, .admin-table td {

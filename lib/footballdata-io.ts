@@ -70,6 +70,10 @@ export interface FdMatch {
   status?: string;
   home_team?: { team_id?: number; team_name?: string };
   away_team?: { team_id?: number; team_name?: string };
+  /* /seasons/{id}/matches embeds 1X2 odds directly on each match as plain
+   * numbers. Unpriced (far-future) matches come back as {0,0,0} — these
+   * must be treated as "no odds available" (parse1X2Odds returns null). */
+  odds?: { home_win: number; draw: number; away_win: number };
 }
 
 /** List matches for a given footballdata.io season_id (paginated; we pull

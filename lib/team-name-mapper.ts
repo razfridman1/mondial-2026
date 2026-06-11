@@ -38,6 +38,7 @@ const API_NAME_SYNONYMS: Record<string, string> = {
   "saudi arabia":          "KSA",
   "usa":                   "USA",
   "united states":         "USA",
+  "usmnt":                 "USA",
   "england":               "ENG",
   "scotland":              "SCO",
   "panama":                "PAN",

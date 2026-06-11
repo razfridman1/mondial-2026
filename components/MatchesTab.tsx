@@ -18,6 +18,7 @@ import {
   matchLiveStatus, relativeLabel,
 } from "@/lib/utils";
 import { effMatch } from "@/lib/sim";
+import { useOddsMap } from "@/lib/useOddsMap";
 import { resolveAllStages } from "@/lib/bracket";
 import type { Match, StageId } from "@/lib/types";
 import MatchModal from "./MatchModal";
@@ -123,6 +124,10 @@ export default function MatchesTab() {
   /* Resolve knockout placeholders to real team codes once previous stages finish. */
   const resolved = useMemo(() => resolveAllStages(matchResults), [matchResults]);
 
+  /* Real 1X2 odds (footballdata.io), keyed by match id. Only group-stage
+   * matches close to kickoff have priced odds — others are simply absent. */
+  const oddsMap = useOddsMap();
+
   /* All effective matches — with knockout placeholders swapped for real codes when known.
    * Knockout matches are HIDDEN from the schedule list until football-data.org
    * populates real teams (i.e., until the bracket resolver fills them in from
@@ -132,11 +137,13 @@ export default function MatchesTab() {
     () => MATCHES
       .map(m => {
         const eff = effMatch(m, overrides[m.id], simConfig);
-        if (m.stage === "GROUP") return eff;
+        const odds = oddsMap[m.id] || eff.odds;
+        if (m.stage === "GROUP") return { ...eff, odds };
         const r = resolved[m.id];
-        if (!r) return eff;
+        if (!r) return { ...eff, odds };
         return {
           ...eff,
+          odds,
           home: r.home || eff.home,
           away: r.away || eff.away,
           homeIsPlaceholder: !r.home,
@@ -149,7 +156,7 @@ export default function MatchesTab() {
         return !m.homeIsPlaceholder && !m.awayIsPlaceholder;
       })
       .sort((a, b) => +new Date(a.utc) - +new Date(b.utc)),
-    [overrides, simConfig, resolved]
+    [overrides, simConfig, resolved, oddsMap]
   );
 
   /* Bucketed lists */

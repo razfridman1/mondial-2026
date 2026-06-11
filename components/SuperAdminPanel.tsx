@@ -30,6 +30,7 @@ interface ProfileRow {
 interface PredictionRow {
   id: string; uid: string; matchId: string;
   homeScore: number; awayScore: number; joker?: boolean; auto?: boolean;
+  updatedAt?: number;
 }
 interface GroupRow {
   id: string; name: string; inviteCode: string; description?: string;
@@ -301,11 +302,26 @@ function UserRowEditor({ profile, onPatch, onDelete }: any) {
 }
 
 /* ============================ 3. PREDICTIONS ============================ */
+/* localStorage key + helper for "new since last visit" badges. Returns
+ * Date.now() (i.e. "nothing new") on first-ever load so existing data
+ * doesn't flood the badge the first time this ships. */
+const PREDICTIONS_SEEN_KEY = "mondial_admin_predictions_seen_at";
+function readSeenAt(key: string): number {
+  if (typeof window === "undefined") return Date.now();
+  const v = window.localStorage.getItem(key);
+  return v ? Number(v) : Date.now();
+}
+
 function PredictionsAdmin() {
   const [rows, setRows] = useState<PredictionRow[]>([]);
   const [profilesByUid, setProfilesByUid] = useState<Record<string, { displayName: string; avatarId: string }>>({});
   const [resultsByMatch, setResultsByMatch] = useState<Record<string, { home: number; away: number }>>({});
   const [busy, setBusy] = useState(false);
+  const [userModal, setUserModal] = useState<string | null>(null);
+
+  /* "🆕 ניחושים חדשים" badge — predictions a real user filled in (not
+   * auto-generated) since the admin last acknowledged this section. */
+  const [predSeenAt, setPredSeenAt] = useState<number>(() => readSeenAt(PREDICTIONS_SEEN_KEY));
 
   /* Filters */
   const [search, setSearch]   = useState("");
@@ -416,11 +432,42 @@ function PredictionsAdmin() {
     return t;
   }, [filtered, resultsByMatch]);
 
+  /* New (manually-filled) predictions since the admin last acknowledged
+   * this section — grouped by user for the badge. */
+  const newPredsByUid = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of rows) {
+      if (p.auto) continue; // not a real "user filled it in" event
+      if (!p.updatedAt || p.updatedAt <= predSeenAt) continue;
+      m.set(p.uid, (m.get(p.uid) || 0) + 1);
+    }
+    return m;
+  }, [rows, predSeenAt]);
+  const newPredsTotal = useMemo(() => Array.from(newPredsByUid.values()).reduce((a, b) => a + b, 0), [newPredsByUid]);
+
+  function ackNewPredictions() {
+    const now = Date.now();
+    if (typeof window !== "undefined") window.localStorage.setItem(PREDICTIONS_SEEN_KEY, String(now));
+    setPredSeenAt(now);
+  }
+
   return (
     <div className="adm-body">
+      {newPredsTotal > 0 && (
+        <div className="admin-new-badge">
+          <span>🆕 <strong>{newPredsTotal}</strong> ניחושים חדשים מילאו {newPredsByUid.size} משתמשים: {
+            Array.from(newPredsByUid.entries())
+              .map(([uid, count]) => `${profilesByUid[uid]?.displayName || uid.slice(0, 8)} (${count})`)
+              .join(", ")
+          }</span>
+          <button className="btn btn-small" onClick={ackNewPredictions}>✓ סמן כנקרא</button>
+        </div>
+      )}
+
       <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
         💡 כל הניחושים של כל המשתמשים מוצגים. השתמש בפילטרים כדי לצמצם תצוגה.
         בעמודה "נקודות" — חישוב לפי תוצאות שכבר קיימות (משחקים שלא הסתיימו = 0).
+        לחץ על שם משתמש כדי לראות את 4 המשחקים הקרובים שלו ואיזה ניחושים הוא מילא בעצמו.
       </p>
 
       <div className="filter-row" style={{ flexWrap: "wrap" }}>
@@ -480,6 +527,7 @@ function PredictionsAdmin() {
                 result={resultsByMatch[p.matchId]}
                 onPatch={patch}
                 onDelete={del}
+                onUserClick={setUserModal}
               />
             ))}
             {!filtered.length && !busy && (
@@ -490,11 +538,20 @@ function PredictionsAdmin() {
           </tbody>
         </table>
       </div>
+
+      {userModal && (
+        <UserPredictionDeepView
+          uid={userModal}
+          profile={profilesByUid[userModal]}
+          rows={rows}
+          onClose={() => setUserModal(null)}
+        />
+      )}
     </div>
   );
 }
 
-function PredictionRowEditor({ pred, profile, result, onPatch, onDelete }: any) {
+function PredictionRowEditor({ pred, profile, result, onPatch, onDelete, onUserClick }: any) {
   const [h, setH] = useState(pred.homeScore);
   const [a, setA] = useState(pred.awayScore);
   const [editing, setEditing] = useState(false);
@@ -517,7 +574,14 @@ function PredictionRowEditor({ pred, profile, result, onPatch, onDelete }: any) 
   return (
     <tr>
       <td>
-        <strong style={{ fontSize: 13 }}>{profile?.displayName || "—"}</strong>
+        <button
+          className="btn-link"
+          onClick={() => onUserClick?.(pred.uid)}
+          title="הצג את 4 המשחקים הקרובים של המשתמש"
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "inherit", textDecoration: "underline", textUnderlineOffset: 2 }}
+        >
+          <strong style={{ fontSize: 13 }}>{profile?.displayName || "—"}</strong>
+        </button>
         <br />
         <span className="muted" style={{ fontFamily: "monospace", fontSize: 10 }}>{pred.uid.slice(0, 10)}…</span>
       </td>
@@ -565,6 +629,91 @@ function PredictionRowEditor({ pred, profile, result, onPatch, onDelete }: any) 
         <button className="btn btn-small" onClick={() => onDelete(pred.id)} style={{ color: "var(--red)", marginInlineStart: 4 }}>🗑️</button>
       </td>
     </tr>
+  );
+}
+
+/* User "deep view" — opened by clicking a username in the predictions
+ * table. Shows the 4 nearest upcoming matches and, for each, whether the
+ * user filled it in themselves, whether it was auto-filled by the system
+ * (because they didn't), or whether it's still empty. */
+function UserPredictionDeepView({ uid, profile, rows, onClose }: {
+  uid: string;
+  profile?: { displayName: string };
+  rows: PredictionRow[];
+  onClose: () => void;
+}) {
+  const upcoming = useMemo(() => {
+    const now = Date.now();
+    return MATCHES
+      .filter(m => new Date(m.utc).getTime() >= now)
+      .sort((a, b) => +new Date(a.utc) - +new Date(b.utc))
+      .slice(0, 4);
+  }, []);
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog" style={{ maxWidth: 600 }}>
+        <button className="modal-close" onClick={onClose} aria-label="סגור">✕</button>
+        <header className="modal-header">
+          <h2>🔍 {profile?.displayName || uid.slice(0, 10)}</h2>
+          <div className="muted">4 המשחקים הקרובים — האם המשתמש מילא בעצמו?</div>
+        </header>
+
+        {upcoming.length === 0 ? (
+          <p className="muted" style={{ marginTop: 14 }}>אין משחקים קרובים.</p>
+        ) : (
+          <div className="adm-table-wrap" style={{ marginTop: 14 }}>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>משחק</th>
+                  <th>מועד</th>
+                  <th>ניחוש</th>
+                  <th>מצב</th>
+                </tr>
+              </thead>
+              <tbody>
+                {upcoming.map(m => {
+                  const p = rows.find(r => r.uid === uid && r.matchId === m.id);
+                  return (
+                    <tr key={m.id}>
+                      <td style={{ fontSize: 12 }}>
+                        <span>{TEAMS[m.home]?.flag || ""} {TEAMS[m.home]?.name || m.home}</span>
+                        <span className="muted"> נגד </span>
+                        <span>{TEAMS[m.away]?.name || m.away} {TEAMS[m.away]?.flag || ""}</span>
+                        <br />
+                        <span className="muted" style={{ fontSize: 10 }}>{m.id}</span>
+                      </td>
+                      <td style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                        {formatIsraelDate(m.utc, { short: true })} {formatIsraelTime(m.utc)}
+                      </td>
+                      <td>
+                        {p
+                          ? <strong style={{ fontVariantNumeric: "tabular-nums" }}>{p.homeScore} : {p.awayScore}</strong>
+                          : <span className="muted">—</span>}
+                      </td>
+                      <td>
+                        {!p ? (
+                          <span className="badge badge-finished" style={{ background: "rgba(239,68,68,0.18)" }}>❌ לא מילא</span>
+                        ) : p.auto ? (
+                          <span className="badge badge-finished" style={{ background: "rgba(245,158,11,0.18)", color: "var(--orange)" }}>🤖 מולא אוטומטית</span>
+                        ) : (
+                          <span className="status-pill pill-open">✅ מילא ידנית</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="mc-actions" style={{ marginTop: 16 }}>
+          <button className="btn btn-primary" onClick={onClose}>סגור</button>
+        </div>
+      </div>
+    </div>
   );
 }
 

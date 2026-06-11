@@ -4,6 +4,7 @@ import { TEAMS, VENUES, CHANNELS, STAGES } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { formatIsraelDate, formatIsraelTime, oddsToProbabilities } from "@/lib/utils";
 import { effMatch } from "@/lib/sim";
+import { useOddsMap } from "@/lib/useOddsMap";
 import { MATCHES } from "@/lib/data";
 import { shareToWhatsApp, matchShareText } from "@/lib/share";
 import { buildMatchLineups, type TeamLineup } from "@/lib/lineups";
@@ -71,9 +72,11 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
     return () => { cancelled = true; };
   }, [matchId, liveSquads]);
 
+  const oddsMap = useOddsMap();
   const base = MATCHES.find(m => m.id === matchId);
   if (!base) return null;
-  const m = effMatch(base, overrides[matchId], simConfig);
+  const eff = effMatch(base, overrides[matchId], simConfig);
+  const m = { ...eff, odds: oddsMap[matchId] || eff.odds };
   const home = TEAMS[m.home] || { code: m.home, name: m.home, flag: "❓" };
   const away = TEAMS[m.away] || { code: m.away, name: m.away, flag: "❓" };
   const venue = VENUES[m.venue] || { name: m.venue, city: "", country: "", flag: "", capacity: 0 };

@@ -1,7 +1,17 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
+
+/* localStorage key + helper for the "🆕 new users" badge. Returns
+ * Date.now() (i.e. "nothing new") on first-ever load so existing users
+ * don't flood the badge the first time this ships. */
+const USERS_SEEN_KEY = "mondial_admin_users_seen_at";
+function readSeenAt(key: string): number {
+  if (typeof window === "undefined") return Date.now();
+  const v = window.localStorage.getItem(key);
+  return v ? Number(v) : Date.now();
+}
 
 function formatJoinDate(raw?: string): string {
   if (!raw) return "—";
@@ -42,6 +52,10 @@ export default function AdminUsers() {
   const [filter, setFilter] = useState("");
   const [onlyUnassigned, setOnlyUnassigned] = useState(false);
   const [groupFilter, setGroupFilter] = useState<string>(""); // "" = all groups
+
+  /* "🆕 משתמשים חדשים" badge — users who joined since the admin last
+   * acknowledged this tab. */
+  const [usersSeenAt, setUsersSeenAt] = useState<number>(() => readSeenAt(USERS_SEEN_KEY));
 
   async function authHeaders() {
     const token = await getFirebase().auth!.currentUser!.getIdToken();
@@ -234,6 +248,17 @@ export default function AdminUsers() {
 
   const unassignedCount = users.filter(u => (u.groupIds || []).length === 0).length;
 
+  const newUsers = useMemo(
+    () => users.filter(u => u.createdAt && new Date(u.createdAt).getTime() > usersSeenAt),
+    [users, usersSeenAt]
+  );
+
+  function ackNewUsers() {
+    const now = Date.now();
+    if (typeof window !== "undefined") window.localStorage.setItem(USERS_SEEN_KEY, String(now));
+    setUsersSeenAt(now);
+  }
+
   return (
     <section style={{ marginTop: 26 }}>
       <div className="admin-bar">
@@ -242,6 +267,15 @@ export default function AdminUsers() {
           ➕ צור משתמש פנימי חדש
         </button>
       </div>
+
+      {newUsers.length > 0 && (
+        <div className="admin-new-badge">
+          <span>🆕 <strong>{newUsers.length}</strong> משתמשים חדשים הצטרפו: {
+            newUsers.map(u => u.displayName || u.email || u.uid.slice(0, 8)).join(", ")
+          }</span>
+          <button className="btn btn-small" onClick={ackNewUsers}>✓ סמן כנקרא</button>
+        </div>
+      )}
 
       <p className="muted" style={{ marginBottom: 10 }}>
         מציג את <strong>כל המשתמשים</strong> במערכת — גם משתמשי Google וגם משתמשים פנימיים (username/password) שאתה יצרת.
