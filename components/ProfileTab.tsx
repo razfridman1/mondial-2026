@@ -78,18 +78,30 @@ export default function ProfileTab() {
   }, [user?.uid, groups]);
 
   /* Admin-only: number of user logins (today / all-time), excluding the
-   * admin's own logins. See /api/auth/log-login + /api/admin/login-stats. */
+   * admin's own logins. See /api/auth/log-login + /api/admin/login-stats.
+   * Defaults to 0/0 — if no non-admin logins have happened yet (or the
+   * fetch is still in flight / fails), show "0" rather than hiding the
+   * widget entirely. */
   useEffect(() => {
     if (!user?.isAdmin) { setLoginStats(null); return; }
+    setLoginStats({ total: 0, today: 0 });
+    let cancelled = false;
     (async () => {
-      try {
-        const fb = getFirebase();
-        const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
-        if (!tok) return;
-        const r = await fetch("/api/admin/login-stats", { headers: { authorization: `Bearer ${tok}` } });
-        if (r.ok) setLoginStats(await r.json());
-      } catch {}
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const fb = getFirebase();
+          const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
+          if (!tok) { await new Promise(res => setTimeout(res, 300)); continue; }
+          const r = await fetch("/api/admin/login-stats", { headers: { authorization: `Bearer ${tok}` } });
+          if (r.ok) {
+            const j = await r.json();
+            if (!cancelled) setLoginStats({ total: j.total ?? 0, today: j.today ?? 0 });
+          }
+          return;
+        } catch {}
+      }
     })();
+    return () => { cancelled = true; };
   }, [user?.isAdmin]);
 
   if (!user) {
