@@ -56,6 +56,23 @@ export function tomorrowKey(): string {
   return israelDateKey(t.toISOString());
 }
 
+/* =====================================================================
+ * fakeSiteUserCount — decorative "users on site" counter shown to
+ * regular (non-admin) users near their profile. Starts at FAKE_BASE on
+ * FAKE_START_DATE and grows by FAKE_DAILY for every Israel-local day
+ * that has passed since then (purely cosmetic, not a real metric).
+ * ===================================================================*/
+const FAKE_USERS_START_DATE = "2026-06-11";
+const FAKE_USERS_BASE = 246;
+const FAKE_USERS_DAILY = 359;
+
+export function fakeSiteUserCount(): number {
+  const start = new Date(`${FAKE_USERS_START_DATE}T00:00:00Z`);
+  const now = new Date(`${todayKey()}T00:00:00Z`);
+  const days = Math.floor((now.getTime() - start.getTime()) / 86400000);
+  return FAKE_USERS_BASE + Math.max(0, days) * FAKE_USERS_DAILY;
+}
+
 export function formatIsraelDate(utcIso: string, opts: { short?: boolean } = {}): string {
   const p = israelParts(utcIso);
   const weekdayIdx = new Date(`${p.year}-${String(p.month).padStart(2,"0")}-${String(p.day).padStart(2,"0")}T12:00:00`).getDay();

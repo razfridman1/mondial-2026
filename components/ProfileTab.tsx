@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { setUserDoc, getFirebase } from "@/lib/firebase";
+import { fakeSiteUserCount } from "@/lib/utils";
 import { AVATARS } from "@/lib/avatars";
 import { ACHIEVEMENTS } from "@/lib/achievements";
 import { AvatarDisplay } from "./AvatarPicker";
@@ -184,6 +185,16 @@ export default function ProfileTab() {
             <span className="admin-login-stat">
               <strong>{loginStats.total}</strong>
               <span className="muted"> סה״כ</span>
+            </span>
+          </div>
+        )}
+
+        {/* Regular users: decorative "site users" counter */}
+        {!user.isAdmin && (
+          <div className="admin-login-stats">
+            <span className="chip chip-strong">👥 משתמשים באתר</span>
+            <span className="admin-login-stat">
+              <strong>{fakeSiteUserCount().toLocaleString("he-IL")}</strong>
             </span>
           </div>
         )}
