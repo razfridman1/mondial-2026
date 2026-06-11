@@ -25,7 +25,8 @@ export async function GET(req: Request) {
 
 /* POST /api/admin/results { matchId, home, away } — upsert */
 export async function POST(req: Request) {
-  try { await authedAdmin(req); }
+  let decoded;
+  try { decoded = await authedAdmin(req); }
   catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.status || 401 }); }
   const body = await req.json();
   if (!body.matchId) return NextResponse.json({ error: "missing matchId" }, { status: 400 });
@@ -36,7 +37,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid scores" }, { status: 400 });
   }
   const { db } = getAdmin();
-  await db.collection("match_results").doc(body.matchId).set({
+  const ref = db.collection("match_results").doc(body.matchId);
+
+  /* Auto-backup: snapshot the result as it was BEFORE this edit, so it can
+   * be restored later from the "עריכה ידנית" history view. Only the real
+   * previous data is stored — nothing fabricated. */
+  const existing = await ref.get();
+  if (existing.exists) {
+    await db.collection("match_results_history").add({
+      ...existing.data(),
+      matchId: body.matchId,
+      backedUpAt: Date.now(),
+      backedUpBy: decoded.email || null,
+      action: "update",
+    });
+  }
+
+  await ref.set({
     matchId: body.matchId, home, away,
     finishedAt: body.finishedAt || Date.now(),
     sim: false,
@@ -48,13 +65,28 @@ export async function POST(req: Request) {
 
 /* DELETE /api/admin/results { matchId } */
 export async function DELETE(req: Request) {
-  try { await authedAdmin(req); }
+  let decoded;
+  try { decoded = await authedAdmin(req); }
   catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.status || 401 }); }
   const body = await req.json().catch(() => ({}));
   const url = new URL(req.url);
   const matchId = body.matchId || url.searchParams.get("matchId");
   if (!matchId) return NextResponse.json({ error: "missing matchId" }, { status: 400 });
   const { db } = getAdmin();
-  await db.collection("match_results").doc(matchId).delete();
+  const ref = db.collection("match_results").doc(matchId);
+
+  /* Auto-backup the result before deleting it, so it can be restored. */
+  const existing = await ref.get();
+  if (existing.exists) {
+    await db.collection("match_results_history").add({
+      ...existing.data(),
+      matchId,
+      backedUpAt: Date.now(),
+      backedUpBy: decoded.email || null,
+      action: "delete",
+    });
+  }
+
+  await ref.delete();
   return NextResponse.json({ ok: true });
 }

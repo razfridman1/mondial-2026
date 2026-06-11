@@ -186,28 +186,88 @@ function ResultsAdmin() {
   );
 }
 
-function ResultRowEditor({ match, result, onSave, onDelete }: any) {
+function ResultRowEditor({ match, result, onSave, onDelete, onRestored }: any) {
   const [home, setHome] = useState(result?.home ?? "");
   const [away, setAway] = useState(result?.away ?? "");
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<any[] | null>(null);
+  const [historyBusy, setHistoryBusy] = useState(false);
   useEffect(() => { setHome(result?.home ?? ""); setAway(result?.away ?? ""); }, [result?.home, result?.away]);
   const homeTeam = TEAMS[match.home];
   const awayTeam = TEAMS[match.away];
+
+  async function loadHistory() {
+    setHistoryBusy(true);
+    try {
+      const r = await fetch(`/api/admin/results/history?matchId=${match.id}`, { headers: await adminAuthHeaders() });
+      setHistory(r.ok ? await r.json() : []);
+    } finally { setHistoryBusy(false); }
+  }
+  function toggleHistory() {
+    const next = !showHistory;
+    setShowHistory(next);
+    if (next && history === null) loadHistory();
+  }
+  async function restore(backupId: string) {
+    if (!confirm("לשחזר את הגרסה הזו? המצב הנוכחי יישמר כגיבוי וניתן יהיה לחזור אליו.")) return;
+    await fetch("/api/admin/results/history", {
+      method: "POST", headers: await adminAuthHeaders(),
+      body: JSON.stringify({ matchId: match.id, backupId }),
+    });
+    setHistory(null);
+    onRestored?.();
+    loadHistory();
+  }
+
+  const ACTION_LABELS: Record<string, string> = {
+    update: "עריכה ידנית", delete: "מחיקה", "before-restore": "לפני שחזור",
+  };
+
   return (
-    <tr>
-      <td><small className="muted">{match.id}</small><br />
-          {homeTeam?.flag} {homeTeam?.name || match.home} <span className="muted">נגד</span> {awayTeam?.name || match.away} {awayTeam?.flag}</td>
-      <td className="muted" style={{ fontSize: 11 }}>{formatIsraelDate(match.utc, { short: true })}<br />{formatIsraelTime(match.utc)}</td>
-      <td><input type="number" min={0} max={30} value={home} onChange={e => setHome(e.target.value)} style={{ width: 60 }} /></td>
-      <td>:</td>
-      <td><input type="number" min={0} max={30} value={away} onChange={e => setAway(e.target.value)} style={{ width: 60 }} /></td>
-      <td>
-        <button className="btn btn-small btn-primary"
-                disabled={home === "" || away === ""}
-                onClick={() => onSave(match.id, Number(home), Number(away))}>שמור</button>
-        {result && <button className="btn btn-small" onClick={() => onDelete(match.id)} style={{ marginInlineStart: 4, color: "var(--red)" }}>מחק</button>}
-        {result?.sim && <span className="chip" style={{ marginInlineStart: 4 }}>סים</span>}
-      </td>
-    </tr>
+    <>
+      <tr>
+        <td><small className="muted">{match.id}</small><br />
+            {homeTeam?.flag} {homeTeam?.name || match.home} <span className="muted">נגד</span> {awayTeam?.name || match.away} {awayTeam?.flag}</td>
+        <td className="muted" style={{ fontSize: 11 }}>{formatIsraelDate(match.utc, { short: true })}<br />{formatIsraelTime(match.utc)}</td>
+        <td><input type="number" min={0} max={30} value={home} onChange={e => setHome(e.target.value)} style={{ width: 60 }} /></td>
+        <td>:</td>
+        <td><input type="number" min={0} max={30} value={away} onChange={e => setAway(e.target.value)} style={{ width: 60 }} /></td>
+        <td>
+          <button className="btn btn-small btn-primary"
+                  disabled={home === "" || away === ""}
+                  onClick={() => onSave(match.id, Number(home), Number(away))}>שמור</button>
+          {result && <button className="btn btn-small" onClick={() => onDelete(match.id)} style={{ marginInlineStart: 4, color: "var(--red)" }}>מחק</button>}
+          {result?.sim && <span className="chip" style={{ marginInlineStart: 4 }}>סים</span>}
+          <button className="btn btn-small" onClick={toggleHistory} style={{ marginInlineStart: 4 }} title="גיבויים קודמים">🕘</button>
+        </td>
+      </tr>
+      {showHistory && (
+        <tr>
+          <td colSpan={6} style={{ background: "var(--bg-elev)" }}>
+            {historyBusy && <div className="muted" style={{ fontSize: 12 }}>טוען גיבויים…</div>}
+            {!historyBusy && history && history.length === 0 && (
+              <div className="muted" style={{ fontSize: 12 }}>אין גיבויים קודמים למשחק זה.</div>
+            )}
+            {!historyBusy && history && history.length > 0 && (
+              <table style={{ width: "100%", fontSize: 12 }}>
+                <thead><tr><th>תאריך</th><th>תוצאה</th><th>פעולה</th><th>ע"י</th><th></th></tr></thead>
+                <tbody>
+                  {history.map(h => (
+                    <tr key={h.id}>
+                      <td className="muted">{formatIsraelDate(new Date(h.backedUpAt).toISOString(), { short: true })} {formatIsraelTime(new Date(h.backedUpAt).toISOString())}</td>
+                      <td>{h.home != null ? `${h.home}:${h.away}` : "—"}</td>
+                      <td className="muted">{ACTION_LABELS[h.action] || h.action}</td>
+                      <td className="muted">{h.backedUpBy || "—"}</td>
+                      <td><button className="btn btn-small" onClick={() => restore(h.id)}>שחזר</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 

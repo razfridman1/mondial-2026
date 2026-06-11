@@ -11,21 +11,34 @@
 "use client";
 
 import { TEAMS, CHANNELS, STAGES, VENUES } from "./data";
+import { AVATARS } from "./avatars";
 import { formatIsraelDate, formatIsraelTime } from "./utils";
-import type { Match } from "./types";
+import type { Match, LeaderRow } from "./types";
 
-type CardKind = "match" | "prediction" | "leaderboard";
+type CardKind = "match" | "prediction" | "leaderboard" | "leaderboard-table";
 
 interface MatchCardArgs { match: Match; }
 interface PredictionCardArgs { match: Match; home: number; away: number; joker?: boolean; }
 interface LeaderboardCardArgs { rank: number; name: string; points: number; }
+interface LeaderboardTableArgs { rows: LeaderRow[]; groupName?: string | null; limit?: number; }
 
 export function buildSvg(kind: CardKind, args: any): { svg: string; width: number; height: number; filename: string } {
   switch (kind) {
-    case "match":          return buildMatchInstaCard(args as MatchCardArgs);
-    case "prediction":     return buildPredictionCard(args as PredictionCardArgs);
-    case "leaderboard":    return buildLeaderboardCard(args as LeaderboardCardArgs);
+    case "match":             return buildMatchInstaCard(args as MatchCardArgs);
+    case "prediction":        return buildPredictionCard(args as PredictionCardArgs);
+    case "leaderboard":       return buildLeaderboardCard(args as LeaderboardCardArgs);
+    case "leaderboard-table": return buildLeaderboardTableCard(args as LeaderboardTableArgs);
   }
+}
+
+/* Escape text for safe embedding inside SVG <text> elements. */
+function escapeXml(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 /* ------- 1080×1080 Instagram square ------- */
@@ -172,6 +185,75 @@ function buildLeaderboardCard({ rank, name, points }: LeaderboardCardArgs) {
   };
 }
 
+/* ------- Leaderboard TABLE card — looks like the in-app "🏆 דירוג חברים"
+ * leaderboard list (dark cards, gold/silver/bronze highlight for top 3,
+ * avatar + name + points), so a shared screenshot looks like the real app. */
+function buildLeaderboardTableCard({ rows, groupName, limit = 10 }: LeaderboardTableArgs) {
+  const W = 1080;
+  const top = rows.slice(0, limit);
+  const ROW_H = 132;
+  const HEADER_H = groupName ? 320 : 260;
+  const FOOTER_H = 110;
+  const H = HEADER_H + Math.max(top.length, 1) * ROW_H + FOOTER_H;
+
+  const medal = (rank: number) => rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
+  const rankColor = (rank: number) => rank === 1 ? "#ffd24a" : rank === 2 ? "#c0c0c0" : rank === 3 ? "#cd7f32" : "#2a3354";
+
+  const rowsSvg = top.map((r, i) => {
+    const rank = r.rank || i + 1;
+    const y = HEADER_H + i * ROW_H;
+    const accent = rankColor(rank);
+    const isTop3 = rank <= 3;
+    const avatar = AVATARS.find(a => a.id === r.avatarId);
+    const flag = avatar?.flag || "👤";
+    const m = medal(rank);
+    return `
+    <g transform="translate(0 ${y})">
+      <rect x="60" y="12" width="${W - 120}" height="${ROW_H - 24}" rx="20"
+            fill="#181f37" stroke="${accent}" stroke-width="${isTop3 ? 5 : 2}"
+            ${rank === 1 ? `fill-opacity="1"` : ""}/>
+      ${rank === 1 ? `<rect x="60" y="12" width="${W - 120}" height="${ROW_H - 24}" rx="20" fill="#ffd24a" fill-opacity="0.08"/>` : ""}
+      <text x="${W - 110}" y="${ROW_H / 2 + 16}" text-anchor="middle" font-family="Heebo, Rubik, Arial" font-size="44" font-weight="900" fill="${isTop3 ? accent : "#ffd24a"}">${m || `#${rank}`}</text>
+      <text x="${W - 195}" y="${ROW_H / 2 + 18}" text-anchor="middle" font-size="62">${flag}</text>
+      <text x="${W - 270}" y="${ROW_H / 2 + 14}" text-anchor="end" font-family="Heebo, Rubik, Arial" font-size="38" font-weight="800" fill="#eef1ff">${escapeXml(r.displayName)}</text>
+      <text x="170" y="${ROW_H / 2 + 14}" text-anchor="end" font-family="Heebo, Rubik, Arial" font-size="46" font-weight="900" fill="#ffd24a">${r.totalPoints}</text>
+      <text x="180" y="${ROW_H / 2 + 14}" text-anchor="start" font-family="Heebo" font-size="22" fill="#9aa3c7">נק'</text>
+    </g>`;
+  }).join("");
+
+  const now = new Date().toISOString();
+  return {
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#0b1020"/>
+      <stop offset="60%" stop-color="#182343"/>
+      <stop offset="100%" stop-color="#0b1020"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd24a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="${W}" height="${H}" fill="url(#bg)"/>
+
+  <g transform="translate(${W / 2} 100)" text-anchor="middle" font-family="Heebo, Rubik, Arial">
+    <text font-size="58" font-weight="900" fill="url(#gold)">🏆 לוח התוצאות</text>
+    ${groupName ? `<text y="58" font-size="36" font-weight="700" fill="#eef1ff">${escapeXml(groupName)}</text>` : ""}
+    <text y="${groupName ? 108 : 56}" font-size="24" fill="#9aa3c7">מונדיאל 2026 · ${formatIsraelDate(now)} ${formatIsraelTime(now)}</text>
+  </g>
+
+  ${rowsSvg}
+
+  ${rows.length > top.length ? `<text x="${W / 2}" y="${HEADER_H + top.length * ROW_H + 50}" text-anchor="middle" font-family="Heebo" font-size="24" fill="#9aa3c7">+ עוד ${rows.length - top.length} משתתפים</text>` : ""}
+
+  <text x="${W / 2}" y="${H - 36}" text-anchor="middle" font-family="Heebo" font-size="24" fill="#9aa3c7">#מונדיאל2026 #מי_יצדק</text>
+</svg>`,
+    width: W, height: H,
+    filename: `mondial-leaderboard-table.png`,
+  };
+}
+
 /* =====================================================================
  * Render & share helpers (browser-only)
  * ===================================================================*/
@@ -273,6 +355,73 @@ export function openShareCard(kind: CardKind, args: any) {
       }
     } catch (e) {
       alert("שגיאה בשיתוף — נסה שוב.");
+    }
+  });
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* Open a modal that shows the leaderboard as a card styled like the in-app
+ * "🏆 דירוג חברים" table (dark cards, gold/silver/bronze rows, avatars,
+ * points), and lets the user share it as an IMAGE (WhatsApp, etc. via the
+ * native share sheet) or download it — instead of the old plain-text
+ * message. */
+export function openLeaderboardShareCard(rows: LeaderRow[], groupName?: string | null) {
+  const { svg, width, height, filename } = buildSvg("leaderboard-table", { rows, groupName });
+
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" role="dialog" style="max-width: 480px;">
+      <button class="modal-close" aria-label="סגור">✕</button>
+      <header class="modal-header">
+        <h2>🏆 שתף את לוח התוצאות</h2>
+        <div class="muted">תמונה בעיצוב האתר — מוכנה לשיתוף</div>
+      </header>
+      <div class="share-card-preview" style="max-height: 60vh; overflow:auto;">${svg}</div>
+      <div class="mc-actions" style="margin-top:14px; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-primary" data-act="share">📤 שתף</button>
+        <button class="btn" data-act="download">⬇️ הורד תמונה</button>
+      </div>
+      <p class="muted" style="font-size:11px;margin-top:10px; line-height:1.5;">
+        📱 לחיצה על "שתף" תפתח את תפריט השיתוף (וואטסאפ ועוד). אם זה לא עובד במכשיר שלך, לחץ "הורד תמונה" ושתף אותה ידנית.
+      </p>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay || (e.target as HTMLElement).classList.contains("modal-close")) overlay.remove();
+  });
+
+  overlay.querySelector("[data-act='share']")!.addEventListener("click", async () => {
+    try {
+      const blob = await svgToPngBlob(svg, width, height);
+      const file = new File([blob], filename, { type: "image/png" });
+      if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
+        await (navigator as any).share({ files: [file], title: "מונדיאל 2026 — לוח התוצאות" });
+        return;
+      }
+      downloadBlob(blob, filename);
+      alert("השיתוף הישיר לא נתמך בדפדפן הזה — התמונה הורדה, אפשר לצרף אותה ידנית בוואטסאפ.");
+    } catch {
+      alert("שגיאה בשיתוף — נסה שוב.");
+    }
+  });
+
+  overlay.querySelector("[data-act='download']")!.addEventListener("click", async () => {
+    try {
+      const blob = await svgToPngBlob(svg, width, height);
+      downloadBlob(blob, filename);
+    } catch {
+      alert("שגיאה ביצירת התמונה.");
     }
   });
 }

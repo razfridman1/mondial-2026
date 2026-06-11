@@ -4,7 +4,8 @@ import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
 import { TEAMS, STAGES } from "@/lib/data";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
-import { shareToWhatsApp, leaderboardShareText, weeklyReminderShareText } from "@/lib/share";
+import { shareToWhatsApp, weeklyReminderShareText } from "@/lib/share";
+import { openLeaderboardShareCard } from "@/lib/share-cards";
 import { getUserDoc } from "@/lib/firebase";
 import { AVATARS } from "@/lib/avatars";
 import { AvatarDisplay } from "./AvatarPicker";
@@ -570,12 +571,11 @@ function GroupLeaderboardCard({
             {rows.length > 0 && (
               <button
                 className="btn btn-small wa-btn"
-                onClick={() => shareToWhatsApp(leaderboardShareText({
+                onClick={() => openLeaderboardShareCard(
                   rows,
-                  groupName: groupId ? groupName.replace(/^[🌍🏆📊]+\s*/, "") : null,
-                  limit: 10,
-                }))}
-                title="שתף את לוח התוצאות בווטסאפ"
+                  groupId ? groupName.replace(/^[🌍🏆📊]+\s*/, "") : null,
+                )}
+                title="שתף את לוח התוצאות כתמונה — נראה כמו האתר"
               >
                 💬 שתף טבלה
               </button>
