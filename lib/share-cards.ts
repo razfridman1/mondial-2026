@@ -287,13 +287,24 @@ function buildMatchPredictionsCard({ match, predictions, groupName, result, isKn
   const away = TEAMS[match.away] || { name: match.away, flag: "?" } as any;
   const stage = STAGES[match.stage]?.name || "";
   const list = predictions.slice(0, 20);
-  const ROW_H = 116;
+  /* Two-column grid layout, matching the in-app "🔮 מה החברים ניחשו" grid
+   * (.fr-preds-grid): RTL order, so item 0 is the top-right cell, item 1 the
+   * top-left cell, item 2 the second row's right cell, etc. */
+  const COLS = 2;
+  const GAP = 24;
+  const CW = (W - 120 - GAP) / 2;
+  const CH = 156;
+  const ROW_GAP = 20;
+  const rowsCount = Math.max(Math.ceil(list.length / COLS), 1);
   const HEADER_H = groupName ? 460 : 410;
   const FOOTER_H = 100;
-  const H = HEADER_H + Math.max(list.length, 1) * ROW_H + FOOTER_H;
+  const H = HEADER_H + rowsCount * (CH + ROW_GAP) + FOOTER_H;
 
   const rowsSvg = list.map((p, i) => {
-    const y = HEADER_H + i * ROW_H;
+    const col = i % COLS;
+    const row = Math.floor(i / COLS);
+    const x = col === 0 ? (W - 60 - CW) : 60;
+    const y = HEADER_H + row * (CH + ROW_GAP);
     const avatar = AVATARS.find(a => a.id === p.avatarId);
     const flag = avatar?.flag || "👤";
     const scoreText = p.hidden
@@ -310,17 +321,18 @@ function buildMatchPredictionsCard({ match, predictions, groupName, result, isKn
       actualWinner: result.winner ?? null,
       isKnockout: !!isKnockout,
     }) : null;
-    const autoX = 290;
-    const pointsX = p.auto && !p.hidden ? 380 : 290;
+    const tagX = 175;
+    const pointsX = (p.auto && !p.hidden) ? 230 : 175;
     return `
-    <g transform="translate(0 ${y})">
-      <rect x="60" y="10" width="${W - 120}" height="${ROW_H - 20}" rx="18"
+    <g transform="translate(${x} ${y})">
+      <rect x="0" y="0" width="${CW}" height="${CH}" rx="20"
             fill="#181f37" stroke="${accent}" stroke-width="${p.isSelf ? 4 : 2}"/>
-      <text x="${W - 110}" y="${ROW_H / 2 + 16}" text-anchor="middle" font-size="56">${flag}</text>
-      <text x="${W - 190}" y="${ROW_H / 2 + 14}" text-anchor="end" font-family="Heebo, Rubik, Arial" font-size="38" font-weight="800" fill="#eef1ff">${escapeXml(p.displayName)}</text>
-      <text x="120" y="${ROW_H / 2 + 16}" text-anchor="start" font-family="Heebo, Rubik, Arial" font-size="48" font-weight="900" fill="${p.hidden ? "#9aa3c7" : "#ffd24a"}">${scoreText}</text>
-      ${p.auto && !p.hidden ? `<text x="${autoX}" y="${ROW_H / 2 + 16}" font-size="36">🤖</text>` : ""}
-      ${sc ? `<text x="${pointsX}" y="${ROW_H / 2 + 16}" text-anchor="start" font-family="Heebo, Rubik, Arial" font-size="34" font-weight="800" fill="${sc.points > 0 ? "#7CFC9A" : "#9aa3c7"}">${sc.exact ? "🎯 " : ""}${sc.points} נק׳</text>` : ""}
+      <text x="${CW - 58}" y="56" text-anchor="middle" font-size="52">${flag}</text>
+      <text x="${CW - 100}" y="50" text-anchor="end" font-family="Heebo, Rubik, Arial" font-size="30" font-weight="800" fill="#eef1ff">${escapeXml(p.displayName)}</text>
+      ${p.isSelf ? `<rect x="${CW - 162}" y="62" width="62" height="30" rx="8" fill="#2a3354"/><text x="${CW - 131}" y="83" text-anchor="middle" font-family="Heebo, Rubik, Arial" font-size="20" font-weight="700" fill="#ffd24a">אתה</text>` : ""}
+      <text x="24" y="${CH - 30}" text-anchor="start" font-family="Heebo, Rubik, Arial" font-size="44" font-weight="900" fill="${p.hidden ? "#9aa3c7" : "#ffd24a"}">${scoreText}</text>
+      ${p.auto && !p.hidden ? `<text x="${tagX}" y="${CH - 30}" font-size="32">🤖</text>` : ""}
+      ${sc ? `<text x="${pointsX}" y="${CH - 30}" text-anchor="start" font-family="Heebo, Rubik, Arial" font-size="30" font-weight="800" fill="${sc.points > 0 ? "#7CFC9A" : "#9aa3c7"}">${sc.exact ? "🎯 " : ""}${sc.points} נק׳</text>` : ""}
     </g>`;
   }).join("");
 
@@ -358,7 +370,7 @@ function buildMatchPredictionsCard({ match, predictions, groupName, result, isKn
 
   ${rowsSvg}
 
-  ${predictions.length > list.length ? `<text x="${W / 2}" y="${HEADER_H + list.length * ROW_H + 50}" text-anchor="middle" font-family="Heebo" font-size="24" fill="#9aa3c7">+ עוד ${predictions.length - list.length} ניחושים</text>` : ""}
+  ${predictions.length > list.length ? `<text x="${W / 2}" y="${HEADER_H + rowsCount * (CH + ROW_GAP) + 50}" text-anchor="middle" font-family="Heebo" font-size="24" fill="#9aa3c7">+ עוד ${predictions.length - list.length} ניחושים</text>` : ""}
 
   <text x="${W / 2}" y="${H - 36}" text-anchor="middle" font-family="Heebo" font-size="24" fill="#9aa3c7">#מונדיאל2026 #מי_יצדק</text>
 </svg>`,

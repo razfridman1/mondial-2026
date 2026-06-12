@@ -405,7 +405,7 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
         </button>
         {(status === "live" || isFinished) && currentGroupId && (
           <button className="btn btn-small wa-btn" onClick={sharePredictions} disabled={sharingPreds} title="שתף את ניחושי הקבוצה למשחק הזה">
-            {sharingPreds ? "…טוען" : "🔮📤 שתף ניחושים"}
+            {sharingPreds ? "…טוען" : "📤 שתף ניחושי הקבוצה"}
           </button>
         )}
       </div>
