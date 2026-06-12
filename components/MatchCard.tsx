@@ -27,6 +27,9 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
   const matchResults = useStore(s => s.matchResults);
   const user = useStore(s => s.user);
   const refreshMatchResults = useStore(s => s.refreshMatchResults);
+  const currentGroupId = useStore(s => s.currentGroupId);
+  const groups = useStore(s => s.groups);
+  const [sharingPreds, setSharingPreds] = useState(false);
 
   /* Admin-only inline "set final result" editor — lets the admin record
    * the final score directly from the match card the moment a match ends,
@@ -97,6 +100,32 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
       setEditingResult(false);
     } finally {
       setSavingResult(false);
+    }
+  }
+
+  /* "שתף ניחושים" — once the match is live (or finished), let the user
+   * share the whole group's predictions for it as a card image, reusing
+   * /api/group-predictions scoped to the currently-selected group. */
+  async function sharePredictions(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!currentGroupId || !user) return;
+    setSharingPreds(true);
+    try {
+      const token = await getFirebase().auth!.currentUser!.getIdToken();
+      const r = await fetch(`/api/group-predictions?groupId=${currentGroupId}`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) throw new Error();
+      const data = await r.json();
+      const row = (data.rows || []).find((x: any) => x.matchId === match.id);
+      const preds = row?.predictions || [];
+      const groupName = groups.find(g => g.id === currentGroupId)?.name;
+      const { openMatchPredictionsShareCard } = await import("@/lib/share-cards");
+      openMatchPredictionsShareCard(match, preds, groupName ? groupName.replace(/^[🌍🏆📊]+\s*/, "") : null);
+    } catch {
+      alert("שגיאה בטעינת הניחושים לשיתוף");
+    } finally {
+      setSharingPreds(false);
     }
   }
 
@@ -371,6 +400,11 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
             <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/>
           </svg>
         </button>
+        {(status === "live" || isFinished) && currentGroupId && (
+          <button className="btn btn-small wa-btn" onClick={sharePredictions} disabled={sharingPreds} title="שתף את ניחושי הקבוצה למשחק הזה">
+            {sharingPreds ? "…טוען" : "🔮📤 שתף ניחושים"}
+          </button>
+        )}
       </div>
     </article>
   );

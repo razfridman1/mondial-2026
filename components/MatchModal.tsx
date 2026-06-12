@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { TEAMS, VENUES, CHANNELS, STAGES } from "@/lib/data";
 import { useStore } from "@/lib/store";
-import { formatIsraelDate, formatIsraelTime, oddsToProbabilities } from "@/lib/utils";
+import { formatIsraelDate, formatIsraelTime, oddsToProbabilities, matchLiveStatus } from "@/lib/utils";
 import { effMatch } from "@/lib/sim";
 import { useOddsMap } from "@/lib/useOddsMap";
 import { MATCHES } from "@/lib/data";
@@ -47,6 +47,13 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
   const hasResult = !!matchResults[matchId];
   const hasPrediction = !!predictions[matchId];
 
+  /* Effective match (with overrides/sim applied) — needed early to know
+   * whether the match is currently live, so the friend-predictions effect
+   * below can fetch group predictions for live matches too. */
+  const baseForStatus = MATCHES.find(mt => mt.id === matchId);
+  const effForStatus = baseForStatus ? effMatch(baseForStatus, overrides[matchId], simConfig) : null;
+  const isLive = effForStatus ? matchLiveStatus(effForStatus as any) === "live" : false;
+
   useEffect(() => {
     let cancelled = false;
     fetch("/api/match-previews")
@@ -87,12 +94,13 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
     return () => { cancelled = true; };
   }, [matchId]);
 
-  /* Friends' predictions for finished matches — shown permanently on the
-   * match card (never hidden/cleared) so group members can compare guesses
-   * once the result is in. Reuses /api/group-predictions, scoped to the
+  /* Friends' predictions — shown on the match card once it's meaningful to
+   * compare guesses: either the match is currently LIVE (so everyone's
+   * picks are already locked in and visible) or it has finished (shown
+   * permanently). Reuses /api/group-predictions, scoped to the
    * currently-selected group. */
   useEffect(() => {
-    if (!hasResult || !currentGroupId || !user) { setFriendPreds(null); return; }
+    if (!(hasResult || isLive) || !currentGroupId || !user) { setFriendPreds(null); return; }
     let cancelled = false;
     (async () => {
       try {
@@ -109,7 +117,28 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
       }
     })();
     return () => { cancelled = true; };
-  }, [matchId, hasResult, currentGroupId, user?.uid]);
+  }, [matchId, hasResult, isLive, currentGroupId, user?.uid]);
+
+  /* Poll while the match is live so the predictions list (and any score
+   * recalculation once a result lands) stays fresh without a manual reload. */
+  useEffect(() => {
+    if (!isLive || !currentGroupId || !user) return;
+    const id = setInterval(() => {
+      (async () => {
+        try {
+          const token = await getFirebase().auth!.currentUser!.getIdToken();
+          const r = await fetch(`/api/group-predictions?groupId=${currentGroupId}`, {
+            headers: { authorization: `Bearer ${token}` },
+          });
+          if (!r.ok) return;
+          const data = await r.json();
+          const row = (data.rows || []).find((x: any) => x.matchId === matchId);
+          setFriendPreds(row?.predictions || []);
+        } catch {}
+      })();
+    }, 30000);
+    return () => clearInterval(id);
+  }, [matchId, isLive, currentGroupId, user?.uid]);
 
   const oddsMap = useOddsMap();
   const base = MATCHES.find(m => m.id === matchId);
@@ -157,16 +186,20 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
           </section>
         )}
 
-        {hasResult && friendPreds && friendPreds.length > 0 && (
+        {(hasResult || isLive) && friendPreds && friendPreds.length > 0 && (
           <section className="modal-section">
-            <h3>🔮 מה החברים ניחשו{currentGroup ? ` · ${currentGroup.name}` : ""}</h3>
+            <h3>
+              🔮 מה החברים ניחשו{currentGroup ? ` · ${currentGroup.name}` : ""}
+              {isLive && !hasResult && <span className="badge badge-live" style={{ marginInlineStart: 8 }}>🔴 חי</span>}
+            </h3>
             <div className="fr-preds-grid">
               {friendPreds.map(p => {
-                const sc = (p.homeScore != null && p.awayScore != null) ? scorePrediction({
+                const result = matchResults[matchId];
+                const sc = (result && p.homeScore != null && p.awayScore != null) ? scorePrediction({
                   predictedHome: p.homeScore, predictedAway: p.awayScore,
-                  actualHome: matchResults[matchId].home, actualAway: matchResults[matchId].away,
+                  actualHome: result.home, actualAway: result.away,
                   predictedWinner: p.predictedWinner ?? null,
-                  actualWinner: matchResults[matchId].winner ?? null,
+                  actualWinner: result.winner ?? null,
                   isKnockout: m.stage !== "GROUP",
                 }) : null;
                 return (

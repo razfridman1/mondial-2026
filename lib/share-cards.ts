@@ -15,12 +15,23 @@ import { AVATARS } from "./avatars";
 import { formatIsraelDate, formatIsraelTime } from "./utils";
 import type { Match, LeaderRow } from "./types";
 
-type CardKind = "match" | "prediction" | "leaderboard" | "leaderboard-table";
+type CardKind = "match" | "prediction" | "leaderboard" | "leaderboard-table" | "match-predictions";
 
 interface MatchCardArgs { match: Match; }
 interface PredictionCardArgs { match: Match; home: number; away: number; joker?: boolean; }
 interface LeaderboardCardArgs { rank: number; name: string; points: number; }
 interface LeaderboardTableArgs { rows: LeaderRow[]; groupName?: string | null; limit?: number; }
+export interface MatchPredictionRow {
+  displayName: string;
+  avatarId: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  joker?: boolean;
+  auto?: boolean;
+  hidden?: boolean;
+  isSelf?: boolean;
+}
+interface MatchPredictionsCardArgs { match: Match; predictions: MatchPredictionRow[]; groupName?: string | null; }
 
 export function buildSvg(kind: CardKind, args: any): { svg: string; width: number; height: number; filename: string } {
   switch (kind) {
@@ -28,6 +39,7 @@ export function buildSvg(kind: CardKind, args: any): { svg: string; width: numbe
     case "prediction":        return buildPredictionCard(args as PredictionCardArgs);
     case "leaderboard":       return buildLeaderboardCard(args as LeaderboardCardArgs);
     case "leaderboard-table": return buildLeaderboardTableCard(args as LeaderboardTableArgs);
+    case "match-predictions": return buildMatchPredictionsCard(args as MatchPredictionsCardArgs);
   }
 }
 
@@ -254,6 +266,82 @@ function buildLeaderboardTableCard({ rows, groupName, limit = 10 }: LeaderboardT
   };
 }
 
+/* ------- Match predictions card — styled like the in-app "🔮 מה החברים
+ * ניחשו" grid (avatars + names + each member's score for one match), so a
+ * shared image looks like the real app. Used for "share predictions" once
+ * a match is live or finished. */
+function buildMatchPredictionsCard({ match, predictions, groupName }: MatchPredictionsCardArgs) {
+  const W = 1080;
+  const home = TEAMS[match.home] || { name: match.home, flag: "?" } as any;
+  const away = TEAMS[match.away] || { name: match.away, flag: "?" } as any;
+  const stage = STAGES[match.stage]?.name || "";
+  const list = predictions.slice(0, 20);
+  const ROW_H = 116;
+  const HEADER_H = groupName ? 460 : 410;
+  const FOOTER_H = 100;
+  const H = HEADER_H + Math.max(list.length, 1) * ROW_H + FOOTER_H;
+
+  const rowsSvg = list.map((p, i) => {
+    const y = HEADER_H + i * ROW_H;
+    const avatar = AVATARS.find(a => a.id === p.avatarId);
+    const flag = avatar?.flag || "👤";
+    const scoreText = p.hidden
+      ? "🔒"
+      : (p.homeScore != null && p.awayScore != null ? `${p.homeScore} : ${p.awayScore}` : "—");
+    const accent = p.isSelf ? "#ffd24a" : "#2a3354";
+    return `
+    <g transform="translate(0 ${y})">
+      <rect x="60" y="10" width="${W - 120}" height="${ROW_H - 20}" rx="18"
+            fill="#181f37" stroke="${accent}" stroke-width="${p.isSelf ? 4 : 2}"/>
+      <text x="${W - 110}" y="${ROW_H / 2 + 16}" text-anchor="middle" font-size="56">${flag}</text>
+      <text x="${W - 190}" y="${ROW_H / 2 + 14}" text-anchor="end" font-family="Heebo, Rubik, Arial" font-size="38" font-weight="800" fill="#eef1ff">${escapeXml(p.displayName)}</text>
+      <text x="120" y="${ROW_H / 2 + 16}" text-anchor="start" font-family="Heebo, Rubik, Arial" font-size="48" font-weight="900" fill="${p.hidden ? "#9aa3c7" : "#ffd24a"}">${scoreText}</text>
+      ${p.auto && !p.hidden ? `<text x="280" y="${ROW_H / 2 + 16}" font-size="36">🤖</text>` : ""}
+    </g>`;
+  }).join("");
+
+  return {
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#0b1020"/>
+      <stop offset="60%" stop-color="#182343"/>
+      <stop offset="100%" stop-color="#0b1020"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd24a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="${W}" height="${H}" fill="url(#bg)"/>
+
+  <g transform="translate(${W / 2} 110)" text-anchor="middle" font-family="Heebo, Rubik, Arial">
+    <text font-size="46" font-weight="900" fill="url(#gold)">🔮 הניחושים של הקבוצה</text>
+    ${groupName ? `<text y="56" font-size="32" font-weight="700" fill="#eef1ff">${escapeXml(groupName)}</text>` : ""}
+    <text y="${groupName ? 110 : 60}" font-size="24" fill="#9aa3c7">${stage}${match.group ? ` · בית ${match.group}` : ""}</text>
+  </g>
+
+  <g transform="translate(0 ${groupName ? 270 : 230})" text-anchor="middle" font-family="Heebo, Rubik" fill="#fff">
+    <text x="${W * 0.25}" y="0"  font-size="120">${home.flag}</text>
+    <text x="${W * 0.25}" y="80" font-size="38" font-weight="800">${home.name}</text>
+
+    <text x="${W * 0.5}"  y="-10" font-size="56" font-weight="900" fill="url(#gold)">VS</text>
+
+    <text x="${W * 0.75}" y="0"  font-size="120">${away.flag}</text>
+    <text x="${W * 0.75}" y="80" font-size="38" font-weight="800">${away.name}</text>
+  </g>
+
+  ${rowsSvg}
+
+  ${predictions.length > list.length ? `<text x="${W / 2}" y="${HEADER_H + list.length * ROW_H + 50}" text-anchor="middle" font-family="Heebo" font-size="24" fill="#9aa3c7">+ עוד ${predictions.length - list.length} ניחושים</text>` : ""}
+
+  <text x="${W / 2}" y="${H - 36}" text-anchor="middle" font-family="Heebo" font-size="24" fill="#9aa3c7">#מונדיאל2026 #מי_יצדק</text>
+</svg>`,
+    width: W, height: H,
+    filename: `mondial-${match.id}-group-preds.png`,
+  };
+}
+
 /* =====================================================================
  * Render & share helpers (browser-only)
  * ===================================================================*/
@@ -407,6 +495,66 @@ export function openLeaderboardShareCard(rows: LeaderRow[], groupName?: string |
       const file = new File([blob], filename, { type: "image/png" });
       if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
         await (navigator as any).share({ files: [file], title: "מונדיאל 2026 — לוח התוצאות" });
+        return;
+      }
+      downloadBlob(blob, filename);
+      alert("השיתוף הישיר לא נתמך בדפדפן הזה — התמונה הורדה, אפשר לצרף אותה ידנית בוואטסאפ.");
+    } catch {
+      alert("שגיאה בשיתוף — נסה שוב.");
+    }
+  });
+
+  overlay.querySelector("[data-act='download']")!.addEventListener("click", async () => {
+    try {
+      const blob = await svgToPngBlob(svg, width, height);
+      downloadBlob(blob, filename);
+    } catch {
+      alert("שגיאה ביצירת התמונה.");
+    }
+  });
+}
+
+/* Open a modal that shows the group's predictions for a single match as a
+ * card styled like the in-app "🔮 מה החברים ניחשו" grid, and lets the user
+ * share it as an IMAGE (WhatsApp etc. via the native share sheet) or
+ * download it. Used by the "📤 שתף ניחושים" button once a match is live. */
+export function openMatchPredictionsShareCard(
+  match: Match,
+  predictions: MatchPredictionRow[],
+  groupName?: string | null,
+) {
+  const { svg, width, height, filename } = buildSvg("match-predictions", { match, predictions, groupName });
+
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" role="dialog" style="max-width: 480px;">
+      <button class="modal-close" aria-label="סגור">✕</button>
+      <header class="modal-header">
+        <h2>🔮 שתף את הניחושים</h2>
+        <div class="muted">תמונה בעיצוב האתר — מוכנה לשיתוף</div>
+      </header>
+      <div class="share-card-preview" style="max-height: 60vh; overflow:auto;">${svg}</div>
+      <div class="mc-actions" style="margin-top:14px; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-primary" data-act="share">📤 שתף</button>
+        <button class="btn" data-act="download">⬇️ הורד תמונה</button>
+      </div>
+      <p class="muted" style="font-size:11px;margin-top:10px; line-height:1.5;">
+        📱 לחיצה על "שתף" תפתח את תפריט השיתוף (וואטסאפ ועוד). אם זה לא עובד במכשיר שלך, לחץ "הורד תמונה" ושתף אותה ידנית.
+      </p>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay || (e.target as HTMLElement).classList.contains("modal-close")) overlay.remove();
+  });
+
+  overlay.querySelector("[data-act='share']")!.addEventListener("click", async () => {
+    try {
+      const blob = await svgToPngBlob(svg, width, height);
+      const file = new File([blob], filename, { type: "image/png" });
+      if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
+        await (navigator as any).share({ files: [file], title: "מונדיאל 2026 — ניחושי הקבוצה" });
         return;
       }
       downloadBlob(blob, filename);

@@ -153,7 +153,7 @@ export default function FriendsRanking() {
 
   const filtered = useMemo(() => {
     const now = Date.now();
-    return rows.filter(r => {
+    const scoped = rows.filter(r => {
       const start = new Date(r.utc).getTime();
       /* Matches with a real result (manual or synced) are always
        * "finished", regardless of their effective kickoff time. */
@@ -162,6 +162,27 @@ export default function FriendsRanking() {
       if (scope === "finished") return isFinished;
       return true;
     });
+
+    /* Reorder so the match happening RIGHT NOW (if any) is shown first,
+     * then upcoming matches (soonest first), then past matches in
+     * reverse-chronological order — scrolling down reaches older
+     * matches. `rows` arrives sorted ascending by kickoff time, so the
+     * "past" bucket needs to be reversed to put the most recent finished
+     * match closest to the live one. */
+    const LIVE_WINDOW_MS = 115 * 60 * 1000;
+    const live: MatchRow[] = [];
+    const upcoming: MatchRow[] = [];
+    const past: MatchRow[] = [];
+    for (const r of scoped) {
+      const start = new Date(r.utc).getTime();
+      const isLiveNow = !r.result && now >= start && now <= start + LIVE_WINDOW_MS;
+      if (isLiveNow) live.push(r);
+      else if (start > now) upcoming.push(r);
+      else past.push(r);
+    }
+    upcoming.sort((a, b) => new Date(a.utc).getTime() - new Date(b.utc).getTime());
+    past.sort((a, b) => new Date(b.utc).getTime() - new Date(a.utc).getTime());
+    return [...live, ...upcoming, ...past];
   }, [rows, scope]);
 
   /* ---- group management (merged in from the old "הקבוצות שלי" tab) ---- */
