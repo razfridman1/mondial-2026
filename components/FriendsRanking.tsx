@@ -10,6 +10,7 @@ import { getUserDoc } from "@/lib/firebase";
 import { AVATARS } from "@/lib/avatars";
 import { AvatarDisplay } from "./AvatarPicker";
 import MatchModal from "./MatchModal";
+import { scorePrediction } from "@/lib/scoring";
 import type { LeaderRow, ActivityEvent } from "@/lib/types";
 
 interface PredictionCell {
@@ -32,6 +33,7 @@ interface MatchRow {
   stage: string;
   group: string | null;
   visible: boolean;
+  result?: { home: number; away: number; winner?: string } | null;
   predictions: PredictionCell[];
 }
 
@@ -152,8 +154,11 @@ export default function FriendsRanking() {
     const now = Date.now();
     return rows.filter(r => {
       const start = new Date(r.utc).getTime();
-      if (scope === "upcoming") return start > now - 2 * 60 * 60 * 1000; // upcoming + last 2h
-      if (scope === "finished") return start < now;
+      /* Matches with a real result (manual or synced) are always
+       * "finished", regardless of their effective kickoff time. */
+      const isFinished = !!r.result || start < now;
+      if (scope === "upcoming") return !isFinished && start > now - 2 * 60 * 60 * 1000; // upcoming + last 2h
+      if (scope === "finished") return isFinished;
       return true;
     });
   }, [rows, scope]);
@@ -915,7 +920,7 @@ function MatchBlock({ row, onOpen }: { row: MatchRow; onOpen: () => void }) {
   /* Admins see all predictions unredacted (server marks `hidden: false` on them),
    * so if nothing is hidden treat the row as visible regardless of timing. */
   const allRevealed = row.predictions.every(p => !p.hidden);
-  const visibleNow = row.visible || msToVisibility <= 0 || allRevealed;
+  const visibleNow = row.visible || msToVisibility <= 0 || allRevealed || !!row.result;
   const fmtCountdown = () => {
     const total = Math.max(0, Math.floor(msToVisibility / 1000));
     const h = Math.floor(total / 3600);
@@ -956,6 +961,15 @@ function MatchBlock({ row, onOpen }: { row: MatchRow; onOpen: () => void }) {
         {row.predictions.map(p => {
           /* Render the predicted winner for KO matches (real team code → flag+name). */
           const winnerTeam = p.predictedWinner ? (TEAMS as any)[p.predictedWinner] : null;
+          const sc = (row.result && p.homeScore != null && p.awayScore != null)
+            ? scorePrediction({
+                predictedHome: p.homeScore, predictedAway: p.awayScore,
+                actualHome: row.result.home, actualAway: row.result.away,
+                predictedWinner: p.predictedWinner ?? null,
+                actualWinner: row.result.winner ?? null,
+                isKnockout,
+              })
+            : null;
           return (
             <div key={p.uid} className={`fr-pred ${p.isSelf ? "is-self" : ""} ${p.hidden ? "is-hidden" : ""}`}>
               <AvatarDisplay avatarId={p.avatarId} size={32} />
@@ -975,6 +989,11 @@ function MatchBlock({ row, onOpen }: { row: MatchRow; onOpen: () => void }) {
                         ⚽ {winnerTeam?.flag || ""} {winnerTeam?.name || p.predictedWinner}
                       </span>
                     )}
+                    {sc && (
+                      <span className="fr-pred-points" style={{ color: sc.points > 0 ? "var(--green)" : "var(--text-muted)" }}>
+                        {sc.exact ? "🎯 " : ""}{sc.points} נק׳
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -985,6 +1004,11 @@ function MatchBlock({ row, onOpen }: { row: MatchRow; onOpen: () => void }) {
           <div className="muted" style={{ padding: 8 }}>טרם נחתמו ניחושים.</div>
         )}
       </div>
+      {row.result && (
+        <div className="muted" style={{ fontSize: 12, padding: "0 8px 8px" }}>
+          ⚽ תוצאה סופית: {row.result.home} : {row.result.away}
+        </div>
+      )}
     </div>
   );
 }

@@ -93,6 +93,18 @@ export async function GET(req: Request) {
     return { ...withOv, effUtc: effectiveUtc(withOv.utc, sim) };
   });
 
+  /* 4b. Real results (manual entry or live sync) — used to (a) force
+   * predictions visible for finished matches and (b) let the client
+   * compute each member's points per match. */
+  const resultsSnap = await db.collection("match_results").get();
+  const results: Record<string, { home: number; away: number; winner?: string }> = {};
+  resultsSnap.forEach(d => {
+    const data = d.data() as any;
+    if (data?.home != null && data?.away != null) {
+      results[d.id] = { home: data.home, away: data.away, ...(data.winner ? { winner: data.winner } : {}) };
+    }
+  });
+
   /* 5. Build rows for matches that have at least 1 prediction.
    *    Super-admins see EVERY prediction regardless of timing (no privacy redaction). */
   const now = Date.now();
@@ -102,7 +114,11 @@ export async function GET(req: Request) {
   const rows = matchEff
     .filter(mt => allPreds.some(p => p.matchId === mt.id))
     .map(mt => {
-      const visible = now >= new Date(mt.effUtc).getTime() - VISIBILITY_THRESHOLD_MS;
+      const result = results[mt.id] || null;
+      /* Finished matches (real result entered manually or synced from the
+       * live feed) always reveal every member's prediction permanently —
+       * regardless of the normal 2-minutes-before-kickoff timing rule. */
+      const visible = !!result || now >= new Date(mt.effUtc).getTime() - VISIBILITY_THRESHOLD_MS;
       const preds = allPreds
         .filter(p => p.matchId === mt.id)
         .map(p => {
@@ -132,6 +148,7 @@ export async function GET(req: Request) {
         stage: mt.stage,
         group: mt.group,
         visible,
+        result,
         predictions: preds,
       };
     })

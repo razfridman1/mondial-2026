@@ -295,7 +295,16 @@ function AllStagesSchedule({ matches, onOpen }: {
         if (!byDay.has(k)) byDay.set(k, []);
         byDay.get(k)!.push(m);
       }
-      return { stage: sid, byDay: [...byDay.entries()], count: list.length };
+      /* Today/future days first (chronological), past days last (also
+       * chronological among themselves) — so the first card a user sees
+       * is always today's, and shifts forward automatically each day. */
+      const todayK = todayKey();
+      const entries = [...byDay.entries()].sort(([a], [b]) => {
+        const aPast = a < todayK, bPast = b < todayK;
+        if (aPast !== bPast) return aPast ? 1 : -1;
+        return a < b ? -1 : a > b ? 1 : 0;
+      });
+      return { stage: sid, byDay: entries, count: list.length };
     }).filter(b => b.count > 0);
   }, [matches]);
 
