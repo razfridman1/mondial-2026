@@ -43,6 +43,7 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
   const [preview, setPreview] = useState<PreviewEntry | null>(null);
   const [summary, setSummary] = useState<SummaryEntry | null>(null);
   const [friendPreds, setFriendPreds] = useState<FriendPrediction[] | null>(null);
+  const [sharingPreds, setSharingPreds] = useState(false);
 
   const hasResult = !!matchResults[matchId];
   const hasPrediction = !!predictions[matchId];
@@ -152,6 +153,25 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
   const channels = (m.channels || []).map(c => CHANNELS[c]).filter(Boolean);
   const currentGroup = groups.find(g => g.id === currentGroupId);
 
+  /* Share the group's predictions for this match — available once the
+   * match is live (predictions are locked in) or finished. Reuses the
+   * already-fetched `friendPreds`, and passes the result so finished
+   * matches show points (🎯/✅) like the grid above. */
+  async function sharePredictions() {
+    if (!friendPreds || !friendPreds.length) return;
+    setSharingPreds(true);
+    try {
+      const { openMatchPredictionsShareCard } = await import("@/lib/share-cards");
+      const result = matchResults[matchId];
+      openMatchPredictionsShareCard(m, friendPreds, currentGroup ? currentGroup.name.replace(/^[🌍🏆📊]+\s*/, "") : null, {
+        result: result ? { home: result.home, away: result.away, winner: result.winner } : null,
+        isKnockout: m.stage !== "GROUP",
+      });
+    } finally {
+      setSharingPreds(false);
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" role="dialog" aria-modal="true">
@@ -188,9 +208,14 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
 
         {(hasResult || isLive) && friendPreds && friendPreds.length > 0 && (
           <section className="modal-section">
-            <h3>
-              🔮 מה החברים ניחשו{currentGroup ? ` · ${currentGroup.name}` : ""}
-              {isLive && !hasResult && <span className="badge badge-live" style={{ marginInlineStart: 8 }}>🔴 חי</span>}
+            <h3 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+              <span>
+                🔮 מה החברים ניחשו{currentGroup ? ` · ${currentGroup.name}` : ""}
+                {isLive && !hasResult && <span className="badge badge-live" style={{ marginInlineStart: 8 }}>🔴 חי</span>}
+              </span>
+              <button className="btn btn-small wa-btn" onClick={sharePredictions} disabled={sharingPreds} title="שתף את ניחושי הקבוצה למשחק הזה">
+                {sharingPreds ? "…טוען" : "📤 שתף"}
+              </button>
             </h3>
             <div className="fr-preds-grid">
               {friendPreds.map(p => {
