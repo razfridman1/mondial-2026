@@ -53,7 +53,7 @@ export default function FriendsRanking() {
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [openMatch, setOpenMatch] = useState<string | null>(null);
-  const [scope, setScope] = useState<"upcoming" | "finished" | "all">("upcoming");
+  const [scope, setScope] = useState<"upcoming" | "finished" | "all">("all");
   /* Selected leaderboard view: ALWAYS a specific group id.
    * The user can never see a global / cross-group view — every view
    * is scoped to one of the user's own groups. Initialized from
@@ -253,9 +253,9 @@ export default function FriendsRanking() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18 }}>
         <h3 className="sec-title" style={{ margin: 0 }}>🔮 ניחושים פר משחק</h3>
         <div className="filter-row" style={{ margin: 0 }}>
+          <button className={`seg ${scope === "all" ? "on" : ""}`} onClick={() => setScope("all")}>הכול</button>
           <button className={`seg ${scope === "upcoming" ? "on" : ""}`} onClick={() => setScope("upcoming")}>קרובים</button>
           <button className={`seg ${scope === "finished" ? "on" : ""}`} onClick={() => setScope("finished")}>הסתיימו</button>
-          <button className={`seg ${scope === "all" ? "on" : ""}`} onClick={() => setScope("all")}>הכול</button>
         </div>
       </div>
 
