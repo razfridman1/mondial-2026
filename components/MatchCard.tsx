@@ -101,20 +101,16 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
   }
 
   /* Mini group-standings table (real data via lib/standings.ts, computed
-   * from match_results). Only shown for group-stage matches. The home
-   * team's row is shown last regardless of its table position, per
-   * request — the "#" column still reflects its real standing. */
+   * from match_results). Only shown for group-stage matches. */
   const groupStandings = useMemo(() => {
     if (match.stage !== "GROUP" || !match.group) return null;
     return computeGroupStandings(match.group, matchResults);
   }, [match.stage, match.group, matchResults]);
 
-  const displayStandings = useMemo(() => {
-    if (!groupStandings) return null;
-    const homeRow = groupStandings.filter(s => s.teamCode === match.home);
-    const otherRows = groupStandings.filter(s => s.teamCode !== match.home);
-    return [...otherRows, ...homeRow];
-  }, [groupStandings, match.home]);
+  /* Standard table order — 1st place first, then 2nd, etc. (same as the
+   * full standings tab). The home team's row is still highlighted via
+   * the "is-home" class, just in its real table position. */
+  const displayStandings = groupStandings;
 
   const minutesToKick = useMemo(
     () => Math.round((new Date(match.utc).getTime() - Date.now()) / 60000),
