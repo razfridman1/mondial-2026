@@ -708,17 +708,34 @@ function UserStatsModal({
   predictionRows: MatchRow[];
   onClose: () => void;
 }) {
-  /* Pull every prediction this user made from the group-predictions snapshot */
+  /* Pull every prediction this user made from the group-predictions snapshot.
+   * Finished matches (with a real result) are shown first — most recent
+   * first — so you can immediately see how the user did, followed by
+   * upcoming/unresolved predictions (soonest first). */
   const myPreds = useMemo(() => {
     const out: Array<{
       matchId: string; home: string; away: string; utc: string;
+      result?: { home: number; away: number; winner?: string } | null;
+      isKnockout: boolean;
       pred: PredictionCell | null;
     }> = [];
     for (const mr of predictionRows) {
       const p = mr.predictions.find(x => x.uid === row.uid);
-      if (p) out.push({ matchId: mr.matchId, home: mr.home, away: mr.away, utc: mr.utc, pred: p });
+      if (p) out.push({
+        matchId: mr.matchId, home: mr.home, away: mr.away, utc: mr.utc,
+        result: mr.result, isKnockout: mr.stage !== "GROUP", pred: p,
+      });
     }
-    return out.sort((a, b) => new Date(b.utc).getTime() - new Date(a.utc).getTime());
+    const now = Date.now();
+    const finished: typeof out = [];
+    const upcoming: typeof out = [];
+    for (const item of out) {
+      const isFinished = !!item.result || new Date(item.utc).getTime() < now;
+      (isFinished ? finished : upcoming).push(item);
+    }
+    finished.sort((a, b) => new Date(b.utc).getTime() - new Date(a.utc).getTime());
+    upcoming.sort((a, b) => new Date(a.utc).getTime() - new Date(b.utc).getTime());
+    return [...finished, ...upcoming];
   }, [predictionRows, row.uid]);
 
   /* Fetch the public profile doc for extra details (bio, joinedAt, etc.) */
@@ -865,6 +882,15 @@ function UserStatsModal({
               {myPreds.slice(0, 20).map(p => {
                 const home = TEAMS[p.home] || { name: p.home, flag: "❓" };
                 const away = TEAMS[p.away] || { name: p.away, flag: "❓" };
+                const sc = (p.result && !p.pred?.hidden && p.pred?.homeScore != null && p.pred?.awayScore != null)
+                  ? scorePrediction({
+                      predictedHome: p.pred.homeScore, predictedAway: p.pred.awayScore,
+                      actualHome: p.result.home, actualAway: p.result.away,
+                      predictedWinner: p.pred.predictedWinner ?? null,
+                      actualWinner: p.result.winner ?? null,
+                      isKnockout: p.isKnockout,
+                    })
+                  : null;
                 return (
                   <div key={p.matchId} style={{
                     display: "grid",
@@ -879,10 +905,22 @@ function UserStatsModal({
                     <span style={{ textAlign: "start" }}>
                       {home.flag} {home.name}
                     </span>
-                    <span style={{ fontWeight: 800, color: p.pred?.hidden ? "var(--text-muted)" : "var(--accent)" }}>
-                      {p.pred?.hidden
-                        ? "🔒"
-                        : `${p.pred?.homeScore} : ${p.pred?.awayScore}`}
+                    <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                      <span style={{ fontWeight: 800, color: p.pred?.hidden ? "var(--text-muted)" : "var(--accent)" }}>
+                        {p.pred?.hidden
+                          ? "🔒"
+                          : `${p.pred?.homeScore} : ${p.pred?.awayScore}`}
+                      </span>
+                      {p.result && (
+                        <span className="muted" style={{ fontSize: 10 }}>
+                          תוצאה: {p.result.home} : {p.result.away}
+                        </span>
+                      )}
+                      {sc && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: sc.points > 0 ? "var(--green)" : "var(--text-muted)" }}>
+                          {sc.exact ? "🎯 " : ""}{sc.points} נק׳
+                        </span>
+                      )}
                     </span>
                     <span style={{ textAlign: "end" }}>
                       {away.name} {away.flag}
