@@ -204,16 +204,22 @@ export default function MatchesTab() {
     today: buckets.today.length,
   };
 
-  /* Auto-scroll DISABLED — was causing jumpy behaviour (page lands at
-   * top, then 500ms later scrolls to first card, leaving the card top
-   * partially hidden behind the sticky pills bar). Users can scroll
-   * naturally; the floating "🎯 חזור להיום" button (when visible)
-   * provides a manual way to jump to today's match. */
+  /* On entering the Matches tab (stages view), land directly on today's
+   * matches — but keep the chronological list intact above/below so users
+   * can still scroll BACK to finished matches or FORWARD to upcoming ones.
+   * Uses an instant ("auto") jump, not a smooth animated scroll, so there's
+   * no visible jumpiness — the page simply opens already positioned at
+   * today. Runs once per mount (i.e. once per visit to the tab). */
   useEffect(() => {
     if (typeof window === "undefined") return;
     try { (history as any).scrollRestoration = "manual"; } catch {}
-    didInitialScroll.current = true;
-  }, []);
+    if (section !== "stages" || didInitialScroll.current) return;
+    const id = requestAnimationFrame(() => {
+      scrollToToday("auto");
+      didInitialScroll.current = true;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [section, matches]);
 
   /* Hide the floating "back to today" button when today's section is already
    * in view. Falls back to "any matches at all" check otherwise. */
