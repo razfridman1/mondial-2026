@@ -26,7 +26,7 @@ interface Prefs {
   tab: "schedule" | "weekpredictions" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin";
 }
 
-export type MatchResult = { home: number; away: number; finishedAt: number };
+export type MatchResult = { home: number; away: number; finishedAt: number; winner?: string };
 
 interface MondialState {
   user: AppUser | null;
