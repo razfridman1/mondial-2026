@@ -121,7 +121,10 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
       const preds = row?.predictions || [];
       const groupName = groups.find(g => g.id === currentGroupId)?.name;
       const { openMatchPredictionsShareCard } = await import("@/lib/share-cards");
-      openMatchPredictionsShareCard(match, preds, groupName ? groupName.replace(/^[🌍🏆📊]+\s*/, "") : null);
+      openMatchPredictionsShareCard(match, preds, groupName ? groupName.replace(/^[🌍🏆📊]+\s*/, "") : null, {
+        result: matchResult ? { home: matchResult.home, away: matchResult.away, winner: matchResult.winner } : null,
+        isKnockout: match.stage !== "GROUP",
+      });
     } catch {
       alert("שגיאה בטעינת הניחושים לשיתוף");
     } finally {

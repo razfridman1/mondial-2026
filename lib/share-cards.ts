@@ -13,6 +13,7 @@
 import { TEAMS, CHANNELS, STAGES, VENUES } from "./data";
 import { AVATARS } from "./avatars";
 import { formatIsraelDate, formatIsraelTime } from "./utils";
+import { scorePrediction } from "./scoring";
 import type { Match, LeaderRow } from "./types";
 
 type CardKind = "match" | "prediction" | "leaderboard" | "leaderboard-table" | "match-predictions";
@@ -26,12 +27,22 @@ export interface MatchPredictionRow {
   avatarId: string;
   homeScore: number | null;
   awayScore: number | null;
+  predictedWinner?: string | null;
   joker?: boolean;
   auto?: boolean;
   hidden?: boolean;
   isSelf?: boolean;
 }
-interface MatchPredictionsCardArgs { match: Match; predictions: MatchPredictionRow[]; groupName?: string | null; }
+interface MatchPredictionsCardArgs {
+  match: Match;
+  predictions: MatchPredictionRow[];
+  groupName?: string | null;
+  /* When the match has finished, pass the real result so each member's
+   * points (🎯/✅) can be shown alongside their prediction — matching the
+   * "🔮 מה החברים ניחשו" section in the match modal. */
+  result?: { home: number; away: number; winner?: string } | null;
+  isKnockout?: boolean;
+}
 
 export function buildSvg(kind: CardKind, args: any): { svg: string; width: number; height: number; filename: string } {
   switch (kind) {
@@ -270,7 +281,7 @@ function buildLeaderboardTableCard({ rows, groupName, limit = 10 }: LeaderboardT
  * ניחשו" grid (avatars + names + each member's score for one match), so a
  * shared image looks like the real app. Used for "share predictions" once
  * a match is live or finished. */
-function buildMatchPredictionsCard({ match, predictions, groupName }: MatchPredictionsCardArgs) {
+function buildMatchPredictionsCard({ match, predictions, groupName, result, isKnockout }: MatchPredictionsCardArgs) {
   const W = 1080;
   const home = TEAMS[match.home] || { name: match.home, flag: "?" } as any;
   const away = TEAMS[match.away] || { name: match.away, flag: "?" } as any;
@@ -289,6 +300,18 @@ function buildMatchPredictionsCard({ match, predictions, groupName }: MatchPredi
       ? "🔒"
       : (p.homeScore != null && p.awayScore != null ? `${p.homeScore} : ${p.awayScore}` : "—");
     const accent = p.isSelf ? "#ffd24a" : "#2a3354";
+    /* For finished matches (result provided), show the points each member
+     * earned for their prediction, mirroring the "🔮 מה החברים ניחשו"
+     * section in the match modal (🎯 for an exact score, ✅/points otherwise). */
+    const sc = (result && !p.hidden && p.homeScore != null && p.awayScore != null) ? scorePrediction({
+      predictedHome: p.homeScore, predictedAway: p.awayScore,
+      actualHome: result.home, actualAway: result.away,
+      predictedWinner: p.predictedWinner ?? null,
+      actualWinner: result.winner ?? null,
+      isKnockout: !!isKnockout,
+    }) : null;
+    const autoX = 290;
+    const pointsX = p.auto && !p.hidden ? 380 : 290;
     return `
     <g transform="translate(0 ${y})">
       <rect x="60" y="10" width="${W - 120}" height="${ROW_H - 20}" rx="18"
@@ -296,7 +319,8 @@ function buildMatchPredictionsCard({ match, predictions, groupName }: MatchPredi
       <text x="${W - 110}" y="${ROW_H / 2 + 16}" text-anchor="middle" font-size="56">${flag}</text>
       <text x="${W - 190}" y="${ROW_H / 2 + 14}" text-anchor="end" font-family="Heebo, Rubik, Arial" font-size="38" font-weight="800" fill="#eef1ff">${escapeXml(p.displayName)}</text>
       <text x="120" y="${ROW_H / 2 + 16}" text-anchor="start" font-family="Heebo, Rubik, Arial" font-size="48" font-weight="900" fill="${p.hidden ? "#9aa3c7" : "#ffd24a"}">${scoreText}</text>
-      ${p.auto && !p.hidden ? `<text x="280" y="${ROW_H / 2 + 16}" font-size="36">🤖</text>` : ""}
+      ${p.auto && !p.hidden ? `<text x="${autoX}" y="${ROW_H / 2 + 16}" font-size="36">🤖</text>` : ""}
+      ${sc ? `<text x="${pointsX}" y="${ROW_H / 2 + 16}" text-anchor="start" font-family="Heebo, Rubik, Arial" font-size="34" font-weight="800" fill="${sc.points > 0 ? "#7CFC9A" : "#9aa3c7"}">${sc.exact ? "🎯 " : ""}${sc.points} נק׳</text>` : ""}
     </g>`;
   }).join("");
 
@@ -326,6 +350,7 @@ function buildMatchPredictionsCard({ match, predictions, groupName }: MatchPredi
     <text x="${W * 0.25}" y="80" font-size="38" font-weight="800">${home.name}</text>
 
     <text x="${W * 0.5}"  y="-10" font-size="56" font-weight="900" fill="url(#gold)">VS</text>
+    ${result ? `<text x="${W * 0.5}" y="50" font-size="34" font-weight="800" fill="#eef1ff">🏁 ${result.home} : ${result.away}</text>` : ""}
 
     <text x="${W * 0.75}" y="0"  font-size="120">${away.flag}</text>
     <text x="${W * 0.75}" y="80" font-size="38" font-weight="800">${away.name}</text>
@@ -522,8 +547,13 @@ export function openMatchPredictionsShareCard(
   match: Match,
   predictions: MatchPredictionRow[],
   groupName?: string | null,
+  extra?: { result?: { home: number; away: number; winner?: string } | null; isKnockout?: boolean },
 ) {
-  const { svg, width, height, filename } = buildSvg("match-predictions", { match, predictions, groupName });
+  const { svg, width, height, filename } = buildSvg("match-predictions", {
+    match, predictions, groupName,
+    result: extra?.result ?? null,
+    isKnockout: !!extra?.isKnockout,
+  });
 
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
