@@ -67,17 +67,16 @@ export default function MatchesTab() {
     }
     if (!dayEl) return false;
 
-    /* Inside that day, target the FIRST match card (earliest kickoff). */
-    const firstCard = dayEl.querySelector<HTMLElement>(".match-card")
-                   || dayEl.querySelector<HTMLElement>(".mt-card")
-                   || dayEl;
+    /* Target the day SECTION itself (not just the first card) so its
+     * heading — "יום שישי, 12 יוני 2026 · היום · X משחקים" — stays visible
+     * above the cards instead of being scrolled past. */
 
     /* OFFSET clears whatever sticky element covers the top of the
      * viewport: mobile browser URL bar (~60px) or desktop sticky pills
      * bar (~56px) — using 70-90px gives a small breathing buffer. */
     const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches;
     const OFFSET = isMobile ? 70 : 90;
-    const rect = firstCard.getBoundingClientRect();
+    const rect = dayEl.getBoundingClientRect();
     const targetY = window.scrollY + rect.top - OFFSET;
     window.scrollTo({ top: Math.max(0, targetY), behavior });
     return true;
