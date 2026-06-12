@@ -73,7 +73,7 @@ function buildMatchInstaCard({ match }: MatchCardArgs) {
   const stage = STAGES[match.stage]?.name || "";
   const channels = (match.channels || []).map(c => CHANNELS[c]?.name).filter(Boolean).slice(0, 3).join(" · ");
   return {
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" direction="ltr">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%"  stop-color="#0b1020"/>
@@ -141,7 +141,7 @@ function buildPredictionCard({ match, home, away, joker }: PredictionCardArgs) {
   const homeTeam = TEAMS[match.home] || { name: match.home, flag: "?" } as any;
   const awayTeam = TEAMS[match.away] || { name: match.away, flag: "?" } as any;
   return {
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" direction="ltr">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#0b1020"/>
@@ -184,7 +184,7 @@ function buildLeaderboardCard({ rank, name, points }: LeaderboardCardArgs) {
   const W = 1080, H = 1080;
   const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : "🏅";
   return {
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" direction="ltr">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#0b1020"/><stop offset="100%" stop-color="#182343"/>
@@ -246,7 +246,7 @@ function buildLeaderboardTableCard({ rows, groupName, limit = 10 }: LeaderboardT
 
   const now = new Date().toISOString();
   return {
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" direction="ltr">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%"  stop-color="#0b1020"/>
@@ -337,7 +337,7 @@ function buildMatchPredictionsCard({ match, predictions, groupName, result, isKn
   }).join("");
 
   return {
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" direction="ltr">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%"  stop-color="#0b1020"/>
