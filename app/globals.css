@@ -2274,7 +2274,7 @@ button { font-family: inherit; cursor: pointer; }
 .scoring-legend .pts-gold   { background: linear-gradient(135deg, #facc15, #f59e0b); color: #1a1a1a; }
 .scoring-legend .pts-silver { background: linear-gradient(135deg, #cbd5e1, #94a3b8); color: #1a1a1a; }
 .scoring-legend .pts-bronze { background: linear-gradient(135deg, #fb923c, #c2410c); color: #1a1a1a; }
-.scoring-legend .pts-fire   { background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; min-width: auto; padding: 0 10px; }
+.scoring-legend .pts-fire   { background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; min-width: auto; padding: 0 10px; flex-shrink: 0; }
 .scoring-legend-bonus {
   margin-top: 10px;
   padding-top: 8px;
@@ -2283,6 +2283,10 @@ button { font-family: inherit; cursor: pointer; }
   align-items: center;
   gap: 8px;
   font-size: 12px;
+}
+.scoring-legend-bonus span:last-child {
+  flex: 1;
+  line-height: 1.4;
 }
 @media (max-width: 640px) {
   .scoring-legend { flex: 1 1 100%; }

@@ -9,6 +9,7 @@ import { ACHIEVEMENTS } from "@/lib/achievements";
 import { AvatarDisplay } from "./AvatarPicker";
 import AvatarPicker from "./AvatarPicker";
 import Onboarding from "./Onboarding";
+import { ScoringLegend } from "./ScoringLegend";
 import type { LeaderRow } from "@/lib/types";
 
 export default function ProfileTab() {
@@ -333,37 +334,5 @@ export default function ProfileTab() {
   );
 }
 
-/* =====================================================================
- * ScoringLegend — quick-reference card that explains how points are
- * awarded. Lives inside the profile hero so users always see it.
- * ===================================================================*/
-function ScoringLegend() {
-  return (
-    <aside className="scoring-legend" aria-label="מפתח ניקוד">
-      <div className="scoring-legend-title">🧮 מפתח ניקוד</div>
-
-      <div className="scoring-legend-section">
-        <div className="scoring-legend-stage">🏟 שלב הבתים</div>
-        <ul>
-          <li><span className="pts pts-gold">7</span> תוצאה מדויקת</li>
-          <li><span className="pts pts-silver">4</span> תוצאה נכונה + הפרש שערים</li>
-          <li><span className="pts pts-bronze">3</span> רק תוצאה נכונה (מנצח/תיקו)</li>
-        </ul>
-      </div>
-
-      <div className="scoring-legend-section">
-        <div className="scoring-legend-stage">🥊 שלבי נוקאאוט</div>
-        <ul>
-          <li><span className="pts pts-gold">8</span> תוצאה מדויקת + מנצח</li>
-          <li><span className="pts pts-silver">5</span> מנצח נכון + הפרש שערים</li>
-          <li><span className="pts pts-bronze">3</span> רק מנצח נכון (כולל הארכה/פנדלים)</li>
-        </ul>
-      </div>
-
-      <div className="scoring-legend-bonus">
-        <span className="pts pts-fire">🔥 +1</span>
-        בונוס מהניחוש הנכון השני ברצף ואילך
-      </div>
-    </aside>
-  );
-}
+/* ScoringLegend now lives in ./ScoringLegend (shared with FriendsRanking's
+ * "מפתח ניקוד" button). */

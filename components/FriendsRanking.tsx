@@ -10,6 +10,7 @@ import { getUserDoc } from "@/lib/firebase";
 import { AVATARS } from "@/lib/avatars";
 import { AvatarDisplay } from "./AvatarPicker";
 import MatchModal from "./MatchModal";
+import { ScoringLegendModal } from "./ScoringLegend";
 import { scorePrediction } from "@/lib/scoring";
 import type { LeaderRow, ActivityEvent } from "@/lib/types";
 
@@ -499,6 +500,7 @@ function GroupLeaderboardCard({
   const [rows, setRows] = useState<LeaderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(!collapsed);
+  const [showScoringKey, setShowScoringKey] = useState(false);
 
   async function load() {
     /* Same defense as the parent component: never fetch a global
@@ -586,6 +588,13 @@ function GroupLeaderboardCard({
               </button>
             )}
             <button
+              className="btn btn-small"
+              onClick={() => setShowScoringKey(true)}
+              title="איך מחשבים נקודות?"
+            >
+              🧮 מפתח ניקוד
+            </button>
+            <button
               className="btn btn-small wa-btn"
               onClick={() => shareToWhatsApp(weeklyReminderShareText(groupId ? groupName : null))}
               title="שלח לקבוצה תזכורת בווטסאפ למלא ניחושים לשבוע"
@@ -619,6 +628,7 @@ function GroupLeaderboardCard({
           ? <div className="muted">…טוען</div>
           : <Leaderboard rows={rows} myUid={myUid} predictionRows={predictionRows} />
       )}
+      {showScoringKey && <ScoringLegendModal onClose={() => setShowScoringKey(false)} />}
     </div>
   );
 }
