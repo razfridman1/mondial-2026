@@ -161,6 +161,7 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
 
   return (
     <article className={`match-card status-${status} is-clickable`} data-match-id={match.id}
+             data-finished={isFinished ? "true" : undefined}
              onClick={onCardClick}
              onKeyDown={(e) => { if (e.key === "Enter") onOpen(match.id); }}
              role="button" tabIndex={0}

@@ -83,6 +83,24 @@ export default function MatchesTab() {
     return true;
   }
 
+  /* Scroll-to-finished plumbing. Lets users jump straight to the cards of
+   * matches that have already ended (real result entered manually or
+   * synced) — these can otherwise sit far down the list, after the
+   * today/upcoming days for the same stage. */
+  function scrollToFinished(behavior: ScrollBehavior = "smooth") {
+    const root = bodyRef.current;
+    if (!root) return false;
+    const card = root.querySelector<HTMLElement>('[data-finished="true"]');
+    if (!card) return false;
+
+    const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches;
+    const OFFSET = isMobile ? 70 : 90;
+    const rect = card.getBoundingClientRect();
+    const targetY = window.scrollY + rect.top - OFFSET;
+    window.scrollTo({ top: Math.max(0, targetY), behavior });
+    return true;
+  }
+
   /* Live tick — faster during active simulation so that match cards
    * transition through scheduled→pregame→live→finished as sim time
    * advances. 1s during sim, 10s otherwise. */
@@ -222,6 +240,15 @@ export default function MatchesTab() {
 
   const showBackToToday = section === "stages" && !todayVisible;
 
+  /* "Jump to results" — shown whenever at least one match (in the by-stage
+   * view) already has a real result, so users can scroll straight to
+   * finished-match cards regardless of where they sit in the list. */
+  const hasFinished = useMemo(
+    () => matches.some(m => !!matchResults[m.id]),
+    [matches, matchResults]
+  );
+  const showJumpToFinished = section === "stages" && hasFinished;
+
   return (
     <section className="matches-tab">
       {/* Section pills */}
@@ -252,6 +279,16 @@ export default function MatchesTab() {
         <button className="mt-back-to-today" onClick={() => scrollToToday("smooth")}
                 aria-label="חזור להיום">
           🎯 חזור להיום
+        </button>
+      )}
+
+      {/* Floating "jump to results" button — scrolls to the first
+       * finished-match card so users can find results without manually
+       * scrolling past today/upcoming days. */}
+      {showJumpToFinished && (
+        <button className="mt-back-to-today mt-jump-to-results" onClick={() => scrollToFinished("smooth")}
+                aria-label="עבור לתוצאות">
+          🏁 לתוצאות
         </button>
       )}
 

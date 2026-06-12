@@ -4281,6 +4281,27 @@ html[data-theme="light"] .chat-panel {
   .mt-back-to-today { bottom: 16px; padding: 11px 18px; font-size: 13px; }
 }
 
+/* ---- Floating "jump to results" button — sits beside "back to today" ---- */
+.mt-jump-to-results {
+  left: auto;
+  right: 22px;
+  transform: none;
+  background: linear-gradient(135deg, #2ecc71 0%, #1aa260 100%);
+  box-shadow: 0 8px 24px rgba(46, 204, 113, 0.45),
+              0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.mt-jump-to-results:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(46, 204, 113, 0.55),
+              0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.mt-jump-to-results:active {
+  transform: translateY(0);
+}
+@media (max-width: 720px) {
+  .mt-jump-to-results { right: 16px; }
+}
+
 /* ---- Name setup modal (mandatory after invite-link join) ---- */
 .name-setup-modal {
   max-width: 460px;
