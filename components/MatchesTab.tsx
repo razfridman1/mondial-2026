@@ -332,15 +332,12 @@ function AllStagesSchedule({ matches, onOpen }: {
         if (!byDay.has(k)) byDay.set(k, []);
         byDay.get(k)!.push(m);
       }
-      /* Today/future days first (chronological), past days last (also
-       * chronological among themselves) — so the first card a user sees
-       * is always today's, and shifts forward automatically each day. */
-      const todayK = todayKey();
-      const entries = [...byDay.entries()].sort(([a], [b]) => {
-        const aPast = a < todayK, bPast = b < todayK;
-        if (aPast !== bPast) return aPast ? 1 : -1;
-        return a < b ? -1 : a > b ? 1 : 0;
-      });
+      /* Plain chronological order (past → today → future) so users can
+       * scroll BACK to see finished matches' cards (and forward for
+       * upcoming ones). The "🎯 חזור להיום" floating button jumps straight
+       * to today's section, giving the "today first" effect on demand
+       * without hiding past days from normal scrolling. */
+      const entries = [...byDay.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
       return { stage: sid, byDay: entries, count: list.length };
     }).filter(b => b.count > 0);
   }, [matches]);
