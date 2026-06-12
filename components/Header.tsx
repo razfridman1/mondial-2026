@@ -157,7 +157,19 @@ export default function Header() {
           <button
             key={t.id}
             className={`tab-btn ${tab === t.id ? "on" : ""} ${t.hideOnMobile ? "tab-hide-mobile" : ""}`}
-            onClick={() => setPref("tab", t.id)}
+            onClick={() => {
+              setPref("tab", t.id);
+              /* Switching tabs doesn't navigate (SPA), so the previous
+               * scroll position carries over — e.g. leaving "משחקים"
+               * scrolled down to today's matches would land on
+               * "דירוג חברים" already scrolled past the leaderboard
+               * table, showing the per-match predictions list first.
+               * Reset to top on every tab switch so each tab opens at
+               * its natural starting point. */
+              if (typeof window !== "undefined") {
+                window.scrollTo({ top: 0, behavior: "auto" });
+              }
+            }}
           >
             {t.label}
           </button>
