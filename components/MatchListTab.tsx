@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { MATCHES, TEAMS, VENUES, STAGES } from "@/lib/data";
 import { useStore } from "@/lib/store";
-import { formatIsraelDate, formatIsraelTime, matchLiveStatus } from "@/lib/utils";
+import { formatIsraelDate, formatIsraelTime, matchLiveStatus, israelDateKey } from "@/lib/utils";
 import { effMatch } from "@/lib/sim";
 import { resolveAllStages } from "@/lib/bracket";
 import { useOddsMap } from "@/lib/useOddsMap";
@@ -16,6 +16,16 @@ import type { StageId } from "@/lib/types";
 import MatchModal from "./MatchModal";
 
 const STAGE_ORDER: StageId[] = ["GROUP", "R32", "R16", "QF", "SF", "THIRD", "FINAL"];
+
+/* "Night block" key for a match: groups together the evening (18:00+) and
+ * the following early-morning (until 07:00) matches into the same block,
+ * by shifting the timestamp back 7h before reading the Israel date. A
+ * separator line is drawn whenever this key changes between consecutive
+ * (sorted) matches. */
+function nightBlockKey(utc: string): string {
+  const shifted = new Date(new Date(utc).getTime() - 7 * 3600 * 1000).toISOString();
+  return israelDateKey(shifted);
+}
 
 export default function MatchListTab() {
   const user = useStore(s => s.user);
@@ -82,6 +92,9 @@ export default function MatchListTab() {
     </div>
   );
 
+  const now = Date.now();
+  const TWO_DAYS = 2 * 24 * 3600 * 1000;
+
   return (
     <>
       <div className="admin-bar">
@@ -98,7 +111,7 @@ export default function MatchListTab() {
         </select>
         <input
           type="text"
-          placeholder="🔎 חיפוש נבחרת / אצטדיון..."
+          placeholder="🔎 חיפוש נבחרת..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{
@@ -109,7 +122,7 @@ export default function MatchListTab() {
       </div>
 
       <div className="admin-table-wrap">
-        <table className="admin-table">
+        <table className="admin-table mlt-table">
           <thead>
             <tr>
               <th>תאריך</th>
@@ -118,19 +131,26 @@ export default function MatchListTab() {
               <th>בית</th>
               <th></th>
               <th>חוץ</th>
-              <th>אצטדיון</th>
               <th>סטטוס</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map(m => {
+            {filtered.map((m, i) => {
               const home = TEAMS[m.home] || { name: m.home, flag: "❓" } as any;
               const away = TEAMS[m.away] || { name: m.away, flag: "❓" } as any;
-              const venue = VENUES[m.venue] || { name: m.venue, city: "" } as any;
               const result = matchResults[m.id];
               const status = result ? "finished" : matchLiveStatus(m as any);
+              const isFinished = status === "finished";
+              const startMs = +new Date(m.utc);
+              const isSoon = !isFinished && status !== "live" && startMs - now <= TWO_DAYS && startMs - now >= -TWO_DAYS;
+              const prev = filtered[i - 1];
+              const isNewBlock = i > 0 && nightBlockKey(m.utc) !== nightBlockKey(prev.utc);
+              const rowClass = [
+                isNewBlock ? "mlt-row-sep" : "",
+                isFinished ? "mlt-row-finished" : isSoon ? "mlt-row-soon" : "",
+              ].filter(Boolean).join(" ");
               return (
-                <tr key={m.id} onClick={() => setOpenId(m.id)} style={{ cursor: "pointer" }}>
+                <tr key={m.id} className={rowClass} onClick={() => setOpenId(m.id)} style={{ cursor: "pointer" }}>
                   <td>{formatIsraelDate(m.utc, { short: true })}</td>
                   <td>{formatIsraelTime(m.utc)}</td>
                   <td>
@@ -142,7 +162,6 @@ export default function MatchListTab() {
                     {result ? <strong>{result.home} : {result.away}</strong> : "—"}
                   </td>
                   <td>{away.name} {away.flag}</td>
-                  <td className="muted">{venue.name}{venue.city ? ` · ${venue.city}` : ""}</td>
                   <td>
                     {status === "live"      && <span className="badge badge-live">🔴 חי</span>}
                     {status === "pregame"   && <span className="muted">קדם-משחק</span>}
@@ -153,7 +172,7 @@ export default function MatchListTab() {
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="muted" style={{ textAlign: "center", padding: 20 }}>לא נמצאו משחקים</td></tr>
+              <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 20 }}>לא נמצאו משחקים</td></tr>
             )}
           </tbody>
         </table>

@@ -1345,6 +1345,15 @@ button { font-family: inherit; cursor: pointer; }
 .adm-ch { font-size: 11px; padding: 2px 4px; }
 .adm-actions { display: flex; gap: 4px; }
 
+/* ---------- MATCH LIST (admin) ---------- */
+.mlt-table { font-size: 16px; }
+.mlt-table th, .mlt-table td { padding: 12px 10px; }
+.mlt-table th { font-size: 13px; }
+.mlt-row-sep td { border-top: 2px solid var(--accent); }
+.mlt-row-finished td { background: rgba(239, 68, 68, 0.14); }
+.mlt-row-soon td { background: rgba(255, 210, 74, 0.14); }
+.mlt-row-finished.mlt-row-sep td, .mlt-row-soon.mlt-row-sep td { border-top: 2px solid var(--accent); }
+
 /* ---------- MODAL ---------- */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.7);
