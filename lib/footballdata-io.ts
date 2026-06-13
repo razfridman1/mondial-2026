@@ -63,6 +63,11 @@ export async function fdGetRaw(path: string): Promise<{ ok: boolean; status?: nu
   }
 }
 
+/* World Cup 2026 on footballdata.io: league_id=50, season_id=618
+ * ("International World Cup", 2026). Shared by the odds sync and the
+ * results cross-check. */
+export const WC_SEASON_ID = 618;
+
 export interface FdMatch {
   match_id: number;
   match_date?: string;
@@ -74,6 +79,19 @@ export interface FdMatch {
    * numbers. Unpriced (far-future) matches come back as {0,0,0} — these
    * must be treated as "no odds available" (parse1X2Odds returns null). */
   odds?: { home_win: number; draw: number; away_win: number };
+  /* Final score fields — footballdata.io's documented shape is loose, so
+   * parseFdMatchResult() below checks several plausible locations. */
+  home_score?: number;
+  away_score?: number;
+  score?: {
+    home?: number;
+    away?: number;
+    fulltime?: { home?: number; away?: number };
+    full_time?: { home?: number; away?: number };
+    ft?: { home?: number; away?: number };
+  };
+  full_time_score?: string; // e.g. "2-1"
+  ft_score?: string;
 }
 
 /** List matches for a given footballdata.io season_id (paginated; we pull
@@ -141,4 +159,59 @@ export function parse1X2Odds(raw: any): Odds | null {
 export async function fetchMatchOdds(matchId: number | string): Promise<Odds | null> {
   const data = await fdGet(`/matches/${matchId}/odds`);
   return parse1X2Odds(data);
+}
+
+/* ---------------------------------------------------------------------
+ * Final-score cross-check — used by /api/cron/sync-results as a SECOND
+ * source alongside football-data.org, so a finished result is confirmed
+ * (or flagged as a discrepancy) by two independent feeds before it's
+ * trusted as "final".
+ * ------------------------------------------------------------------- */
+export interface FdResult {
+  home: number;
+  away: number;
+}
+
+const FINISHED_STATUSES = new Set([
+  "ft", "aet", "pen", "finished", "match finished", "full time", "fulltime", "ended", "complete", "completed",
+]);
+
+/** Parse a finished match's final score from a footballdata.io FdMatch.
+ * Returns null unless the status clearly indicates the match has ended
+ * AND both scores parse as valid non-negative numbers — never fabricates
+ * a result from an in-progress or scheduled match. footballdata.io's
+ * score shape isn't fully documented, so several plausible locations are
+ * tried, same defensive approach as parse1X2Odds(). */
+export function parseFdMatchResult(fm: FdMatch): FdResult | null {
+  const status = (fm.status || "").trim().toLowerCase();
+  if (!status) return null;
+  const isFinished =
+    FINISHED_STATUSES.has(status) ||
+    status.includes("finish") ||
+    status.includes("ended") ||
+    status.includes("full time");
+  if (!isFinished) return null;
+
+  const candidates: Array<[unknown, unknown]> = [
+    [fm.home_score, fm.away_score],
+    [fm.score?.home, fm.score?.away],
+    [fm.score?.fulltime?.home, fm.score?.fulltime?.away],
+    [fm.score?.full_time?.home, fm.score?.full_time?.away],
+    [fm.score?.ft?.home, fm.score?.ft?.away],
+  ];
+  for (const [h, a] of candidates) {
+    if (h != null && a != null) {
+      const home = Number(h), away = Number(a);
+      if (Number.isFinite(home) && Number.isFinite(away) && home >= 0 && away >= 0) {
+        return { home, away };
+      }
+    }
+  }
+  for (const raw of [fm.full_time_score, fm.ft_score]) {
+    if (typeof raw === "string") {
+      const m = raw.match(/^\s*(\d+)\s*[-:]\s*(\d+)\s*$/);
+      if (m) return { home: Number(m[1]), away: Number(m[2]) };
+    }
+  }
+  return null;
 }

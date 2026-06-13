@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
 import { MATCHES } from "@/lib/data";
-import { listSeasonMatches, parse1X2Odds, hasFootballDataIoKey } from "@/lib/footballdata-io";
+import { listSeasonMatches, parse1X2Odds, hasFootballDataIoKey, WC_SEASON_ID } from "@/lib/footballdata-io";
 import { teamCodeFromApiName } from "@/lib/team-name-mapper";
 
 export const runtime = "nodejs";
@@ -31,7 +31,7 @@ export const maxDuration = 30;
  * ===================================================================*/
 
 const SECRET = process.env.CRON_SECRET || "";
-const SEASON_ID = 618; // World Cup 2026 on footballdata.io (league_id=50)
+const SEASON_ID = WC_SEASON_ID; // World Cup 2026 on footballdata.io (league_id=50)
 
 export async function GET(req: Request) {
   if (SECRET) {

@@ -6,6 +6,7 @@ import { teamCodeFromApiName } from "@/lib/team-name-mapper";
 import type { MatchResult } from "@/lib/standings";
 import { fetchExternalMatchDetails } from "@/lib/football-data-api";
 import { generateMatchSummaryNarrative } from "@/lib/matchSummary";
+import { listSeasonMatches, parseFdMatchResult, hasFootballDataIoKey, WC_SEASON_ID, type FdMatch } from "@/lib/footballdata-io";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,27 +15,42 @@ export const maxDuration = 60;
 /* =====================================================================
  * GET /api/cron/sync-results
  *
- * Pulls live World Cup results from an external football data API and
- * writes them to the `match_results` collection.
+ * Pulls live World Cup results and writes them to the `match_results`
+ * collection — fully automatic, no manual admin action required.
+ *
+ * TWO INDEPENDENT SOURCES, checked in parallel every minute:
+ *   1. football-data.org (PRIMARY) — full match feed incl. knockout
+ *      winner/penalties, used to build post-match summaries.
+ *   2. footballdata.io   (SECONDARY, group stage) — used to CONFIRM the
+ *      primary result (doc.confirmedBy) or flag a discrepancy
+ *      (doc.secondarySourceMismatch) for admin review. If the primary
+ *      source isn't configured or hasn't reported a match as finished
+ *      yet, the secondary source's result is written on its own
+ *      (source: "live-footballdata.io") so the result still appears
+ *      immediately.
  *
  * Configuration (Vercel env vars):
- *   FOOTBALL_API_KEY   — required to enable live sync
- *   FOOTBALL_API_URL   — default: https://api.football-data.org/v4
- *   CRON_SECRET        — optional, protects the endpoint from public access
+ *   FOOTBALL_API_KEY      — football-data.org (primary)
+ *   FOOTBALLDATA_IO_API_KEY — footballdata.io (secondary/cross-check)
+ *   FOOTBALL_API_URL      — default: https://api.football-data.org/v4
+ *   CRON_SECRET           — optional, protects the endpoint
  *
- * If FOOTBALL_API_KEY is not set, the endpoint is a no-op (returns
- * { ok: true, skipped: "not configured" }). This is the safe default
- * during the simulation phase before the tournament.
+ * If NEITHER key is set, the endpoint is a no-op
+ * ({ ok: true, skipped: "not configured" }).
+ *
+ * Manual fallback: admin-entered results (/api/admin/results, which set
+ * `setByAdmin: true`) are NEVER overwritten by this sync — so manual
+ * entry remains available as a safety net if auto-sync can't find or
+ * resolve a match, without auto-sync fighting back over it.
  *
  * Match mapping: each external match is identified by (date + home team
- * + away team). We map external team codes/names to our internal 3-letter
- * TEAMS codes by checking name+nameEn match.
- *
- * Results are written with `source: "live"` so they're distinguishable
- * from admin-entered or sim-generated results.
+ * + away team), mapping external team codes/names to our internal
+ * 3-letter TEAMS codes via teamCodeFromApiName.
  * ===================================================================*/
 
 const SECRET = process.env.CRON_SECRET || "";
+
+type StoredResult = MatchResult & { setByAdmin?: boolean };
 
 export async function GET(req: Request) {
   if (SECRET) {
@@ -45,20 +61,23 @@ export async function GET(req: Request) {
   }
 
   const apiKey = process.env.FOOTBALL_API_KEY;
-  if (!apiKey) {
+  const hasFD = !!apiKey;
+  const hasFDIO = hasFootballDataIoKey();
+
+  if (!hasFD && !hasFDIO) {
     return NextResponse.json({
       ok: true,
-      skipped: "FOOTBALL_API_KEY not configured — live sync is disabled",
-      docs: "Set FOOTBALL_API_KEY in Vercel env vars when the tournament starts. The free tier of football-data.org works.",
+      skipped: "no result source configured",
+      docs: "Set FOOTBALL_API_KEY and/or FOOTBALLDATA_IO_API_KEY in Vercel env vars when the tournament starts. The free tier of football-data.org works.",
     });
   }
 
   /* ----- Rate-limit guard ---------------------------------------------
-   * The cron is scheduled every minute. To stay inside football-data.org's
-   * free tier we ONLY call the external API when at least one match is
-   * "active" — defined as starting within the next 15 minutes through
-   * 3 hours after kickoff (covers 90' + injury time + admin lag). Outside
-   * those windows we short-circuit and return ok with skipped="no-active".
+   * The cron is scheduled every minute. To stay inside the free tiers we
+   * ONLY call the external APIs when at least one match is "active" —
+   * defined as starting within the next 15 minutes through 3 hours after
+   * kickoff (covers 90' + ET + penalties + admin lag). Outside those
+   * windows we short-circuit and return ok with skipped="no-active".
    * If the request includes ?force=1 we bypass the guard (manual sync). */
   const url = new URL(req.url);
   const force = url.searchParams.get("force") === "1";
@@ -78,17 +97,6 @@ export async function GET(req: Request) {
   const baseUrl = process.env.FOOTBALL_API_URL || "https://api.football-data.org/v4";
 
   try {
-    /* World Cup 2026 — competition code "WC" on football-data.org */
-    const r = await fetch(`${baseUrl}/competitions/WC/matches?season=2026`, {
-      headers: { "X-Auth-Token": apiKey },
-    });
-    if (!r.ok) {
-      const err = await r.text();
-      return NextResponse.json({ error: "api_failed", details: err.slice(0, 500) }, { status: 502 });
-    }
-    const data = await r.json();
-    const externalMatches: any[] = data.matches || [];
-
     const { db } = getAdmin();
 
     /* Build the bracket resolver from EXISTING results so we know which
@@ -96,12 +104,61 @@ export async function GET(req: Request) {
      * external knockout fixtures (which have real team names) to our
      * placeholder-driven matches (1A, W R32-1, etc). */
     const existingResSnap = await db.collection("match_results").get();
-    const existingResults: Record<string, MatchResult> = {};
+    const existingResults: Record<string, StoredResult> = {};
     existingResSnap.forEach(d => {
       const data = d.data() as any;
-      existingResults[d.id] = { home: data.home, away: data.away, finishedAt: data.finishedAt || 0 };
+      existingResults[d.id] = {
+        home: data.home, away: data.away, finishedAt: data.finishedAt || 0,
+        ...(data.winner ? { winner: data.winner } : {}),
+        setByAdmin: !!data.setByAdmin,
+      };
     });
     const resolved = resolveAllStages(existingResults);
+
+    /* ----- Fetch both sources in parallel ---------------------------- */
+    const [fdOrg, fdio] = await Promise.all([
+      hasFD ? fetchFootballDataOrgMatches(baseUrl, apiKey!) : Promise.resolve(null),
+      hasFDIO ? listSeasonMatches(WC_SEASON_ID, { limit: 100, maxPages: 1 }).catch(() => [] as FdMatch[]) : Promise.resolve([] as FdMatch[]),
+    ]);
+
+    if (!fdOrg && !hasFDIO) {
+      // Only source configured failed outright.
+      return NextResponse.json({ error: "api_failed", details: "football-data.org request failed" }, { status: 502 });
+    }
+
+    const externalMatches: any[] = fdOrg?.matches || [];
+    const fdOrgError = fdOrg?.error || null;
+
+    /* Map footballdata.io's finished group-stage matches to our match ids,
+     * normalized to OUR home/away order. */
+    const fdioResultsByMatch: Record<string, { home: number; away: number }> = {};
+    for (const fm of fdio) {
+      const result = parseFdMatchResult(fm);
+      if (!result) continue;
+
+      const homeCode = teamCodeFromApiName(fm.home_team?.team_name);
+      const awayCode = teamCodeFromApiName(fm.away_team?.team_name);
+      if (!homeCode || !awayCode) continue;
+
+      const fdDate = fm.date_unix
+        ? new Date(fm.date_unix * 1000).toISOString().slice(0, 10)
+        : (fm.match_date || "").slice(0, 10);
+      if (!fdDate) continue;
+
+      const our = MATCHES.find(m => {
+        if (m.stage !== "GROUP") return false;
+        const ourDate = new Date(m.utc).toISOString().slice(0, 10);
+        if (ourDate !== fdDate) return false;
+        const direct = m.home === homeCode && m.away === awayCode;
+        const swap = m.home === awayCode && m.away === homeCode;
+        return direct || swap;
+      });
+      if (!our) continue;
+
+      let home = result.home, away = result.away;
+      if (our.home === awayCode && our.away === homeCode) { [home, away] = [away, home]; }
+      fdioResultsByMatch[our.id] = { home, away };
+    }
 
     /* Existing post-match summaries — used to avoid regenerating (and
      * re-calling the AI / external API) for matches we've already
@@ -110,7 +167,7 @@ export async function GET(req: Request) {
     const existingSummaries: Record<string, any> = summariesSnap.exists ? (summariesSnap.data() || {}) : {};
     const summaryCandidates: Array<{ matchId: string; externalId: any; homeCode: string; awayCode: string; homeScore: number; awayScore: number }> = [];
 
-    let inserted = 0, updated = 0, skipped = 0;
+    let inserted = 0, updated = 0, skipped = 0, skippedAdminLocked = 0, confirmed = 0, mismatches = 0;
     let batch = db.batch();
     let ops = 0;
 
@@ -120,6 +177,11 @@ export async function GET(req: Request) {
 
       const ourMatch = findOurMatch(ext, resolved);
       if (!ourMatch) { skipped++; continue; }
+
+      /* Respect a manually-entered admin result — admin entry is the
+       * fallback for when auto-sync can't find/resolve a match; don't
+       * let auto-sync fight back over it. */
+      if (existingResults[ourMatch.id]?.setByAdmin) { skippedAdminLocked++; continue; }
 
       const ref = db.collection("match_results").doc(ourMatch.id);
       const existing = await ref.get();
@@ -152,6 +214,19 @@ export async function GET(req: Request) {
          * still reports DRAW we'll leave winner unset until updated. */
       }
 
+      /* Cross-check against the secondary source (group stage only). */
+      const fdioResult = fdioResultsByMatch[ourMatch.id];
+      if (fdioResult) {
+        if (fdioResult.home === doc.home && fdioResult.away === doc.away) {
+          doc.confirmedBy = "footballdata.io";
+          confirmed++;
+        } else {
+          doc.secondarySourceMismatch = { source: "footballdata.io", home: fdioResult.home, away: fdioResult.away, checkedAt: Date.now() };
+          mismatches++;
+        }
+        delete fdioResultsByMatch[ourMatch.id]; // handled — don't double-write below
+      }
+
       batch.set(ref, doc, { merge: true });
       ops++;
       if (existing.exists) updated++;
@@ -180,17 +255,46 @@ export async function GET(req: Request) {
 
       if (ops >= 450) { await batch.commit(); batch = db.batch(); ops = 0; }
     }
+
+    /* ----- Secondary-only writes --------------------------------------
+     * Any footballdata.io-confirmed-finished GROUP match the primary
+     * source didn't cover this run (not configured, or not yet reporting
+     * FINISHED) gets written on its own so the result still appears
+     * immediately. Skipped for admin-locked results, and skipped if it'd
+     * be a no-op (identical score already stored). */
+    let fdioOnlyWrites = 0;
+    for (const [matchId, fres] of Object.entries(fdioResultsByMatch)) {
+      const existing = existingResults[matchId];
+      if (existing?.setByAdmin) { skippedAdminLocked++; continue; }
+      if (existing && existing.home === fres.home && existing.away === fres.away) continue;
+
+      const ref = db.collection("match_results").doc(matchId);
+      batch.set(ref, {
+        matchId,
+        home: fres.home,
+        away: fres.away,
+        finishedAt: Date.now(),
+        sim: false,
+        source: "live-footballdata.io",
+      }, { merge: true });
+      ops++;
+      fdioOnlyWrites++;
+      if (existing) updated++; else inserted++;
+      if (ops >= 450) { await batch.commit(); batch = db.batch(); ops = 0; }
+    }
+
     if (ops > 0) await batch.commit();
 
     /* Generate post-match summaries (real data + AI narrative) for any
      * newly-finished matches. Limited per run to avoid timeouts/rate
-     * limits — at most one match normally finishes per minute anyway. */
+     * limits — at most one match normally finishes per minute anyway.
+     * Requires football-data.org (the only source with goal/card detail). */
     let summariesGenerated = 0;
-    if (summaryCandidates.length) {
+    if (hasFD && summaryCandidates.length) {
       const summaryUpdates: Record<string, any> = {};
       for (const cand of summaryCandidates.slice(0, 2)) {
         try {
-          const details = await fetchExternalMatchDetails(cand.externalId, apiKey, baseUrl);
+          const details = await fetchExternalMatchDetails(cand.externalId, apiKey!, baseUrl);
           if (!details) continue;
           const text = await generateMatchSummaryNarrative({
             matchId: cand.matchId,
@@ -211,9 +315,39 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, inserted, updated, skipped, total: externalMatches.length, summariesGenerated });
+    return NextResponse.json({
+      ok: true,
+      inserted, updated, skipped,
+      skippedAdminLocked,
+      total: externalMatches.length,
+      summariesGenerated,
+      sources: {
+        "football-data.org": hasFD ? (fdOrgError ? `error: ${fdOrgError}` : "ok") : "not configured",
+        "footballdata.io": hasFDIO ? "ok" : "not configured",
+      },
+      crossCheck: { confirmed, mismatches, fdioOnlyWrites },
+    });
   } catch (e: any) {
     return NextResponse.json({ error: "sync_failed", message: e?.message || String(e) }, { status: 500 });
+  }
+}
+
+/* Fetch the World Cup match list from football-data.org. Returns null on
+ * network failure; returns { matches: [], error } on a non-OK response so
+ * the caller can still proceed with the secondary source. */
+async function fetchFootballDataOrgMatches(baseUrl: string, apiKey: string): Promise<{ matches: any[]; error?: string } | null> {
+  try {
+    const r = await fetch(`${baseUrl}/competitions/WC/matches?season=2026`, {
+      headers: { "X-Auth-Token": apiKey },
+    });
+    if (!r.ok) {
+      const err = await r.text();
+      return { matches: [], error: `${r.status} ${err.slice(0, 200)}` };
+    }
+    const data = await r.json();
+    return { matches: data.matches || [] };
+  } catch {
+    return null;
   }
 }
 
