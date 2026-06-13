@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { TEAMS } from "@/lib/data";
 import { squadFor } from "@/lib/players";
+import { openScorersShareCard } from "@/lib/share-cards";
 import type { Team } from "@/lib/types";
 import type { ScorerEntry } from "@/app/api/scorers/route";
 
@@ -53,7 +54,16 @@ export default function TopScorersTab() {
 
   return (
     <section className="topscorers-tab">
-      <h2 className="sec-title">⚽🎯 מלך השערים והבישולים</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <h2 className="sec-title">⚽🎯 מלך השערים והבישולים</h2>
+        <button
+          className="btn"
+          onClick={() => openScorersShareCard(topScorers, topAssists)}
+          disabled={loading}
+        >
+          📤 שתף בוואטסאפ
+        </button>
+      </div>
       <p className="muted" style={{ marginTop: 4, marginBottom: 16, fontSize: 13 }}>
         טבלאות השערים והבישולים מתעדכנות אוטומטית לאחר כל משחק שמסתיים.
         בנוסף, ניתן לבחור פעם אחת בלבד מי לדעתך יהיה מלך השערים ומלך הבישולים של הטורניר — ללא אפשרות לשנות בהמשך.

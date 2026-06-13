@@ -15,8 +15,9 @@ import { AVATARS } from "./avatars";
 import { formatIsraelDate, formatIsraelTime } from "./utils";
 import { scorePrediction } from "./scoring";
 import type { Match, LeaderRow } from "./types";
+import type { ScorerEntry } from "@/app/api/scorers/route";
 
-type CardKind = "match" | "prediction" | "leaderboard" | "leaderboard-table" | "match-predictions";
+type CardKind = "match" | "prediction" | "leaderboard" | "leaderboard-table" | "match-predictions" | "scorers-table";
 
 interface MatchCardArgs { match: Match; }
 interface PredictionCardArgs { match: Match; home: number; away: number; joker?: boolean; }
@@ -43,6 +44,11 @@ interface MatchPredictionsCardArgs {
   result?: { home: number; away: number; winner?: string } | null;
   isKnockout?: boolean;
 }
+interface ScorersTableArgs {
+  topScorers: ScorerEntry[];
+  topAssists: ScorerEntry[];
+  limit?: number;
+}
 
 export function buildSvg(kind: CardKind, args: any): { svg: string; width: number; height: number; filename: string } {
   switch (kind) {
@@ -51,6 +57,7 @@ export function buildSvg(kind: CardKind, args: any): { svg: string; width: numbe
     case "leaderboard":       return buildLeaderboardCard(args as LeaderboardCardArgs);
     case "leaderboard-table": return buildLeaderboardTableCard(args as LeaderboardTableArgs);
     case "match-predictions": return buildMatchPredictionsCard(args as MatchPredictionsCardArgs);
+    case "scorers-table":     return buildScorersTableCard(args as ScorersTableArgs);
   }
 }
 
@@ -379,6 +386,91 @@ function buildMatchPredictionsCard({ match, predictions, groupName, result, isKn
   };
 }
 
+/* ------- Top scorers / top assists card — styled like the in-app "מלך
+ * השערים והבישולים" tables (dark rows, medal for top 3, player name + team
+ * flag + count), so a shared image looks like the real app. */
+function buildScorersTableCard({ topScorers, topAssists, limit = 5 }: ScorersTableArgs) {
+  const W = 1080;
+  const scorers = topScorers.slice(0, limit);
+  const assists = topAssists.slice(0, limit);
+  const ROW_H = 110;
+  const SECTION_HEAD_H = 90;
+  const HEADER_H = 220;
+  const SECTION_GAP = 50;
+  const FOOTER_H = 100;
+
+  const rankColor = (rank: number) => rank === 1 ? "#ffd24a" : rank === 2 ? "#c0c0c0" : rank === 3 ? "#cd7f32" : "#2a3354";
+  const medal = (rank: number) => rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
+  const sectionH = (rows: ScorerEntry[]) => SECTION_HEAD_H + Math.max(rows.length, 1) * ROW_H;
+
+  function buildSection(title: string, rows: ScorerEntry[], countLabel: string, yOffset: number) {
+    const rowsSvg = rows.map((r, i) => {
+      const rank = i + 1;
+      const y = SECTION_HEAD_H + i * ROW_H;
+      const accent = rankColor(rank);
+      const isTop3 = rank <= 3;
+      const m = medal(rank);
+      const team = r.teamCode ? TEAMS[r.teamCode] : null;
+      const teamLabel = team ? `${team.flag} ${escapeXml(team.name)}` : "—";
+      return `
+      <g transform="translate(0 ${y})">
+        <rect x="60" y="10" width="${W - 120}" height="${ROW_H - 20}" rx="18"
+              fill="#181f37" stroke="${accent}" stroke-width="${isTop3 ? 5 : 2}"/>
+        ${rank === 1 ? `<rect x="60" y="10" width="${W - 120}" height="${ROW_H - 20}" rx="18" fill="#ffd24a" fill-opacity="0.08"/>` : ""}
+        <text x="${W - 110}" y="${ROW_H / 2 + 14}" text-anchor="middle" font-family="Heebo, Rubik, Arial" font-size="40" font-weight="900" fill="${isTop3 ? accent : "#ffd24a"}">${m || `#${rank}`}</text>
+        <text x="${W - 195}" y="${ROW_H / 2 + 12}" text-anchor="end" font-family="Heebo, Rubik, Arial" font-size="34" font-weight="800" fill="#eef1ff">${escapeXml(r.name)}</text>
+        <text x="${W / 2 - 60}" y="${ROW_H / 2 + 12}" text-anchor="middle" font-family="Heebo, Rubik, Arial" font-size="28" fill="#9aa3c7">${teamLabel}</text>
+        <text x="170" y="${ROW_H / 2 + 14}" text-anchor="end" font-family="Heebo, Rubik, Arial" font-size="44" font-weight="900" fill="#ffd24a">${r.count}</text>
+        <text x="180" y="${ROW_H / 2 + 14}" text-anchor="start" font-family="Heebo" font-size="22" fill="#9aa3c7">${countLabel}</text>
+      </g>`;
+    }).join("");
+
+    const emptyMsg = !rows.length
+      ? `<text x="${W / 2}" y="${SECTION_HEAD_H + ROW_H / 2 + 10}" text-anchor="middle" font-family="Heebo" font-size="26" fill="#9aa3c7">אין עדיין נתונים</text>`
+      : "";
+
+    return `
+    <g transform="translate(0 ${yOffset})">
+      <text x="${W / 2}" y="40" text-anchor="middle" font-family="Heebo, Rubik, Arial" font-size="40" font-weight="900" fill="url(#gold)">${title}</text>
+      ${rowsSvg}${emptyMsg}
+    </g>`;
+  }
+
+  const scorersSvg = buildSection("🥇 מלך השערים", scorers, "שערים", HEADER_H);
+  const assistsSvg = buildSection("🎯 מלך הבישולים", assists, "בישולים", HEADER_H + sectionH(scorers) + SECTION_GAP);
+  const H = HEADER_H + sectionH(scorers) + SECTION_GAP + sectionH(assists) + FOOTER_H;
+
+  const now = new Date().toISOString();
+  return {
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" direction="ltr">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#0b1020"/>
+      <stop offset="60%" stop-color="#182343"/>
+      <stop offset="100%" stop-color="#0b1020"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd24a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="${W}" height="${H}" fill="url(#bg)"/>
+
+  <g transform="translate(${W / 2} 100)" text-anchor="middle" font-family="Heebo, Rubik, Arial">
+    <text font-size="56" font-weight="900" fill="url(#gold)">⚽🎯 מלך השערים והבישולים</text>
+    <text y="56" font-size="24" fill="#9aa3c7">מונדיאל 2026 · ${formatIsraelDate(now)} ${formatIsraelTime(now)}</text>
+  </g>
+
+  ${scorersSvg}
+  ${assistsSvg}
+
+  <text x="${W / 2}" y="${H - 36}" text-anchor="middle" font-family="Heebo" font-size="24" fill="#9aa3c7">#מונדיאל2026 #מי_יצדק</text>
+</svg>`,
+    width: W, height: H,
+    filename: `mondial-top-scorers.png`,
+  };
+}
+
 /* =====================================================================
  * Render & share helpers (browser-only)
  * ===================================================================*/
@@ -597,6 +689,62 @@ export function openMatchPredictionsShareCard(
       const file = new File([blob], filename, { type: "image/png" });
       if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
         await (navigator as any).share({ files: [file], title: "מונדיאל 2026 — ניחושי הקבוצה" });
+        return;
+      }
+      downloadBlob(blob, filename);
+      alert("השיתוף הישיר לא נתמך בדפדפן הזה — התמונה הורדה, אפשר לצרף אותה ידנית בוואטסאפ.");
+    } catch {
+      alert("שגיאה בשיתוף — נסה שוב.");
+    }
+  });
+
+  overlay.querySelector("[data-act='download']")!.addEventListener("click", async () => {
+    try {
+      const blob = await svgToPngBlob(svg, width, height);
+      downloadBlob(blob, filename);
+    } catch {
+      alert("שגיאה ביצירת התמונה.");
+    }
+  });
+}
+
+/* Open a modal that shows the "מלך השערים והבישולים" leaderboards as a card
+ * styled like the in-app tables (top scorers + top assists, medal for top
+ * 3, player + team + count), and lets the user share it as an IMAGE
+ * (WhatsApp etc. via the native share sheet) or download it. */
+export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: ScorerEntry[]) {
+  const { svg, width, height, filename } = buildSvg("scorers-table", { topScorers, topAssists });
+
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" role="dialog" style="max-width: 480px;">
+      <button class="modal-close" aria-label="סגור">✕</button>
+      <header class="modal-header">
+        <h2>⚽🎯 שתף את מלך השערים והבישולים</h2>
+        <div class="muted">תמונה בעיצוב האתר — מוכנה לשיתוף</div>
+      </header>
+      <div class="share-card-preview" style="max-height: 60vh; overflow:auto;">${svg}</div>
+      <div class="mc-actions" style="margin-top:14px; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-primary" data-act="share">📤 שתף</button>
+        <button class="btn" data-act="download">⬇️ הורד תמונה</button>
+      </div>
+      <p class="muted" style="font-size:11px;margin-top:10px; line-height:1.5;">
+        📱 לחיצה על "שתף" תפתח את תפריט השיתוף (וואטסאפ ועוד). אם זה לא עובד במכשיר שלך, לחץ "הורד תמונה" ושתף אותה ידנית.
+      </p>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay || (e.target as HTMLElement).classList.contains("modal-close")) overlay.remove();
+  });
+
+  overlay.querySelector("[data-act='share']")!.addEventListener("click", async () => {
+    try {
+      const blob = await svgToPngBlob(svg, width, height);
+      const file = new File([blob], filename, { type: "image/png" });
+      if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
+        await (navigator as any).share({ files: [file], title: "מונדיאל 2026 — מלך השערים והבישולים" });
         return;
       }
       downloadBlob(blob, filename);

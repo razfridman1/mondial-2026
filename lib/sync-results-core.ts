@@ -536,15 +536,26 @@ export async function runResultsSync(opts: { force?: boolean } = {}): Promise<Sy
         goalCandidates.push({ matchId: m.id, homeCode, awayCode, homeScore: res.home, awayScore: res.away, dateISO: m.utc });
       }
 
+      /* Up to 3 AI lookups per run (instead of just 1): a match whose
+       * goalscorers the AI can't find yet (found:false) must NOT permanently
+       * block later matches in the list — previously this `break`'d after
+       * the very first candidate regardless of outcome, so a single
+       * stubborn match (e.g. M001) starved every match after it of goal
+       * data forever. Failed lookups are simply retried on a later run. */
+      const aiGoalsResults: any[] = [];
+      let aiCallsUsed = 0;
       for (const gc of goalCandidates) {
         if (gc.homeScore + gc.awayScore === 0) {
           goalsUpdates[gc.matchId] = { goals: [], homeCode: gc.homeCode, awayCode: gc.awayCode, updatedAt: Date.now() };
           continue; // no AI call needed for a 0-0 — doesn't consume the per-run budget
         }
 
+        if (aiCallsUsed >= 3) continue; // budget reached — retry the rest on a later run
+
         const homeName = TEAMS[gc.homeCode]?.name || gc.homeCode;
         const awayName = TEAMS[gc.awayCode]?.name || gc.awayCode;
         const glookup = await lookupGoalsViaAI({ homeName, awayName, dateISO: gc.dateISO, homeScore: gc.homeScore, awayScore: gc.awayScore });
+        aiCallsUsed++;
 
         if (glookup.found && glookup.goals) {
           goalsUpdates[gc.matchId] = {
@@ -555,12 +566,12 @@ export async function runResultsSync(opts: { force?: boolean } = {}): Promise<Sy
             source: "ai-websearch",
             aiSources: glookup.sources || [],
           };
-          aiGoalsFallback = { matchId: gc.matchId, found: true };
+          aiGoalsResults.push({ matchId: gc.matchId, found: true });
         } else {
-          aiGoalsFallback = { matchId: gc.matchId, found: false };
+          aiGoalsResults.push({ matchId: gc.matchId, found: false });
         }
-        break; // one AI goals lookup per run
       }
+      if (aiGoalsResults.length) aiGoalsFallback = aiGoalsResults;
     }
 
     if (Object.keys(summaryUpdates).length) {
