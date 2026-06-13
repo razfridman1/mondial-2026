@@ -42,9 +42,10 @@ function isPickCorrect(pick: TopPick | null | undefined, leaders: ScorerEntry[])
   return leaders.some(l => l.teamCode === pick.teamCode && normalizeHe(l.name) === normalizeHe(pick.playerName));
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const { db, auth } = getAdmin();
+    const groupId = new URL(req.url).searchParams.get("groupId");
 
     /* 1. Is the tournament over? */
     const resultsSnap = await db.collection("match_results").get();
@@ -55,11 +56,25 @@ export async function GET() {
     const topScorerLeaders = topLeaders(topScorers);
     const topAssistLeaders = topLeaders(topAssists);
 
-    /* 3. Every profile with at least one pick set. */
+    /* 2b. If scoped to a group, resolve the set of uids in that group —
+     * picks are otherwise shown across the whole site, but a user who
+     * belongs to multiple groups can pick which group's picks to view. */
+    let groupUids: Set<string> | null = null;
+    if (groupId) {
+      const memSnap = await db.collection("group_memberships").where("groupId", "==", groupId).get();
+      groupUids = new Set(
+        memSnap.docs.filter(d => !(d.data() as any).left).map(d => d.data().uid as string)
+      );
+    }
+
+    /* 3. Every profile with at least one pick set (optionally limited to
+     * the selected group's members). */
     const profSnap = await db.collection("profiles").get();
     const withPicks = profSnap.docs.filter(d => {
       const data = d.data() as any;
-      return !!(data.topScorerPick || data.topAssistPick);
+      if (!(data.topScorerPick || data.topAssistPick)) return false;
+      if (groupUids && !groupUids.has(d.id)) return false;
+      return true;
     });
 
     /* 4. Display names — Firestore profile first, fall back to Firebase

@@ -103,13 +103,24 @@ interface AllPicksRow {
 }
 
 function AllPicksTable() {
+  const groups = useStore(s => s.groups);
+  const currentGroupId = useStore(s => s.currentGroupId);
   const [data, setData] = useState<{ finished: boolean; rows: AllPicksRow[] } | null>(null);
+
+  /* If the user belongs to multiple groups, let them pick which group's
+   * picks to view (defaults to their currently-selected group). Users in
+   * 0-1 groups never see the selector — single group, or global view. */
+  const [selectedGroupId, setSelectedGroupId] = useState<string>(() => currentGroupId || "");
+  useEffect(() => {
+    if (currentGroupId && !selectedGroupId) setSelectedGroupId(currentGroupId);
+  }, [currentGroupId, selectedGroupId]);
 
   useEffect(() => {
     let alive = true;
     async function load() {
       try {
-        const r = await fetch("/api/top-picks/all");
+        const q = selectedGroupId ? `?groupId=${selectedGroupId}` : "";
+        const r = await fetch(`/api/top-picks/all${q}`);
         if (r.ok) {
           const j = await r.json();
           if (alive) setData(j);
@@ -119,12 +130,21 @@ function AllPicksTable() {
     load();
     const id = setInterval(load, 60000);
     return () => { alive = false; clearInterval(id); };
-  }, []);
+  }, [selectedGroupId]);
 
   return (
     <div className="stnd-card topscorers-card topscorers-allpicks" style={{ marginTop: 16 }}>
-      <header className="stnd-card-head">
+      <header className="stnd-card-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <h3>👥 הניחושים של כולם</h3>
+        {groups.length > 1 && (
+          <select
+            value={selectedGroupId}
+            onChange={e => setSelectedGroupId(e.target.value)}
+            style={{ fontSize: 12 }}
+          >
+            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        )}
       </header>
       {data?.finished && (
         <p className="muted" style={{ fontSize: 13, margin: "0 0 8px" }}>
