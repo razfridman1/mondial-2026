@@ -568,7 +568,7 @@ export async function runResultsSync(opts: { force?: boolean } = {}): Promise<Sy
           };
           aiGoalsResults.push({ matchId: gc.matchId, found: true });
         } else {
-          aiGoalsResults.push({ matchId: gc.matchId, found: false });
+          aiGoalsResults.push({ matchId: gc.matchId, found: false, reason: glookup.reason });
         }
       }
       if (aiGoalsResults.length) aiGoalsFallback = aiGoalsResults;

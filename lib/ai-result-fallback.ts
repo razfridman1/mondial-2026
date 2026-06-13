@@ -29,6 +29,10 @@ export interface AiGoalsLookup {
   /** Side relative to the home/away orientation the caller supplied. */
   goals?: { minute: number | null; side: "HOME" | "AWAY"; scorer: string; assist?: string; type?: string }[];
   sources?: string[];
+  /** Diagnostic-only: why found:false, surfaced via aiGoalsFallback so a
+   * manual ?force=1 call can show WHY without needing server logs. Never
+   * affects behavior — callers still treat found:false as "retry later". */
+  reason?: string;
 }
 
 const RESULT_SYSTEM_PROMPT = `אתה עוזר שמאתר תוצאות סופיות אמיתיות של משחקי מונדיאל הכדורגל 2026 באמצעות חיפוש אינטרנט.
@@ -56,9 +60,13 @@ const GOALS_SYSTEM_PROMPT = `אתה עוזר שמאתר את רשימת מבקי
 - מספר האובייקטים ברשימת goals חייב להיות שווה בדיוק לסכום השערים (home+away) שניתן לך. אם אינך בטוח בחלק מהשערים — found: false (הכל או לא כלום, אין למלא נתונים חלקיים).
 - "side" מציין איזו קבוצה הבקיעה (home/away לפי האוריינטציה שניתנה), לא איזו קבוצה ניזוקה (שער עצמי משויך לקבוצה שהבקיעה אותו בפועל למול שערה שלה — type:"OWN").`;
 
-async function callClaude(system: string, userMsg: string, maxTokens: number): Promise<{ content: any[] } | null> {
+/* Returns either the parsed Anthropic API response, or { error } with a
+ * short diagnostic string — surfaced (for goals lookups) via
+ * AiGoalsLookup.reason so a manual ?force=1 call can show WHY a lookup
+ * failed (missing key, HTTP error, etc.) without needing server logs. */
+async function callClaude(system: string, userMsg: string, maxTokens: number): Promise<{ content: any[] } | { error: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) return { error: "no_api_key" };
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -75,14 +83,17 @@ async function callClaude(system: string, userMsg: string, maxTokens: number): P
         messages: [{ role: "user", content: userMsg }],
       }),
     });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      const errText = await r.text().catch(() => "");
+      return { error: `http_${r.status}: ${errText.slice(0, 300)}` };
+    }
     return await r.json();
-  } catch {
-    return null;
+  } catch (e: any) {
+    return { error: `fetch_failed: ${e?.message || String(e)}` };
   }
 }
 
-function extractSourcesAndJson(data: { content: any[] }): { sources: string[]; parsed: any | null } {
+function extractSourcesAndJson(data: { content: any[] }): { sources: string[]; parsed: any | null; rawText: string } {
   const content: any[] = data.content || [];
   const sources: string[] = [];
   for (const block of content) {
@@ -95,11 +106,11 @@ function extractSourcesAndJson(data: { content: any[] }): { sources: string[]; p
   const textBlocks = content.filter(b => b.type === "text").map(b => b.text || "");
   const text = textBlocks.join("\n").trim();
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return { sources, parsed: null };
+  if (!jsonMatch) return { sources, parsed: null, rawText: text };
   try {
-    return { sources, parsed: JSON.parse(jsonMatch[0]) };
+    return { sources, parsed: JSON.parse(jsonMatch[0]), rawText: text };
   } catch {
-    return { sources, parsed: null };
+    return { sources, parsed: null, rawText: text };
   }
 }
 
@@ -136,7 +147,7 @@ export async function lookupResultViaAI(opts: {
   }
 
   const data = await callClaude(RESULT_SYSTEM_PROMPT, userMsg, 700);
-  if (!data) return { found: false };
+  if ("error" in data) return { found: false };
 
   const { sources, parsed } = extractSourcesAndJson(data);
   if (!parsed || parsed.found !== true) return { found: false };
@@ -179,18 +190,22 @@ export async function lookupGoalsViaAI(opts: {
     `סך הכל יש ${opts.homeScore + opts.awayScore} שערים במשחק זה. אם אינך מוצא פירוט מלא ומאומת לכל השערים — החזר found:false.`;
 
   const data = await callClaude(GOALS_SYSTEM_PROMPT, userMsg, 1200);
-  if (!data) return { found: false };
+  if ("error" in data) return { found: false, reason: data.error };
 
-  const { sources, parsed } = extractSourcesAndJson(data);
-  if (!parsed || parsed.found !== true || !Array.isArray(parsed.goals)) return { found: false };
+  const { sources, parsed, rawText } = extractSourcesAndJson(data);
+  if (!parsed) return { found: false, reason: `no_json_in_response: ${rawText.slice(0, 200)}` };
+  if (parsed.found !== true) return { found: false, reason: "ai_returned_found_false" };
+  if (!Array.isArray(parsed.goals)) return { found: false, reason: "missing_goals_array" };
 
   const expectedTotal = opts.homeScore + opts.awayScore;
-  if (parsed.goals.length !== expectedTotal) return { found: false };
+  if (parsed.goals.length !== expectedTotal) {
+    return { found: false, reason: `count_mismatch: got ${parsed.goals.length}, expected ${expectedTotal}` };
+  }
 
   const goals: AiGoalsLookup["goals"] = [];
   for (const g of parsed.goals) {
-    if (!g || typeof g.scorer !== "string" || !g.scorer.trim()) return { found: false };
-    if (g.side !== "home" && g.side !== "away") return { found: false };
+    if (!g || typeof g.scorer !== "string" || !g.scorer.trim()) return { found: false, reason: "invalid_goal_entry: missing scorer" };
+    if (g.side !== "home" && g.side !== "away") return { found: false, reason: "invalid_goal_entry: bad side" };
     goals.push({
       minute: typeof g.minute === "number" ? g.minute : null,
       side: g.side === "home" ? "HOME" : "AWAY",
