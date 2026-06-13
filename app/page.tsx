@@ -8,6 +8,7 @@ import WeeklyPredictionsTab from "@/components/WeeklyPredictionsTab";
 import StandingsTab from "@/components/StandingsTab";
 import Bracket from "@/components/Bracket";
 import AdminPanel from "@/components/AdminPanel";
+import MatchListTab from "@/components/MatchListTab";
 import ChatAssistant from "@/components/ChatAssistant";
 import TeamsTab from "@/components/TeamsTab";
 import MyTeamsTab from "@/components/MyTeamsTab";
@@ -33,6 +34,7 @@ function HomeInner() {
         {tab === "myteams"    && <MyTeamsTab />}
         {tab === "bracket"    && <Bracket />}
         {tab === "profile"    && <ProfileTab />}
+        {tab === "matchlist"  && <MatchListTab />}
         {tab === "admin"      && <AdminPanel />}
         {tab === "simulation" && <SimulationPanel />}
         {tab === "superadmin" && <SuperAdminPanel />}
