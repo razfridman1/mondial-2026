@@ -17,7 +17,8 @@ import { useStore } from "@/lib/store";
 import { TEAMS } from "@/lib/data";
 import { squadFor } from "@/lib/players";
 import { openScorersShareCard } from "@/lib/share-cards";
-import type { Team } from "@/lib/types";
+import { AvatarDisplay } from "./AvatarPicker";
+import type { Team, TopPick } from "@/lib/types";
 import type { ScorerEntry } from "@/app/api/scorers/route";
 
 const ALL_TEAMS: Team[] = Object.values(TEAMS).sort((a, b) => a.name.localeCompare(b.name, "he"));
@@ -80,7 +81,110 @@ export default function TopScorersTab() {
         liveSquads={liveSquads}
         setTopPicks={setTopPicks}
       />
+
+      <AllPicksTable />
     </section>
+  );
+}
+
+/* ---------------------------------------------------------------------
+ * "הניחושים של כולם" — every user's one-time pick, visible to everyone.
+ * Once the tournament is over (every match has a result), ✅/❌ marks show
+ * who guessed the real top scorer / top assist correctly.
+ * ------------------------------------------------------------------- */
+interface AllPicksRow {
+  uid: string;
+  displayName: string;
+  avatarId: string;
+  topScorerPick: TopPick | null;
+  topAssistPick: TopPick | null;
+  scorerCorrect: boolean | null;
+  assistCorrect: boolean | null;
+}
+
+function AllPicksTable() {
+  const [data, setData] = useState<{ finished: boolean; rows: AllPicksRow[] } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      try {
+        const r = await fetch("/api/top-picks/all");
+        if (r.ok) {
+          const j = await r.json();
+          if (alive) setData(j);
+        }
+      } catch {}
+    }
+    load();
+    const id = setInterval(load, 60000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  return (
+    <div className="stnd-card topscorers-card topscorers-allpicks" style={{ marginTop: 16 }}>
+      <header className="stnd-card-head">
+        <h3>👥 הניחושים של כולם</h3>
+      </header>
+      {data?.finished && (
+        <p className="muted" style={{ fontSize: 13, margin: "0 0 8px" }}>
+          🏁 הטורניר הסתיים — מי שניחש נכון מסומן ב-✅
+        </p>
+      )}
+      <div className="stnd-table-wrap">
+        <table className="stnd-table">
+          <thead>
+            <tr>
+              <th className="stnd-th-team">משתמש</th>
+              <th>🥇 מלך השערים</th>
+              <th>🎯 מלך הבישולים</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data === null && (
+              <tr><td colSpan={3} className="muted" style={{ textAlign: "center", padding: 16 }}>טוען...</td></tr>
+            )}
+            {data !== null && data.rows.length === 0 && (
+              <tr><td colSpan={3} className="muted" style={{ textAlign: "center", padding: 16 }}>
+                עדיין אין ניחושים — היו הראשונים לבחור!
+              </td></tr>
+            )}
+            {data?.rows.map(row => {
+              const scorerTeam = row.topScorerPick ? TEAMS[row.topScorerPick.teamCode] : null;
+              const assistTeam = row.topAssistPick ? TEAMS[row.topAssistPick.teamCode] : null;
+              return (
+                <tr key={row.uid} className="stnd-row">
+                  <td className="stnd-team">
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <AvatarDisplay avatarId={row.avatarId} size={28} />
+                      <span className="stnd-name">{row.displayName}</span>
+                    </div>
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    {row.topScorerPick ? (
+                      <>
+                        {row.topScorerPick.playerName}
+                        {scorerTeam && <> ({scorerTeam.flag} {scorerTeam.name})</>}
+                        {data.finished && (row.scorerCorrect ? " ✅" : " ❌")}
+                      </>
+                    ) : "—"}
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    {row.topAssistPick ? (
+                      <>
+                        {row.topAssistPick.playerName}
+                        {assistTeam && <> ({assistTeam.flag} {assistTeam.name})</>}
+                        {data.finished && (row.assistCorrect ? " ✅" : " ❌")}
+                      </>
+                    ) : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
