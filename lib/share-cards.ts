@@ -619,7 +619,12 @@ export function openLeaderboardShareCard(rows: LeaderRow[], groupName?: string |
     if (e.target === overlay || (e.target as HTMLElement).classList.contains("modal-close")) overlay.remove();
   });
 
-  overlay.querySelector("[data-act='share']")!.addEventListener("click", async () => {
+  let sharing = false;
+  const leaderboardShareBtn = overlay.querySelector("[data-act='share']") as HTMLButtonElement;
+  leaderboardShareBtn.addEventListener("click", async () => {
+    if (sharing) return; // ignore double-clicks/double-taps — navigator.share() can't run twice at once
+    sharing = true;
+    leaderboardShareBtn.disabled = true;
     try {
       const blob = await svgToPngBlob(svg, width, height);
       const file = new File([blob], filename, { type: "image/png" });
@@ -629,8 +634,11 @@ export function openLeaderboardShareCard(rows: LeaderRow[], groupName?: string |
       }
       downloadBlob(blob, filename);
       alert("השיתוף הישיר לא נתמך בדפדפן הזה — התמונה הורדה, אפשר לצרף אותה ידנית בוואטסאפ.");
-    } catch {
-      alert("שגיאה בשיתוף — נסה שוב.");
+    } catch (e: any) {
+      if (e?.name !== "AbortError") alert("שגיאה בשיתוף — נסה שוב.");
+    } finally {
+      sharing = false;
+      leaderboardShareBtn.disabled = false;
     }
   });
 
@@ -684,7 +692,12 @@ export function openMatchPredictionsShareCard(
     if (e.target === overlay || (e.target as HTMLElement).classList.contains("modal-close")) overlay.remove();
   });
 
-  overlay.querySelector("[data-act='share']")!.addEventListener("click", async () => {
+  let sharing = false;
+  const predictionsShareBtn = overlay.querySelector("[data-act='share']") as HTMLButtonElement;
+  predictionsShareBtn.addEventListener("click", async () => {
+    if (sharing) return; // ignore double-clicks/double-taps — navigator.share() can't run twice at once
+    sharing = true;
+    predictionsShareBtn.disabled = true;
     try {
       const blob = await svgToPngBlob(svg, width, height);
       const file = new File([blob], filename, { type: "image/png" });
@@ -694,8 +707,11 @@ export function openMatchPredictionsShareCard(
       }
       downloadBlob(blob, filename);
       alert("השיתוף הישיר לא נתמך בדפדפן הזה — התמונה הורדה, אפשר לצרף אותה ידנית בוואטסאפ.");
-    } catch {
-      alert("שגיאה בשיתוף — נסה שוב.");
+    } catch (e: any) {
+      if (e?.name !== "AbortError") alert("שגיאה בשיתוף — נסה שוב.");
+    } finally {
+      sharing = false;
+      predictionsShareBtn.disabled = false;
     }
   });
 
@@ -756,7 +772,12 @@ export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: Scor
     document.querySelector(".topscorers-pick-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
-  overlay.querySelector("[data-act='share']")!.addEventListener("click", async () => {
+  let sharing = false;
+  const scorersShareBtn = overlay.querySelector("[data-act='share']") as HTMLButtonElement;
+  scorersShareBtn.addEventListener("click", async () => {
+    if (sharing) return; // ignore double-clicks/double-taps — navigator.share() can't run twice at once
+    sharing = true;
+    scorersShareBtn.disabled = true;
     try {
       const blob = await svgToPngBlob(svg, width, height);
       const file = new File([blob], filename, { type: "image/png" });
@@ -766,9 +787,16 @@ export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: Scor
       }
       downloadBlob(blob, filename);
       alert("השיתוף הישיר לא נתמך בדפדפן הזה — התמונה הורדה, אפשר לצרף אותה ידנית בוואטסאפ.");
-    } catch (e) {
-      console.error("openScorersShareCard: share failed", e);
-      alert("שגיאה בשיתוף — נסה שוב.");
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        // user closed the native share sheet — not an error, do nothing
+      } else {
+        console.error("openScorersShareCard: share failed", e);
+        alert("שגיאה בשיתוף — נסה שוב.");
+      }
+    } finally {
+      sharing = false;
+      scorersShareBtn.disabled = false;
     }
   });
 
