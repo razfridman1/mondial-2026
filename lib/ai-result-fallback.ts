@@ -10,6 +10,7 @@
  * the app's no-fake-data policy, NOTHING is ever fabricated.
  * ===================================================================*/
 import type { ExternalGoal } from "./football-data-api";
+import { normalizeName } from "./players";
 
 export interface AiResultLookup {
   found: boolean;
@@ -264,10 +265,27 @@ export async function translateNamesToHebrew(names: string[]): Promise<Record<st
   const { parsed } = extractSourcesAndJson(data);
   if (!parsed || typeof parsed.translations !== "object" || !parsed.translations) return {};
 
+  const translations = parsed.translations as Record<string, unknown>;
+
+  /* The model is asked to echo back keys EXACTLY, but in practice it
+   * sometimes drops diacritics, changes casing, or trims punctuation
+   * (e.g. "Julián Quiñones" -> "Julian Quinones"). Fall back to a
+   * normalized-name match (same normalizeName used for curated-DB lookup)
+   * so those near-matches still resolve instead of silently being lost. */
+  const byNormalized = new Map<string, string>();
+  for (const [k, v] of Object.entries(translations)) {
+    if (typeof v === "string" && v.trim()) byNormalized.set(normalizeName(k), v.trim());
+  }
+
   const out: Record<string, string> = {};
   for (const n of unique) {
-    const v = (parsed.translations as Record<string, unknown>)[n];
-    if (typeof v === "string" && v.trim()) out[n] = v.trim();
+    const exact = translations[n];
+    if (typeof exact === "string" && exact.trim()) {
+      out[n] = exact.trim();
+      continue;
+    }
+    const fuzzy = byNormalized.get(normalizeName(n));
+    if (fuzzy) out[n] = fuzzy;
   }
   return out;
 }
