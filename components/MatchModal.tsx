@@ -44,6 +44,11 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
   const [summary, setSummary] = useState<SummaryEntry | null>(null);
   const [friendPreds, setFriendPreds] = useState<FriendPrediction[] | null>(null);
   const [sharingPreds, setSharingPreds] = useState(false);
+  /* For LIVE matches only: lets a user who belongs to multiple groups pick
+   * which group's predictions to view/share here, independent of their
+   * globally-selected group elsewhere in the app. Defaults to the current
+   * group and resets whenever the modal is opened for a (new) match. */
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   const hasResult = !!matchResults[matchId];
   const hasPrediction = !!predictions[matchId];
@@ -54,6 +59,12 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
   const baseForStatus = MATCHES.find(mt => mt.id === matchId);
   const effForStatus = baseForStatus ? effMatch(baseForStatus, overrides[matchId], simConfig) : null;
   const isLive = effForStatus ? matchLiveStatus(effForStatus as any) === "live" : false;
+
+  /* Reset the group selector to the user's current group whenever the
+   * modal is (re)opened for a match. */
+  useEffect(() => {
+    setSelectedGroupId(currentGroupId);
+  }, [matchId, currentGroupId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,12 +112,12 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
    * permanently). Reuses /api/group-predictions, scoped to the
    * currently-selected group. */
   useEffect(() => {
-    if (!(hasResult || isLive) || !currentGroupId || !user) { setFriendPreds(null); return; }
+    if (!(hasResult || isLive) || !selectedGroupId || !user) { setFriendPreds(null); return; }
     let cancelled = false;
     (async () => {
       try {
         const token = await getFirebase().auth!.currentUser!.getIdToken();
-        const r = await fetch(`/api/group-predictions?groupId=${currentGroupId}`, {
+        const r = await fetch(`/api/group-predictions?groupId=${selectedGroupId}`, {
           headers: { authorization: `Bearer ${token}` },
         });
         if (!r.ok) throw new Error();
@@ -118,17 +129,17 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
       }
     })();
     return () => { cancelled = true; };
-  }, [matchId, hasResult, isLive, currentGroupId, user?.uid]);
+  }, [matchId, hasResult, isLive, selectedGroupId, user?.uid]);
 
   /* Poll while the match is live so the predictions list (and any score
    * recalculation once a result lands) stays fresh without a manual reload. */
   useEffect(() => {
-    if (!isLive || !currentGroupId || !user) return;
+    if (!isLive || !selectedGroupId || !user) return;
     const id = setInterval(() => {
       (async () => {
         try {
           const token = await getFirebase().auth!.currentUser!.getIdToken();
-          const r = await fetch(`/api/group-predictions?groupId=${currentGroupId}`, {
+          const r = await fetch(`/api/group-predictions?groupId=${selectedGroupId}`, {
             headers: { authorization: `Bearer ${token}` },
           });
           if (!r.ok) return;
@@ -139,7 +150,7 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
       })();
     }, 30000);
     return () => clearInterval(id);
-  }, [matchId, isLive, currentGroupId, user?.uid]);
+  }, [matchId, isLive, selectedGroupId, user?.uid]);
 
   const oddsMap = useOddsMap();
   const base = MATCHES.find(m => m.id === matchId);
@@ -151,10 +162,14 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
   const venue = VENUES[m.venue] || { name: m.venue, city: "", country: "", flag: "", capacity: 0 };
   const stage = STAGES[m.stage];
   const channels = (m.channels || []).map(c => CHANNELS[c]).filter(Boolean);
-  const currentGroup = groups.find(g => g.id === currentGroupId);
+  /* The group whose predictions are currently shown/shared in this modal.
+   * For live matches with multiple groups, the user can override this via
+   * the picker below; otherwise it's just the app's globally-selected
+   * group. */
+  const selectedGroup = groups.find(g => g.id === selectedGroupId);
 
-  /* Share the group's predictions for this match — available once the
-   * match is live (predictions are locked in) or finished. Reuses the
+  /* Share the selected group's predictions for this match — available once
+   * the match is live (predictions are locked in) or finished. Reuses the
    * already-fetched `friendPreds`, and passes the result so finished
    * matches show points (🎯/✅) like the grid above. */
   async function sharePredictions() {
@@ -163,7 +178,7 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
     try {
       const { openMatchPredictionsShareCard } = await import("@/lib/share-cards");
       const result = matchResults[matchId];
-      openMatchPredictionsShareCard(m, friendPreds, currentGroup ? currentGroup.name.replace(/^[🌍🏆📊]+\s*/, "") : null, {
+      openMatchPredictionsShareCard(m, friendPreds, selectedGroup ? selectedGroup.name.replace(/^[🌍🏆📊]+\s*/, "") : null, {
         result: result ? { home: result.home, away: result.away, winner: result.winner } : null,
         isKnockout: m.stage !== "GROUP",
       });
@@ -206,17 +221,37 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
           </section>
         )}
 
-        {(hasResult || isLive) && friendPreds && friendPreds.length > 0 && (
+        {(hasResult || isLive) && (
           <section className="modal-section">
             <h3 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
               <span>
-                🔮 מה החברים ניחשו{currentGroup ? ` · ${currentGroup.name}` : ""}
+                🔮 מה החברים ניחשו{!isLive && selectedGroup ? ` · ${selectedGroup.name}` : ""}
                 {isLive && !hasResult && <span className="badge badge-live" style={{ marginInlineStart: 8 }}>🔴 חי</span>}
               </span>
-              <button className="btn btn-small wa-btn" onClick={sharePredictions} disabled={sharingPreds} title="שתף את ניחושי הקבוצה למשחק הזה">
-                {sharingPreds ? "…טוען" : "📤 שתף"}
-              </button>
+              {friendPreds && friendPreds.length > 0 && (
+                <button className="btn btn-small wa-btn" onClick={sharePredictions} disabled={sharingPreds} title="שתף את ניחושי הקבוצה למשחק הזה">
+                  {sharingPreds ? "…טוען" : "📤 שתף"}
+                </button>
+              )}
             </h3>
+            {/* Live matches: let a user in multiple groups pick whose
+             * predictions to view/share here. */}
+            {isLive && groups.length > 1 && (
+              <div style={{ marginBottom: 10 }}>
+                <select
+                  value={selectedGroupId || ""}
+                  onChange={e => setSelectedGroupId(e.target.value || null)}
+                  aria-label="בחר קבוצה לשיתוף ניחושים"
+                >
+                  {groups.map(g => (
+                    <option key={g.id} value={g.id}>{g.name.replace(/^[🌍🏆📊]+\s*/, "")}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {friendPreds === null ? (
+              <p className="muted" style={{ margin: 0 }}>...טוען</p>
+            ) : friendPreds.length > 0 ? (
             <div className="fr-preds-grid">
               {friendPreds.map(p => {
                 const result = matchResults[matchId];
@@ -251,6 +286,11 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
                 );
               })}
             </div>
+            ) : (
+              <p className="muted" style={{ margin: 0 }}>
+                {selectedGroup ? `אין עדיין ניחושים בקבוצה "${selectedGroup.name.replace(/^[🌍🏆📊]+\s*/, "")}" למשחק הזה.` : "אין עדיין ניחושים למשחק הזה."}
+              </p>
+            )}
           </section>
         )}
 
