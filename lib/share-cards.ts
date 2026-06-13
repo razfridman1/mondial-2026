@@ -751,6 +751,29 @@ export function openMatchPredictionsShareCard(
   });
 }
 
+/* Plain-text summary for direct WhatsApp sharing via wa.me — works on
+ * every device with zero dependency on canvas/Web-Share-API, which makes
+ * it a reliable fallback when the image share button is unavailable. */
+function buildScorersShareText(topScorers: ScorerEntry[], topAssists: ScorerEntry[]): string {
+  const top = (rows: ScorerEntry[], label: string) => {
+    if (!rows.length || rows[0].count <= 0) return `${label}: אין עדיין נתונים`;
+    const r = rows[0];
+    const team = r.teamCode ? TEAMS[r.teamCode] : null;
+    const teamLabel = team ? ` (${team.flag} ${team.name})` : "";
+    return `${label}: ${r.name}${teamLabel} — ${r.count}`;
+  };
+  return [
+    "⚽🎯 *מלך השערים והבישולים* — מונדיאל 2026",
+    "",
+    top(topScorers, "🥇 מלך השערים"),
+    top(topAssists, "🎯 מלך הבישולים"),
+    "",
+    "בחרו גם אתם מי יהיה מלך השערים ומלך הבישולים של הטורניר 🔮",
+    "https://www.fc26.co.il",
+    "#מונדיאל2026 #מי_יצדק",
+  ].join("\n");
+}
+
 /* Open a modal that shows the "מלך השערים והבישולים" leaderboards as a card
  * styled like the in-app tables (top scorers + top assists, medal for top
  * 3, player + team + count), and lets the user share it as an IMAGE
@@ -776,11 +799,12 @@ export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: Scor
       </header>
       <div class="share-card-preview" style="max-height: 60vh; overflow:auto;">${svg}</div>
       <div class="mc-actions" style="margin-top:14px; gap:8px; flex-wrap:wrap;">
-        <button class="btn btn-primary" data-act="share">📤 שתף</button>
+        <button class="btn btn-primary" data-act="share">📤 שתף תמונה</button>
+        <button class="btn" data-act="whatsapp-text">💬 שתף בוואטסאפ</button>
         <button class="btn" data-act="download">⬇️ הורד תמונה</button>
       </div>
       <p class="muted" style="font-size:11px;margin-top:10px; line-height:1.5;">
-        📱 לחיצה על "שתף" תפתח את תפריט השיתוף (וואטסאפ ועוד). אם זה לא עובד במכשיר שלך, לחץ "הורד תמונה" ושתף אותה ידנית.
+        💬 "שתף בוואטסאפ" שולח טקסט עם התוצאות הנוכחיות. 📱 "שתף תמונה" פותח את תפריט השיתוף עם תמונה — אם זה לא עובד במכשיר שלך, לחץ "הורד תמונה" ושתף אותה ידנית.
       </p>
       <div class="modal-section">
         <p style="margin: 0 0 8px;">🔮 עדיין לא ניחשת? בחרו מי יהיה <strong>מלך השערים</strong> ומלך <strong>הבישולים</strong> של הטורניר — ניחוש חד-פעמי!</p>
@@ -796,6 +820,13 @@ export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: Scor
   overlay.querySelector("[data-act='goto-pick']")!.addEventListener("click", () => {
     overlay.remove();
     document.querySelector(".topscorers-pick-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  // Direct WhatsApp text share — works everywhere (mobile app + WhatsApp
+  // Web on desktop), no canvas/Web-Share-API involved.
+  overlay.querySelector("[data-act='whatsapp-text']")!.addEventListener("click", () => {
+    const text = buildScorersShareText(topScorers, topAssists);
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   });
 
   let sharing = false;
