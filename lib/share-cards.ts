@@ -397,7 +397,7 @@ function buildScorersTableCard({ topScorers, topAssists, limit = 5 }: ScorersTab
   const SECTION_HEAD_H = 90;
   const HEADER_H = 220;
   const SECTION_GAP = 50;
-  const FOOTER_H = 100;
+  const FOOTER_H = 150;
 
   const rankColor = (rank: number) => rank === 1 ? "#ffd24a" : rank === 2 ? "#c0c0c0" : rank === 3 ? "#cd7f32" : "#2a3354";
   const medal = (rank: number) => rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
@@ -464,6 +464,7 @@ function buildScorersTableCard({ topScorers, topAssists, limit = 5 }: ScorersTab
   ${scorersSvg}
   ${assistsSvg}
 
+  <text x="${W / 2}" y="${H - 80}" text-anchor="middle" font-family="Heebo, Rubik, Arial" font-size="32" font-weight="800" fill="url(#gold)">בחרו גם אתם: מלך השערים ומלך הבישולים 🔮</text>
   <text x="${W / 2}" y="${H - 36}" text-anchor="middle" font-family="Heebo" font-size="24" fill="#9aa3c7">#מונדיאל2026 #מי_יצדק</text>
 </svg>`,
     width: W, height: H,
@@ -713,7 +714,14 @@ export function openMatchPredictionsShareCard(
  * 3, player + team + count), and lets the user share it as an IMAGE
  * (WhatsApp etc. via the native share sheet) or download it. */
 export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: ScorerEntry[]) {
-  const { svg, width, height, filename } = buildSvg("scorers-table", { topScorers, topAssists });
+  let svg: string, width: number, height: number, filename: string;
+  try {
+    ({ svg, width, height, filename } = buildSvg("scorers-table", { topScorers, topAssists }));
+  } catch (e) {
+    console.error("openScorersShareCard: buildSvg failed", e);
+    alert("שגיאה ביצירת התמונה לשיתוף — נסה שוב.");
+    return;
+  }
 
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
@@ -732,11 +740,20 @@ export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: Scor
       <p class="muted" style="font-size:11px;margin-top:10px; line-height:1.5;">
         📱 לחיצה על "שתף" תפתח את תפריט השיתוף (וואטסאפ ועוד). אם זה לא עובד במכשיר שלך, לחץ "הורד תמונה" ושתף אותה ידנית.
       </p>
+      <div class="modal-section">
+        <p style="margin: 0 0 8px;">🔮 עדיין לא ניחשת? בחרו מי יהיה <strong>מלך השערים</strong> ומלך <strong>הבישולים</strong> של הטורניר — ניחוש חד-פעמי!</p>
+        <button class="btn" data-act="goto-pick">🔮 בחר את הניחוש שלי</button>
+      </div>
     </div>`;
   document.body.appendChild(overlay);
 
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay || (e.target as HTMLElement).classList.contains("modal-close")) overlay.remove();
+  });
+
+  overlay.querySelector("[data-act='goto-pick']")!.addEventListener("click", () => {
+    overlay.remove();
+    document.querySelector(".topscorers-pick-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   overlay.querySelector("[data-act='share']")!.addEventListener("click", async () => {
@@ -749,7 +766,8 @@ export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: Scor
       }
       downloadBlob(blob, filename);
       alert("השיתוף הישיר לא נתמך בדפדפן הזה — התמונה הורדה, אפשר לצרף אותה ידנית בוואטסאפ.");
-    } catch {
+    } catch (e) {
+      console.error("openScorersShareCard: share failed", e);
       alert("שגיאה בשיתוף — נסה שוב.");
     }
   });
@@ -758,7 +776,8 @@ export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: Scor
     try {
       const blob = await svgToPngBlob(svg, width, height);
       downloadBlob(blob, filename);
-    } catch {
+    } catch (e) {
+      console.error("openScorersShareCard: download failed", e);
       alert("שגיאה ביצירת התמונה.");
     }
   });
