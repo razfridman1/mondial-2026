@@ -153,7 +153,7 @@ export async function getScorerLeaderboards(db: FirebaseFirestore.Firestore): Pr
           awayCode: m.awayCode,
           goalCount: (m.goals || []).length,
           goals: (m.goals || []).map(g => ({
-            side: g.teamCode, scorer: g.scorer, assist: g.assist, type: g.type, minute: g.minute,
+            side: g.teamCode ?? undefined, scorer: g.scorer, assist: g.assist, type: g.type, minute: g.minute ?? undefined,
           })),
         },
       ])
