@@ -317,13 +317,21 @@ export async function fetchExternalMatchDetails(externalId: string | number, api
       return null;
     };
 
-    const goals: ExternalGoal[] = (data.goals || []).map((g: any): ExternalGoal => ({
-      minute: typeof g.minute === "number" ? g.minute : null,
-      teamCode: codeForTeamId(g.team?.id),
-      scorer: g.scorer?.name || "",
-      assist: g.assist?.name || undefined,
-      type: g.type || undefined,
-    })).filter((g: ExternalGoal) => g.scorer);
+    /* `assist`/`type` are OMITTED entirely when absent (not set to
+     * `undefined`) — Firestore rejects `undefined` values in documents
+     * ("Cannot use \"undefined\" as a Firestore value"), which would make
+     * the whole live_data/match_goals write fail for any goal without an
+     * assist (the common case). */
+    const goals: ExternalGoal[] = (data.goals || []).map((g: any): ExternalGoal => {
+      const goal: ExternalGoal = {
+        minute: typeof g.minute === "number" ? g.minute : null,
+        teamCode: codeForTeamId(g.team?.id),
+        scorer: g.scorer?.name || "",
+      };
+      if (g.assist?.name) goal.assist = g.assist.name;
+      if (g.type) goal.type = g.type;
+      return goal;
+    }).filter((g: ExternalGoal) => g.scorer);
 
     const bookings: ExternalBooking[] = (data.bookings || []).map((b: any): ExternalBooking => ({
       minute: typeof b.minute === "number" ? b.minute : null,

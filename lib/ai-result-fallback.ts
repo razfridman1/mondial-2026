@@ -219,13 +219,21 @@ export async function lookupGoalsViaAI(opts: {
 }
 
 /** Convenience: map an AiGoalsLookup result to ExternalGoal[] given the
- * caller's home/away team codes. */
+ * caller's home/away team codes.
+ *
+ * IMPORTANT: `assist`/`type` are omitted entirely when absent rather than
+ * set to `undefined` — Firestore rejects `undefined` values in documents
+ * ("Cannot use \"undefined\" as a Firestore value"), which previously made
+ * the whole sync write fail whenever a goal had no assist. */
 export function aiGoalsToExternalGoals(goals: AiGoalsLookup["goals"], homeCode: string, awayCode: string): ExternalGoal[] {
-  return (goals || []).map(g => ({
-    minute: g.minute,
-    teamCode: g.side === "HOME" ? homeCode : awayCode,
-    scorer: g.scorer,
-    assist: g.assist,
-    type: g.type,
-  }));
+  return (goals || []).map(g => {
+    const goal: ExternalGoal = {
+      minute: g.minute,
+      teamCode: g.side === "HOME" ? homeCode : awayCode,
+      scorer: g.scorer,
+    };
+    if (g.assist) goal.assist = g.assist;
+    if (g.type) goal.type = g.type;
+    return goal;
+  });
 }
