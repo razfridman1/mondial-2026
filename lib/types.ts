@@ -111,6 +111,18 @@ export interface UserProfile {
   theme?: "dark" | "light"; // synced across devices
   aiBlocked?: boolean;    // super-admin can block a user from using AI features
   trackedTeams?: string[]; // national teams the user follows in "הנבחרות שלי" (web only)
+  /* One-time, irrevocable picks for "מלך השערים והבישולים" — once set,
+   * the user cannot change them (see /api/top-picks). */
+  topScorerPick?: TopPick;
+  topAssistPick?: TopPick;
+}
+
+/* A user's one-time guess for the tournament's top scorer / top assists
+ * player — picked from a team's squad, never changeable afterward. */
+export interface TopPick {
+  teamCode: string;
+  playerName: string;
+  setAt: number;
 }
 
 /* Multi-tenant private group */

@@ -23,7 +23,7 @@ interface Prefs {
   selectedChannel: string | null;
   selectedTeam: string | null;
   statusFilter: "all" | "live" | "upcoming";
-  tab: "schedule" | "weekpredictions" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin" | "matchlist";
+  tab: "schedule" | "weekpredictions" | "mypredictions" | "topscorers" | "ranking" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin" | "matchlist";
 }
 
 export type MatchResult = { home: number; away: number; finishedAt: number; winner?: string };
@@ -65,6 +65,7 @@ interface MondialState {
   setOverrides: (o: Record<string, BroadcastOverrideDoc>) => void;
   setSimConfig: (c: SimConfig | null) => void;
   loadLiveSquads: () => Promise<void>;
+  setTopPicks: (topScorer: { teamCode: string; playerName: string }, topAssist: { teamCode: string; playerName: string }) => Promise<void>;
 }
 
 export const useStore = create<MondialState>()(
@@ -341,6 +342,22 @@ export const useStore = create<MondialState>()(
             set({ liveSquads: data.squads || {}, liveCoaches: data.coaches || {}, liveSquadsLoaded: true });
           }
         } catch {}
+      },
+      setTopPicks: async (topScorer, topAssist) => {
+        const u = get().user;
+        const prof = get().profile;
+        if (!u || !prof) throw new Error("not logged in");
+        const token = await getFirebase().auth!.currentUser!.getIdToken();
+        const r = await fetch("/api/top-picks", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify({ topScorer, topAssist }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          throw new Error(data.message || data.error || "save failed");
+        }
+        set({ profile: { ...prof, topScorerPick: data.topScorerPick, topAssistPick: data.topAssistPick } });
       },
     }),
     {

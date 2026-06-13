@@ -4,6 +4,7 @@ import AuthProvider from "@/components/AuthProvider";
 import Header from "@/components/Header";
 import MatchesTab from "@/components/MatchesTab";
 import MyPredictionsTab from "@/components/MyPredictionsTab";
+import TopScorersTab from "@/components/TopScorersTab";
 import WeeklyPredictionsTab from "@/components/WeeklyPredictionsTab";
 import StandingsTab from "@/components/StandingsTab";
 import Bracket from "@/components/Bracket";
@@ -28,6 +29,7 @@ function HomeInner() {
         {tab === "schedule"      && <MatchesTab />}
         {tab === "weekpredictions" && <WeeklyPredictionsTab />}
         {tab === "mypredictions" && <MyPredictionsTab />}
+        {tab === "topscorers"    && <TopScorersTab />}
         {tab === "standings"     && <StandingsTab />}
         {tab === "ranking"       && <FriendsRanking />}
         {tab === "teams"      && <TeamsTab />}

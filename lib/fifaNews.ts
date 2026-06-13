@@ -1,16 +1,15 @@
 /* =====================================================================
- * FIFA news ticker content — designed so the messages change every day
- * and never repeat the exact same item twice during the tournament:
+ * FIFA news ticker content:
  *
  * 1. Special date-triggered items (opening day / final day) — as before.
  * 2. TODAY'S and TOMORROW'S real matches, generated live from the actual
  *    schedule (MATCHES). Since the matches themselves differ from day to
  *    day, this content is automatically fresh and unique every day.
- * 3. A "fact of the day" — picked deterministically from a large pool of
- *    curated World Cup 2026 facts + one-per-venue spotlights (40 items in
- *    total), indexed by the number of days since the tournament opener.
- *    With 39 tournament days and a 40-item pool, every day gets a
- *    different fact and nothing repeats across the whole competition.
+ * 3. A "fact" — picked RANDOMLY (via pickRandomFact) from a pool of 40
+ *    curated World Cup 2026 facts + one-per-venue spotlights, by the
+ *    ticker component on every page load, so refreshing the page shows a
+ *    different message (the component avoids repeating the immediately
+ *    previous fact via localStorage).
  * ===================================================================*/
 import { todayKey, tomorrowKey, israelDateKey, formatIsraelTime } from "./utils";
 import { MATCHES, TEAMS, STAGES, VENUES } from "./data";
@@ -25,12 +24,6 @@ export type FifaNewsItem = {
 const OPENING_DATE = "2026-06-11";
 /* Final: MetLife Stadium, NY/NJ */
 const FINAL_DATE = "2026-07-19";
-
-function daysBetween(a: string, b: string): number {
-  const da = new Date(`${a}T00:00:00Z`).getTime();
-  const db = new Date(`${b}T00:00:00Z`).getTime();
-  return Math.round((db - da) / 86400000);
-}
 
 /* Render a single real match line — only for matches whose teams are
  * already known (skips unresolved knockout placeholders like "1A"/"2B"). */
@@ -77,7 +70,19 @@ const VENUE_FACTS: string[] = Object.entries(VENUES)
   .filter(([id]) => id !== "TBD")
   .map(([, v]) => `🏟️ ${v.flag} ${v.name}, ${v.city} (${v.country}) — קיבולת כ-${v.capacity.toLocaleString("he-IL")} צופים, אחד מ-16 אצטדיוני המונדיאל`);
 
-const FACT_POOL: string[] = [...FACTS, ...VENUE_FACTS];
+export const FACT_POOL: string[] = [...FACTS, ...VENUE_FACTS];
+
+/* Pick a random fact from the pool, avoiding `excludeIndex` (the fact
+ * shown on the previous load) when the pool has more than one item — so
+ * every page refresh shows a different fact than last time. */
+export function pickRandomFact(excludeIndex?: number): FifaNewsItem {
+  const n = FACT_POOL.length;
+  let idx = Math.floor(Math.random() * n);
+  if (n > 1 && idx === excludeIndex) {
+    idx = (idx + 1) % n;
+  }
+  return { id: `fact-${idx}`, text: FACT_POOL[idx] };
+}
 
 export function getFifaNews(): FifaNewsItem[] {
   const tk = todayKey();
@@ -127,12 +132,6 @@ export function getFifaNews(): FifaNewsItem[] {
     const line = matchLine(m);
     if (line) items.push({ id: `tomorrow-${m.id}`, text: `📅 מחר: ${line}` });
   }
-
-  /* Fact of the day — deterministic by day-of-tournament, cycles through
-   * the 40-item pool without repeating during the 39-day tournament. */
-  const dayIndex = Math.max(0, daysBetween(OPENING_DATE, tk));
-  const fact = FACT_POOL[dayIndex % FACT_POOL.length];
-  items.push({ id: `fact-${dayIndex % FACT_POOL.length}`, text: fact });
 
   return items;
 }

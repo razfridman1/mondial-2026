@@ -9,7 +9,7 @@ import { AvatarDisplay } from "./AvatarPicker";
 import AvatarPicker from "./AvatarPicker";
 import FifaNewsTicker from "./FifaNewsTicker";
 
-type Tab = "schedule" | "weekpredictions" | "mypredictions" | "ranking" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin" | "matchlist";
+type Tab = "schedule" | "weekpredictions" | "mypredictions" | "topscorers" | "ranking" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin" | "matchlist";
 
 /* "הקבוצות שלי" was removed as its own tab — group management now lives
  * inside "דירוג חברים" (per-group dropdown). The nav is a flat tab list. */
@@ -18,6 +18,7 @@ const NAV: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: boolean
   { id: "weekpredictions",  label: "📅 ניחושי השבוע" },
   { id: "ranking",          label: "🏆 דירוג חברים" },
   { id: "mypredictions",    label: "🔮 הניחושים שלי" },
+  { id: "topscorers",    label: "⚽🎯 מלך השערים והבישולים" },
   { id: "standings",     label: "📊 טבלאות",        hideOnMobile: true },
   { id: "bracket",       label: "🏆 שלב הנוקאאוט",  hideOnMobile: true },
   { id: "myteams",       label: "⭐ הנבחרות שלי" },
