@@ -587,6 +587,30 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+/* Show a small in-modal status message instead of alert(). Repeated
+ * alert() calls get silently suppressed by Chrome ("prevent this page from
+ * creating additional dialogs") after a few dismissals — which made
+ * share/download failures (and successes) look like "nothing happens". */
+function showCardToast(overlay: HTMLElement, message: string, isError = false) {
+  const modal = overlay.querySelector(".modal");
+  if (!modal) return;
+  let toast = modal.querySelector(".share-card-toast") as HTMLElement | null;
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.className = "share-card-toast";
+    toast.style.marginTop = "10px";
+    toast.style.padding = "10px 12px";
+    toast.style.borderRadius = "10px";
+    toast.style.fontSize = "13px";
+    toast.style.textAlign = "center";
+    toast.style.fontWeight = "700";
+    modal.appendChild(toast);
+  }
+  toast.style.background = isError ? "rgba(239,68,68,0.15)" : "rgba(34,197,94,0.15)";
+  toast.style.color = isError ? "#fca5a5" : "#86efac";
+  toast.textContent = message;
+}
+
 /* Open a modal that shows the leaderboard as a card styled like the in-app
  * "🏆 דירוג חברים" table (dark cards, gold/silver/bronze rows, avatars,
  * points), and lets the user share it as an IMAGE (WhatsApp, etc. via the
@@ -633,9 +657,9 @@ export function openLeaderboardShareCard(rows: LeaderRow[], groupName?: string |
         return;
       }
       downloadBlob(blob, filename);
-      alert("השיתוף הישיר לא נתמך בדפדפן הזה — התמונה הורדה, אפשר לצרף אותה ידנית בוואטסאפ.");
+      showCardToast(overlay, "✅ התמונה הורדה — אפשר לצרף אותה ידנית בוואטסאפ.");
     } catch (e: any) {
-      if (e?.name !== "AbortError") alert("שגיאה בשיתוף — נסה שוב.");
+      if (e?.name !== "AbortError") showCardToast(overlay, "שגיאה בשיתוף — נסה שוב.", true);
     } finally {
       sharing = false;
       leaderboardShareBtn.disabled = false;
@@ -646,8 +670,9 @@ export function openLeaderboardShareCard(rows: LeaderRow[], groupName?: string |
     try {
       const blob = await svgToPngBlob(svg, width, height);
       downloadBlob(blob, filename);
+      showCardToast(overlay, "✅ התמונה הורדה.");
     } catch {
-      alert("שגיאה ביצירת התמונה.");
+      showCardToast(overlay, "שגיאה ביצירת התמונה.", true);
     }
   });
 }
@@ -706,9 +731,9 @@ export function openMatchPredictionsShareCard(
         return;
       }
       downloadBlob(blob, filename);
-      alert("השיתוף הישיר לא נתמך בדפדפן הזה — התמונה הורדה, אפשר לצרף אותה ידנית בוואטסאפ.");
+      showCardToast(overlay, "✅ התמונה הורדה — אפשר לצרף אותה ידנית בוואטסאפ.");
     } catch (e: any) {
-      if (e?.name !== "AbortError") alert("שגיאה בשיתוף — נסה שוב.");
+      if (e?.name !== "AbortError") showCardToast(overlay, "שגיאה בשיתוף — נסה שוב.", true);
     } finally {
       sharing = false;
       predictionsShareBtn.disabled = false;
@@ -719,8 +744,9 @@ export function openMatchPredictionsShareCard(
     try {
       const blob = await svgToPngBlob(svg, width, height);
       downloadBlob(blob, filename);
+      showCardToast(overlay, "✅ התמונה הורדה.");
     } catch {
-      alert("שגיאה ביצירת התמונה.");
+      showCardToast(overlay, "שגיאה ביצירת התמונה.", true);
     }
   });
 }
@@ -778,6 +804,7 @@ export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: Scor
     if (sharing) return; // ignore double-clicks/double-taps — navigator.share() can't run twice at once
     sharing = true;
     scorersShareBtn.disabled = true;
+    showCardToast(overlay, "⏳ מכין תמונה לשיתוף...");
     try {
       const blob = await svgToPngBlob(svg, width, height);
       const file = new File([blob], filename, { type: "image/png" });
@@ -786,13 +813,13 @@ export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: Scor
         return;
       }
       downloadBlob(blob, filename);
-      alert("השיתוף הישיר לא נתמך בדפדפן הזה — התמונה הורדה, אפשר לצרף אותה ידנית בוואטסאפ.");
+      showCardToast(overlay, "✅ התמונה הורדה — אפשר לצרף אותה ידנית בוואטסאפ.");
     } catch (e: any) {
       if (e?.name === "AbortError") {
         // user closed the native share sheet — not an error, do nothing
       } else {
         console.error("openScorersShareCard: share failed", e);
-        alert("שגיאה בשיתוף — נסה שוב.");
+        showCardToast(overlay, "שגיאה בשיתוף — נסה שוב.", true);
       }
     } finally {
       sharing = false;
@@ -804,9 +831,10 @@ export function openScorersShareCard(topScorers: ScorerEntry[], topAssists: Scor
     try {
       const blob = await svgToPngBlob(svg, width, height);
       downloadBlob(blob, filename);
+      showCardToast(overlay, "✅ התמונה הורדה.");
     } catch (e) {
       console.error("openScorersShareCard: download failed", e);
-      alert("שגיאה ביצירת התמונה.");
+      showCardToast(overlay, "שגיאה ביצירת התמונה.", true);
     }
   });
 }
