@@ -259,15 +259,34 @@ export async function translateNamesToHebrew(names: string[]): Promise<{ map: Re
   if (!unique.length) return { map: {} };
 
   const userMsg = `תעתק לעברית את שמות השחקנים הבאים:\n${unique.map(n => `- ${n}`).join("\n")}`;
-  const data = await callClaude(TRANSLATE_SYSTEM_PROMPT, userMsg, 1000, false);
+  // Generous token budget: with ~10 names + Hebrew transliterations + JSON
+  // structure/markdown fencing, 1000 tokens was sometimes hit mid-object,
+  // truncating the JSON before its closing brace (no valid parse at all).
+  const data = await callClaude(TRANSLATE_SYSTEM_PROMPT, userMsg, 2048, false);
   if ("error" in data) return { map: {}, reason: data.error };
 
   const { parsed, rawText } = extractSourcesAndJson(data);
-  if (!parsed || typeof parsed.translations !== "object" || !parsed.translations) {
-    return { map: {}, reason: `no_translations_in_response: ${rawText.slice(0, 300)}` };
-  }
 
-  const translations = parsed.translations as Record<string, unknown>;
+  let translations: Record<string, unknown>;
+  if (parsed && typeof parsed.translations === "object" && parsed.translations) {
+    translations = parsed.translations as Record<string, unknown>;
+  } else {
+    /* Fallback for truncated/malformed JSON: pull out individual
+     * "<name>": "<hebrew>" pairs directly via regex, regardless of the
+     * surrounding structure. Any single malformed entry (e.g. a stray
+     * comma instead of a colon) is simply skipped rather than losing the
+     * whole batch — those names just stay English for this run and get
+     * retried (with a fresh AI response) next time. */
+    translations = {};
+    const pairRe = /"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+    let m: RegExpExecArray | null;
+    while ((m = pairRe.exec(rawText))) {
+      translations[m[1]] = m[2];
+    }
+    if (!Object.keys(translations).length) {
+      return { map: {}, reason: `no_translations_in_response: ${rawText.slice(0, 300)}` };
+    }
+  }
 
   /* The model is asked to echo back keys EXACTLY, but in practice it
    * sometimes drops diacritics, changes casing, or trims punctuation
