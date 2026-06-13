@@ -49,8 +49,9 @@ const CURATED_HE_BY_EN: Record<string, string> = (() => {
   return out;
 })();
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const debug = new URL(req.url).searchParams.get("debug") === "1";
     const { db } = getAdmin();
     const snap = await db.collection("live_data").doc("match_goals").get();
     const data: Record<string, { goals?: ExternalGoal[]; homeCode?: string; awayCode?: string }> =
@@ -122,6 +123,10 @@ export async function GET() {
       }
     }
 
+    /* Snapshot original (English) names for the debug name-resolution
+     * report BEFORE mutating entry.name to Hebrew below. */
+    const originalNames = allEntries.map(e => e.name);
+
     for (const entry of allEntries) {
       const he = heByEn.get(entry.name);
       if (he) entry.name = he;
@@ -130,10 +135,45 @@ export async function GET() {
     const byRank = (a: ScorerEntry, b: ScorerEntry) =>
       b.count - a.count || a.name.localeCompare(b.name, "he");
 
-    return NextResponse.json({
+    const out: any = {
       topScorers: Array.from(scorers.values()).sort(byRank),
       topAssists: Array.from(assists.values()).sort(byRank),
-    });
+    };
+
+    /* ?debug=1 — diagnostic snapshot of the raw per-match goal data and the
+     * Hebrew-name resolution state, without requiring admin auth (no PII —
+     * this is the same player/score data already shown on the public tab). */
+    if (debug) {
+      out._debug = {
+        matchGoals: Object.fromEntries(
+          Object.entries(data).map(([matchId, m]) => [
+            matchId,
+            {
+              homeCode: m.homeCode,
+              awayCode: m.awayCode,
+              goalCount: (m.goals || []).length,
+              goals: (m.goals || []).map(g => ({
+                side: g.teamCode, scorer: g.scorer, assist: g.assist, type: g.type, minute: g.minute,
+              })),
+            },
+          ])
+        ),
+        nameResolution: allEntries.map((e, i) => {
+          const original = originalNames[i];
+          return {
+            originalName: original,
+            displayedName: e.name,
+            resolvedFrom: CURATED_HE_BY_EN[normalizeName(original)]
+              ? "curated"
+              : cache[original]
+                ? "cache"
+                : heByEn.has(original) ? "ai-just-now" : "english-fallback",
+          };
+        }),
+      };
+    }
+
+    return NextResponse.json(out);
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
