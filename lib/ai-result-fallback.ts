@@ -64,7 +64,7 @@ const GOALS_SYSTEM_PROMPT = `אתה עוזר שמאתר את רשימת מבקי
  * short diagnostic string — surfaced (for goals lookups) via
  * AiGoalsLookup.reason so a manual ?force=1 call can show WHY a lookup
  * failed (missing key, HTTP error, etc.) without needing server logs. */
-async function callClaude(system: string, userMsg: string, maxTokens: number): Promise<{ content: any[] } | { error: string }> {
+async function callClaude(system: string, userMsg: string, maxTokens: number, useWebSearch: boolean = true): Promise<{ content: any[] } | { error: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: "no_api_key" };
   try {
@@ -79,7 +79,7 @@ async function callClaude(system: string, userMsg: string, maxTokens: number): P
         model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
         max_tokens: maxTokens,
         system,
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
+        ...(useWebSearch ? { tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }] } : {}),
         messages: [{ role: "user", content: userMsg }],
       }),
     });
@@ -236,4 +236,38 @@ export function aiGoalsToExternalGoals(goals: AiGoalsLookup["goals"], homeCode: 
     if (g.type) goal.type = g.type;
     return goal;
   });
+}
+
+const TRANSLATE_SYSTEM_PROMPT = `אתה מומחה לתעתיק שמות שחקני כדורגל מאנגלית לעברית, בדיוק כפי שמקובל בתקשורת הספורט הישראלית (כמו ONE, ספורט 5, ynet ספורט, מאקו ספורט).
+קיבלת רשימת שמות שחקנים באנגלית. עבור כל שם, החזר את התעתיק העברי הטבעי והמדויק ביותר (כפי שהיה נכתב בכתבה ישראלית), ולא תרגום מילולי.
+החזר תשובה אך ורק כ-JSON תקין, ללא טקסט נוסף, בפורמט:
+{"translations": {"<השם המקורי באנגלית 1>": "<תעתיק בעברית 1>", "<השם המקורי באנגלית 2>": "<תעתיק בעברית 2>"}}
+חוקים קריטיים:
+- המפתחות ב-JSON חייבים להיות זהים בדיוק (אות-לאות) לשמות שניתנו לך, כולל אותיות גדולות/קטנות וסימנים מיוחדים.
+- תעתיק לעברית בלבד, ללא ניקוד.
+- אם יש לשחקן שם מוכר בעברית (שחקן ידוע) — השתמש בו. אחרת — תעתיק פונטי טבעי.`;
+
+/** Best-effort Hebrew transliteration for a batch of player names (e.g.
+ * goalscorers/assisters from /api/scorers whose English names aren't in the
+ * curated lib/players.ts database). No web search needed — this is a pure
+ * transliteration task, so it's cheap and fast. Returns {} (never throws) on
+ * any failure — callers should fall back to the original English name for
+ * any name missing from the returned map. */
+export async function translateNamesToHebrew(names: string[]): Promise<Record<string, string>> {
+  const unique = Array.from(new Set(names.filter(n => n && n.trim())));
+  if (!unique.length) return {};
+
+  const userMsg = `תעתק לעברית את שמות השחקנים הבאים:\n${unique.map(n => `- ${n}`).join("\n")}`;
+  const data = await callClaude(TRANSLATE_SYSTEM_PROMPT, userMsg, 1000, false);
+  if ("error" in data) return {};
+
+  const { parsed } = extractSourcesAndJson(data);
+  if (!parsed || typeof parsed.translations !== "object" || !parsed.translations) return {};
+
+  const out: Record<string, string> = {};
+  for (const n of unique) {
+    const v = (parsed.translations as Record<string, unknown>)[n];
+    if (typeof v === "string" && v.trim()) out[n] = v.trim();
+  }
+  return out;
 }

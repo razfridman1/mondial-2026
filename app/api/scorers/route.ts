@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
 import type { ExternalGoal } from "@/lib/football-data-api";
+import { SQUADS, normalizeName } from "@/lib/players";
+import { translateNamesToHebrew } from "@/lib/ai-result-fallback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,15 +16,34 @@ export const dynamic = "force-dynamic";
  * tournament-wide "top scorer" and "top assists" leaderboards, used by the
  * "מלך השערים והבישולים" tab.
  *
- * Ranking: descending by count; ties broken alphabetically by player name
- * (Hebrew/English as provided by the source — no extra info is fabricated).
+ * Ranking: descending by count; ties broken alphabetically by player name.
  * Own goals (type === "OWN") are excluded from both leaderboards.
+ *
+ * Player names ("name" field below) are returned in HEBREW where possible:
+ *  1. Players with curated Hebrew bios (lib/players.ts SQUADS) use that name.
+ *  2. Otherwise, a Hebrew transliteration is looked up from the
+ *     live_data/player_name_he cache (built up over time by
+ *     translateNamesToHebrew — see lib/ai-result-fallback.ts).
+ *  3. Any name still untranslated falls back to the original (English)
+ *     name from the source data — never fabricated, just not yet cached.
  * ===================================================================*/
 export interface ScorerEntry {
   name: string;
   teamCode: string | null;
   count: number;
 }
+
+/* English (normalized) -> Hebrew name, built once per request from the
+ * curated star-player database (covers the most commonly-scoring teams). */
+const CURATED_HE_BY_EN: Record<string, string> = (() => {
+  const out: Record<string, string> = {};
+  for (const list of Object.values(SQUADS)) {
+    for (const p of list) {
+      if (p.nameEn && p.name) out[normalizeName(p.nameEn)] = p.name;
+    }
+  }
+  return out;
+})();
 
 export async function GET() {
   try {
@@ -51,6 +72,55 @@ export async function GET() {
           assists.set(key, cur);
         }
       }
+    }
+
+    /* ----- Hebrew names: curated DB first, then a Firestore-cached AI
+     * transliteration for everyone else. ------------------------------- */
+    const allEntries = [...scorers.values(), ...assists.values()];
+    const heByEn = new Map<string, string>();
+    const stillNeeded: string[] = [];
+
+    for (const entry of allEntries) {
+      const curated = CURATED_HE_BY_EN[normalizeName(entry.name)];
+      if (curated) heByEn.set(entry.name, curated);
+    }
+
+    const namesNeedingCache = allEntries
+      .map(e => e.name)
+      .filter(n => !heByEn.has(n));
+
+    let cache: Record<string, string> = {};
+    if (namesNeedingCache.length) {
+      try {
+        const cacheSnap = await db.collection("live_data").doc("player_name_he").get();
+        cache = cacheSnap.exists ? (cacheSnap.data()?.map || {}) : {};
+      } catch {
+        cache = {};
+      }
+      for (const n of namesNeedingCache) {
+        if (cache[n]) heByEn.set(n, cache[n]);
+        else stillNeeded.push(n);
+      }
+    }
+
+    if (stillNeeded.length) {
+      try {
+        const translated = await translateNamesToHebrew(stillNeeded);
+        if (Object.keys(translated).length) {
+          for (const [en, he] of Object.entries(translated)) heByEn.set(en, he);
+          await db.collection("live_data").doc("player_name_he").set(
+            { map: { ...cache, ...translated } },
+            { merge: true }
+          );
+        }
+      } catch {
+        // best-effort only — entries simply keep their English name for now
+      }
+    }
+
+    for (const entry of allEntries) {
+      const he = heByEn.get(entry.name);
+      if (he) entry.name = he;
     }
 
     const byRank = (a: ScorerEntry, b: ScorerEntry) =>
