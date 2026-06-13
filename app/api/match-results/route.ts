@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
+import { runResultsSync, isWithinActiveWindow } from "@/lib/sync-results-core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+/* How stale live_data/sync_status.lastRunAt must be before this route
+ * triggers a sync itself. Keeps the extra Firestore read + (rare) sync
+ * call cheap for the vast majority of requests, while giving a backup
+ * path independent of Vercel Cron (per requirement: "אם ה-cron נכשל —
+ * אין מנגנון גיבוי אוטומטי מלא"). */
+const STALE_MS = 3 * 60 * 1000;
 
 /* GET /api/match-results — public list of all finished match results.
  * Returns { [matchId]: { home, away, finishedAt } } */
@@ -22,6 +31,21 @@ export async function GET() {
       if (data.isKnockout) entry.isKnockout = true;
       out[d.id] = entry;
     });
+
+    /* Redundant cron-failure backup: if a match is in its active results
+     * window but the cron hasn't run recently, run the sync ourselves. */
+    if (isWithinActiveWindow()) {
+      try {
+        const statusSnap = await db.collection("live_data").doc("sync_status").get();
+        const lastRunAt = statusSnap.exists ? (statusSnap.data()?.lastRunAt || 0) : 0;
+        if (Date.now() - lastRunAt > STALE_MS) {
+          await runResultsSync({ force: false });
+        }
+      } catch {
+        // best-effort only — never block the results response on this
+      }
+    }
+
     return NextResponse.json(out);
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
