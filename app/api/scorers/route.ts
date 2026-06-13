@@ -108,9 +108,11 @@ export async function GET(req: Request) {
       }
     }
 
+    let translateReason: string | undefined;
     if (stillNeeded.length) {
       try {
-        const translated = await translateNamesToHebrew(stillNeeded);
+        const { map: translated, reason } = await translateNamesToHebrew(stillNeeded);
+        translateReason = reason;
         if (Object.keys(translated).length) {
           for (const [en, he] of Object.entries(translated)) heByEn.set(en, he);
           await db.collection("live_data").doc("player_name_he").set(
@@ -118,8 +120,9 @@ export async function GET(req: Request) {
             { merge: true }
           );
         }
-      } catch {
+      } catch (e: any) {
         // best-effort only — entries simply keep their English name for now
+        translateReason = `exception: ${e?.message || String(e)}`;
       }
     }
 
@@ -170,6 +173,7 @@ export async function GET(req: Request) {
                 : heByEn.has(original) ? "ai-just-now" : "english-fallback",
           };
         }),
+        translateReason,
       };
     }
 

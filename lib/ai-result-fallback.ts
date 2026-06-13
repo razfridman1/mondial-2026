@@ -254,16 +254,18 @@ const TRANSLATE_SYSTEM_PROMPT = `אתה מומחה לתעתיק שמות שחק�
  * transliteration task, so it's cheap and fast. Returns {} (never throws) on
  * any failure — callers should fall back to the original English name for
  * any name missing from the returned map. */
-export async function translateNamesToHebrew(names: string[]): Promise<Record<string, string>> {
+export async function translateNamesToHebrew(names: string[]): Promise<{ map: Record<string, string>; reason?: string }> {
   const unique = Array.from(new Set(names.filter(n => n && n.trim())));
-  if (!unique.length) return {};
+  if (!unique.length) return { map: {} };
 
   const userMsg = `תעתק לעברית את שמות השחקנים הבאים:\n${unique.map(n => `- ${n}`).join("\n")}`;
   const data = await callClaude(TRANSLATE_SYSTEM_PROMPT, userMsg, 1000, false);
-  if ("error" in data) return {};
+  if ("error" in data) return { map: {}, reason: data.error };
 
-  const { parsed } = extractSourcesAndJson(data);
-  if (!parsed || typeof parsed.translations !== "object" || !parsed.translations) return {};
+  const { parsed, rawText } = extractSourcesAndJson(data);
+  if (!parsed || typeof parsed.translations !== "object" || !parsed.translations) {
+    return { map: {}, reason: `no_translations_in_response: ${rawText.slice(0, 300)}` };
+  }
 
   const translations = parsed.translations as Record<string, unknown>;
 
@@ -287,5 +289,5 @@ export async function translateNamesToHebrew(names: string[]): Promise<Record<st
     const fuzzy = byNormalized.get(normalizeName(n));
     if (fuzzy) out[n] = fuzzy;
   }
-  return out;
+  return { map: out };
 }
