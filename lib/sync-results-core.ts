@@ -340,17 +340,29 @@ export async function runResultsSync(opts: { force?: boolean } = {}): Promise<Sy
     let aiFallback: any = null;
     if (process.env.ANTHROPIC_API_KEY) {
       const now = Date.now();
-      /* Both group and knockout matches now use the SAME short buffer:
-       * 90 min of regulation play + 5 min grace. If football-data.org /
-       * footballdata.io haven't reported a result by then, the AI
-       * web-search fallback starts trying — and keeps retrying every
-       * cron minute (found:false is harmless, never fabricates). For
-       * knockout matches still in extra time/penalties at the 95-minute
-       * mark, the AI lookup will correctly return found:false (match not
-       * over yet) until FD eventually reports FINISHED, at which point
-       * `existing` gets set and this fallback stops being a candidate. */
-      const GROUP_BUFFER_MS = 95 * 60 * 1000;
-      const KO_BUFFER_MS = 95 * 60 * 1000;
+      /* IMPORTANT: this `buffer` is only a cheap pre-filter to avoid asking
+       * the AI about matches that obviously can't have ended yet — it is
+       * NOT what enforces "5 minutes after the match actually ended".
+       *
+       * We have no independent feed of the *real* final whistle time (that
+       * would require a live-status source, which is exactly what's
+       * missing for a match that reaches this fallback at all — see below).
+       * So the buffer below is intentionally set to the EARLIEST plausible
+       * end time (regulation length only, no stoppage/ET assumed), kept
+       * short on purpose.
+       *
+       * The actual "has this match REALLY finished" check — including any
+       * referee-added stoppage time, extra time, or penalties — is done by
+       * lookupResultViaAI() itself via live web search: it returns
+       * found:false if its sources show the match still in progress, and
+       * only returns found:true (writing a result) once real sources
+       * confirm the match has officially ended. Since this fallback retries
+       * every cron minute, the effective behavior is: "as soon as possible
+       * after the real, official end of the match — whatever that turns
+       * out to be — fill in the result if the primary APIs still haven't."
+       * No result is ever written before the match has truly finished. */
+      const GROUP_BUFFER_MS = 90 * 60 * 1000;  // 90 min: earliest a group match could end
+      const KO_BUFFER_MS = 90 * 60 * 1000;     // 90 min: earliest a KO match could end (before any ET/pens)
       const RECHECK_MS = 3 * 60 * 1000;
 
       for (const m of MATCHES) {
