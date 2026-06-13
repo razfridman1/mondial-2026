@@ -340,8 +340,17 @@ export async function runResultsSync(opts: { force?: boolean } = {}): Promise<Sy
     let aiFallback: any = null;
     if (process.env.ANTHROPIC_API_KEY) {
       const now = Date.now();
-      const GROUP_BUFFER_MS = 2 * 60 * 60 * 1000;
-      const KO_BUFFER_MS = 2.5 * 60 * 60 * 1000;
+      /* Both group and knockout matches now use the SAME short buffer:
+       * 90 min of regulation play + 5 min grace. If football-data.org /
+       * footballdata.io haven't reported a result by then, the AI
+       * web-search fallback starts trying — and keeps retrying every
+       * cron minute (found:false is harmless, never fabricates). For
+       * knockout matches still in extra time/penalties at the 95-minute
+       * mark, the AI lookup will correctly return found:false (match not
+       * over yet) until FD eventually reports FINISHED, at which point
+       * `existing` gets set and this fallback stops being a candidate. */
+      const GROUP_BUFFER_MS = 95 * 60 * 1000;
+      const KO_BUFFER_MS = 95 * 60 * 1000;
       const RECHECK_MS = 3 * 60 * 1000;
 
       for (const m of MATCHES) {
