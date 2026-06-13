@@ -182,6 +182,20 @@ export async function runResultsSync(opts: { force?: boolean } = {}): Promise<Sy
     const existingGoals: Record<string, any> = goalsSnap.exists ? (goalsSnap.data() || {}) : {};
     const summaryCandidates: Array<{ matchId: string; externalId: any; homeCode: string; awayCode: string; homeScore: number; awayScore: number; needsSummary: boolean; needsGoals: boolean }> = [];
 
+    /* A live_data/match_goals entry is only considered "complete" if its
+     * goals array's length matches the known final score total. Earlier
+     * versions of the AI goals fallback (before the exact-count validation
+     * was added) could persist a SHORT goals list (e.g. an own goal missing
+     * a scorer, or a partial AI response) — and since `needsGoals` only
+     * checked *existence*, those matches were never retried. This treats an
+     * incomplete entry the same as a missing one, so it gets re-fetched. */
+    const goalsIncomplete = (matchId: string, totalScore: number): boolean => {
+      const entry = existingGoals[matchId];
+      if (!entry) return true;
+      if (totalScore === 0) return false; // 0-0 legitimately has an empty goals array
+      return !Array.isArray(entry.goals) || entry.goals.length !== totalScore;
+    };
+
     let inserted = 0, updated = 0, skipped = 0, skippedAdminLocked = 0, confirmed = 0, mismatches = 0;
     let batch = db.batch();
     let ops = 0;
@@ -266,7 +280,7 @@ export async function runResultsSync(opts: { force?: boolean } = {}): Promise<Sy
        * missing either piece. */
       if (ext.status === "FINISHED") {
         const needsSummary = !existingSummaries[ourMatch.id];
-        const needsGoals = !existingGoals[ourMatch.id];
+        const needsGoals = goalsIncomplete(ourMatch.id, ext.score.fullTime.home + ext.score.fullTime.away);
         if (needsSummary || needsGoals) {
           let homeCode = ourMatchRecord?.home;
           let awayCode = ourMatchRecord?.away;
@@ -543,9 +557,10 @@ export async function runResultsSync(opts: { force?: boolean } = {}): Promise<Sy
        * or FD not configured) with a known score but no goals entry yet. */
       for (const m of MATCHES) {
         if (goalCandidates.some(g => g.matchId === m.id)) continue;
-        if (existingGoals[m.id] || goalsUpdates[m.id]) continue;
+        if (goalsUpdates[m.id]) continue;
         const res = existingResults[m.id];
         if (!res || typeof res.home !== "number" || typeof res.away !== "number" || !res.finishedAt) continue;
+        if (!goalsIncomplete(m.id, res.home + res.away)) continue;
 
         let homeCode = m.home;
         let awayCode = m.away;

@@ -6,6 +6,10 @@ import { translateNamesToHebrew } from "@/lib/ai-result-fallback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/* The Hebrew-translation fallback below can make a live Claude API call on
+ * a cache miss — without this, Vercel's default function timeout (10s on
+ * many plans) could cut the request short before that call returns. */
+export const maxDuration = 60;
 
 /* =====================================================================
  * GET /api/scorers
