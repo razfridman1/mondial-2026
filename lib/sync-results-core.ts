@@ -380,6 +380,26 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
       const KO_BUFFER_MS = 90 * 60 * 1000;     // 90 min: earliest a KO match could end (before any ET/pens)
       const RECHECK_MS = 3 * 60 * 1000;
 
+      if (opts.debug) {
+        debugCandidates.push(
+          ...MATCHES.slice(0, 10).map(m => {
+            const isKO = m.stage !== "GROUP";
+            const kickoff = new Date(m.utc).getTime();
+            const buffer = isKO ? KO_BUFFER_MS : GROUP_BUFFER_MS;
+            const existing = existingResults[m.id];
+            return {
+              snapshot: true, matchId: m.id, utc: m.utc, isKO,
+              bufferEligible: now >= kickoff + buffer,
+              hasExisting: !!existing,
+              existing: existing ? {
+                home: existing.home, away: existing.away, source: existing.source,
+                setByAdmin: existing.setByAdmin, verificationCount: existing.verificationCount,
+              } : null,
+            };
+          })
+        );
+      }
+
       for (const m of MATCHES) {
         const isKO = m.stage !== "GROUP";
         const kickoff = new Date(m.utc).getTime();
