@@ -667,7 +667,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
       crossCheck: { confirmed, mismatches, fdioOnlyWrites },
       aiFallback,
       aiGoalsFallback,
-      ...(opts.debug ? { debugCandidates } : {}),
+      ...(opts.debug ? { debugCandidates, matchResultsDocIds: existingResSnap.docs.map(d => d.id) } : {}),
     };
   } catch (e: any) {
     return { ok: false, status: 500, error: "sync_failed", message: e?.message || String(e) };
