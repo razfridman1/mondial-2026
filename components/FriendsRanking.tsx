@@ -840,9 +840,9 @@ function UserStatsModal({
           />
           <StatTile
             icon="📝"
-            value={row.predictionsCount}
+            value={row.finishedCount}
             label="סך הניחושים"
-            tooltip="כל הניחושים ששמרת עד עתה (כולל אלו שעוד לא הסתיימו)."
+            tooltip="הניחושים שלך למשחקים שכבר הסתיימו."
           />
         </div>
 
