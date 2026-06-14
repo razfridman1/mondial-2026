@@ -68,6 +68,7 @@ export default function TopScorersTab() {
       <p className="muted" style={{ marginTop: 4, marginBottom: 16, fontSize: 13 }}>
         טבלאות השערים והבישולים מתעדכנות אוטומטית לאחר כל משחק שמסתיים.
         בנוסף, ניתן לבחור פעם אחת בלבד מי לדעתך יהיה מלך השערים ומלך הבישולים של הטורניר — ללא אפשרות לשנות בהמשך.
+        ניתן לבחור עד סוף שלב הבתים.
       </p>
 
       <div className="topscorers-grid">
