@@ -23,6 +23,10 @@ export interface AiResultLookup {
   awayTeamName?: string;
   winnerSide?: "HOME" | "AWAY" | "DRAW";
   sources?: string[];
+  /** Diagnostic-only: why found:false, surfaced via aiFallback so a manual
+   * ?force=1&debug=1 call can show WHY without needing server logs. Never
+   * affects behavior — callers still treat found:false as "retry later". */
+  reason?: string;
 }
 
 export interface AiGoalsLookup {
@@ -148,13 +152,14 @@ export async function lookupResultViaAI(opts: {
   }
 
   const data = await callClaude(RESULT_SYSTEM_PROMPT, userMsg, 700);
-  if ("error" in data) return { found: false };
+  if ("error" in data) return { found: false, reason: data.error };
 
-  const { sources, parsed } = extractSourcesAndJson(data);
-  if (!parsed || parsed.found !== true) return { found: false };
-  if (typeof parsed.home !== "number" || typeof parsed.away !== "number") return { found: false };
-  if (!Number.isInteger(parsed.home) || !Number.isInteger(parsed.away)) return { found: false };
-  if (parsed.home < 0 || parsed.away < 0) return { found: false };
+  const { sources, parsed, rawText } = extractSourcesAndJson(data);
+  if (!parsed) return { found: false, reason: `no_json_in_response: ${rawText.slice(0, 200)}` };
+  if (parsed.found !== true) return { found: false, reason: "ai_returned_found_false" };
+  if (typeof parsed.home !== "number" || typeof parsed.away !== "number") return { found: false, reason: `bad_score_type: ${JSON.stringify({ home: parsed.home, away: parsed.away })}` };
+  if (!Number.isInteger(parsed.home) || !Number.isInteger(parsed.away)) return { found: false, reason: "non_integer_score" };
+  if (parsed.home < 0 || parsed.away < 0) return { found: false, reason: "negative_score" };
 
   const winnerSide: AiResultLookup["winnerSide"] =
     parsed.winnerSide === "HOME" || parsed.winnerSide === "AWAY" || parsed.winnerSide === "DRAW"

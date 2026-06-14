@@ -467,7 +467,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
         }
 
         if (!lookup.found || lookup.home == null || lookup.away == null || !homeCode || !awayCode) {
-          aiFallback = { matchId: m.id, candidate, found: false };
+          aiFallback = { matchId: m.id, candidate, found: false, reason: lookup.reason || (!homeCode || !awayCode ? "missing_team_code" : undefined) };
           break; // try at most one match per run, regardless of outcome
         }
 
