@@ -439,8 +439,8 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
           const r = resolved[m.id];
           if (r?.home && r?.away) {
             homeCode = r.home; awayCode = r.away;
-            const homeName = TEAMS[homeCode]?.name || homeCode;
-            const awayName = TEAMS[awayCode]?.name || awayCode;
+            const homeName = TEAMS[homeCode]?.nameEn || TEAMS[homeCode]?.name || homeCode;
+            const awayName = TEAMS[awayCode]?.nameEn || TEAMS[awayCode]?.name || awayCode;
             lookup = await lookupResultViaAI({ homeName, awayName, dateISO: m.utc, isKnockout: true });
           } else {
             /* Unresolved bracket slot — ask the AI to identify BOTH teams
@@ -461,8 +461,8 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             }
           }
         } else {
-          const homeName = TEAMS[homeCode]?.name || homeCode;
-          const awayName = TEAMS[awayCode]?.name || awayCode;
+          const homeName = TEAMS[homeCode]?.nameEn || TEAMS[homeCode]?.name || homeCode;
+          const awayName = TEAMS[awayCode]?.nameEn || TEAMS[awayCode]?.name || awayCode;
           lookup = await lookupResultViaAI({ homeName, awayName, dateISO: m.utc, isKnockout: false });
         }
 
@@ -621,8 +621,8 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
 
         if (aiCallsUsed >= 3) continue; // budget reached — retry the rest on a later run
 
-        const homeName = TEAMS[gc.homeCode]?.name || gc.homeCode;
-        const awayName = TEAMS[gc.awayCode]?.name || gc.awayCode;
+        const homeName = TEAMS[gc.homeCode]?.nameEn || TEAMS[gc.homeCode]?.name || gc.homeCode;
+        const awayName = TEAMS[gc.awayCode]?.nameEn || TEAMS[gc.awayCode]?.name || gc.awayCode;
         const glookup = await lookupGoalsViaAI({ homeName, awayName, dateISO: gc.dateISO, homeScore: gc.homeScore, awayScore: gc.awayScore });
         aiCallsUsed++;
 
