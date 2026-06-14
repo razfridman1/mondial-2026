@@ -26,8 +26,9 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const force = url.searchParams.get("force") === "1";
+  const debug = url.searchParams.get("debug") === "1";
 
-  const result = await runResultsSync({ force });
+  const result = await runResultsSync({ force, debug });
   const { status, ...payload } = result;
   return NextResponse.json(payload, { status: status || 200 });
 }

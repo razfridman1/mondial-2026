@@ -86,7 +86,7 @@ export interface SyncResult {
   [k: string]: any;
 }
 
-export async function runResultsSync(opts: { force?: boolean } = {}): Promise<SyncResult> {
+export async function runResultsSync(opts: { force?: boolean; debug?: boolean } = {}): Promise<SyncResult> {
   const apiKey = process.env.FOOTBALL_API_KEY;
   const hasFD = !!apiKey;
   const hasFDIO = hasFootballDataIoKey();
@@ -352,6 +352,7 @@ export async function runResultsSync(opts: { force?: boolean } = {}): Promise<Sy
      *
      * Limited to ONE AI result lookup per run (cost + time budget). */
     let aiFallback: any = null;
+    const debugCandidates: any[] = [];
     if (process.env.ANTHROPIC_API_KEY) {
       const now = Date.now();
       /* IMPORTANT: this `buffer` is only a cheap pre-filter to avoid asking
@@ -396,6 +397,18 @@ export async function runResultsSync(opts: { force?: boolean } = {}): Promise<Sy
           (existing.verificationCount || 0) < 3 &&
           now - (existing.lastVerifiedAt || 0) >= RECHECK_MS
         ) candidate = "recheck";
+
+        if (opts.debug && debugCandidates.length < 15) {
+          debugCandidates.push({
+            matchId: m.id, isKO, kickoff: m.utc, candidate,
+            existing: existing ? {
+              home: existing.home, away: existing.away, source: existing.source,
+              verificationCount: existing.verificationCount, lastVerifiedAt: existing.lastVerifiedAt,
+              setByAdmin: existing.setByAdmin, aiMismatch: existing.aiMismatch,
+            } : null,
+          });
+        }
+
         if (!candidate) continue;
 
         let homeCode: string | undefined = m.home;
@@ -634,6 +647,7 @@ export async function runResultsSync(opts: { force?: boolean } = {}): Promise<Sy
       crossCheck: { confirmed, mismatches, fdioOnlyWrites },
       aiFallback,
       aiGoalsFallback,
+      ...(opts.debug ? { debugCandidates } : {}),
     };
   } catch (e: any) {
     return { ok: false, status: 500, error: "sync_failed", message: e?.message || String(e) };
