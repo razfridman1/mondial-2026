@@ -107,6 +107,31 @@ export default function FriendsPredictionsTab() {
     return [...live, ...past];
   }, [rows]);
 
+  /* Success rate per member: % of FINISHED matches where they scored any
+   * points (exact / correct result+diff / correct result), out of ALL
+   * finished matches — recomputed whenever a match's result comes in. */
+  const successRates = useMemo(() => {
+    const finished = rows.filter(r => !!r.result);
+    const map: Record<string, { hits: number; total: number }> = {};
+    for (const m of members) map[m.uid] = { hits: 0, total: finished.length };
+    for (const row of finished) {
+      const isKnockout = row.stage !== "GROUP";
+      for (const p of row.predictions) {
+        if (!map[p.uid]) continue;
+        if (p.hidden || p.homeScore == null || p.awayScore == null) continue;
+        const sc = scorePrediction({
+          predictedHome: p.homeScore, predictedAway: p.awayScore,
+          actualHome: row.result!.home, actualAway: row.result!.away,
+          predictedWinner: p.predictedWinner ?? null,
+          actualWinner: row.result!.winner ?? null,
+          isKnockout,
+        });
+        if (sc.points > 0) map[p.uid].hits++;
+      }
+    }
+    return map;
+  }, [rows, members]);
+
   if (!user) {
     return (
       <section>
@@ -150,14 +175,19 @@ export default function FriendsPredictionsTab() {
             <thead>
               <tr>
                 <th className="fp-th-match">משחק</th>
-                {members.map(m => (
-                  <th key={m.uid}>
-                    <div className="fp-member-head">
-                      <AvatarDisplay avatarId={m.avatarId} size={26} />
-                      <span>{m.displayName}</span>
-                    </div>
-                  </th>
-                ))}
+                {members.map(m => {
+                  const sr = successRates[m.uid];
+                  const pct = sr && sr.total > 0 ? Math.round((sr.hits / sr.total) * 100) : null;
+                  return (
+                    <th key={m.uid}>
+                      <div className="fp-member-head">
+                        {pct !== null && <div className="fp-member-rate">{pct}% הצלחה</div>}
+                        <AvatarDisplay avatarId={m.avatarId} size={26} />
+                        <span>{m.displayName}</span>
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
