@@ -2777,6 +2777,45 @@ html[data-theme="light"] body::after { display: none; }   /* drop the secondary 
   .fr-preds-grid { grid-template-columns: 1fr; }
 }
 
+/* ---------------------------------------------------------------------
+ * "ניחושי חברים" tab — matches x members grid, with a sticky first
+ * (match) column so the table can scroll horizontally on mobile.
+ * ------------------------------------------------------------------- */
+.fp-table-wrap { overflow-x: auto; }
+.fp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.fp-table th, .fp-table td {
+  padding: 8px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.fp-table thead th {
+  background: var(--bg-elev);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.fp-th-match, .fp-td-match {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--bg-card);
+  text-align: start;
+  white-space: normal;
+  min-width: 170px;
+}
+.fp-table thead .fp-th-match { background: var(--bg-elev); z-index: 2; }
+.fp-match-teams { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; flex-wrap: wrap; }
+.fp-match-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.fp-member-head { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 84px; }
+.fp-cell { display: flex; flex-direction: column; gap: 2px; align-items: center; min-width: 84px; }
+.fp-cell-pred { font-weight: 800; font-size: 13px; color: var(--accent); }
+.fp-cell-result { font-size: 11px; color: var(--text-muted); }
+.fp-cell-points { font-size: 11px; font-weight: 700; }
+.fp-cell-locked { font-size: 16px; }
+.fp-cell-empty { color: var(--text-muted); font-size: 12px; }
+
 /* ===================================================================
  * Phase 10: Real-photo legends background
  * Overrides the SVG-only background with a photo collage component.

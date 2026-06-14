@@ -15,6 +15,7 @@ import TeamsTab from "@/components/TeamsTab";
 import MyTeamsTab from "@/components/MyTeamsTab";
 import ProfileTab from "@/components/ProfileTab";
 import FriendsRanking from "@/components/FriendsRanking";
+import FriendsPredictionsTab from "@/components/FriendsPredictionsTab";
 import SimulationBanner from "@/components/SimulationBanner";
 import SimulationPanel from "@/components/SimulationPanel";
 import SuperAdminPanel from "@/components/SuperAdminPanel";
@@ -32,6 +33,7 @@ function HomeInner() {
         {tab === "topscorers"    && <TopScorersTab />}
         {tab === "standings"     && <StandingsTab />}
         {tab === "ranking"       && <FriendsRanking />}
+        {tab === "friendspredictions" && <FriendsPredictionsTab />}
         {tab === "teams"      && <TeamsTab />}
         {tab === "myteams"    && <MyTeamsTab />}
         {tab === "bracket"    && <Bracket />}
