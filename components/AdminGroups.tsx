@@ -750,6 +750,7 @@ function GroupEditModal({
                             exactCount: st.exact,
                             resultCount: 0,
                             predictionsCount: st.preds,
+                            finishedCount: st.preds,
                             streak: 0,
                             rank: i + 1,
                           }));

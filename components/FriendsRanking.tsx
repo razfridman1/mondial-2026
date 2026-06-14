@@ -757,8 +757,8 @@ function UserStatsModal({
 
   const avatarInfo = AVATARS.find(a => a.id === (profile?.avatarId || row.avatarId));
 
-  const accuracyPct = row.predictionsCount > 0
-    ? Math.round((row.resultCount / row.predictionsCount) * 100)
+  const accuracyPct = row.finishedCount > 0
+    ? Math.round((row.resultCount / row.finishedCount) * 100)
     : 0;
 
   return (
@@ -817,7 +817,7 @@ function UserStatsModal({
           <StatTile
             icon="📊"
             value={`${accuracyPct}%`}
-            label={`דיוק (${row.resultCount}/${row.predictionsCount})`}
+            label={`דיוק (${row.resultCount}/${row.finishedCount})`}
             tooltip="אחוז הניחושים שבהם ניחשת נכון מי מנצח (או תיקו) מתוך כלל הניחושים שכבר הסתיימו."
           />
           <StatTile

@@ -153,6 +153,7 @@ export interface LeaderRow {
   exactCount: number;       // exact-score predictions
   resultCount: number;      // correct result only
   predictionsCount: number;
+  finishedCount: number;    // predictions for matches that have a result
   streak: number;
   rank?: number;
 }

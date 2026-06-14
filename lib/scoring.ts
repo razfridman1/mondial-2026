@@ -166,6 +166,7 @@ export function userTotals(
     exactCount: exact,
     resultCount: result,
     predictionsCount: preds.length,
+    finishedCount: finished.length,
     streak,
     jokersHit: 0,
     bonusPoints,

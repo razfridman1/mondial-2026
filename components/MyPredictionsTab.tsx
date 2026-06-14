@@ -467,8 +467,8 @@ function ProfilePeekModal({
 
   const { AVATARS } = require("@/lib/avatars");
   const avatarInfo = AVATARS.find((a: any) => a.id === (profile?.avatarId || row.avatarId));
-  const accuracyPct = row.predictionsCount > 0
-    ? Math.round((row.resultCount / row.predictionsCount) * 100)
+  const accuracyPct = row.finishedCount > 0
+    ? Math.round((row.resultCount / row.finishedCount) * 100)
     : 0;
 
   return (
@@ -516,7 +516,7 @@ function ProfilePeekModal({
           <StatTile icon="📊" value={`${accuracyPct}%`} label="דיוק" />
           <StatTile icon="🎯" value={row.exactCount} label="מדויקים" />
           <StatTile icon="🔥" value={row.streak} label="סטריק" />
-          <StatTile icon="✅" value={`${row.resultCount}/${row.predictionsCount}`} label="תוצאות" />
+          <StatTile icon="✅" value={`${row.resultCount}/${row.finishedCount}`} label="תוצאות" />
         </div>
 
         <div className="mc-actions" style={{ marginTop: 16 }}>
