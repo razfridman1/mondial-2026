@@ -7,7 +7,7 @@ import type { Match } from "@/lib/types";
 
 const LOCK_MINUTES = 3;
 
-export default function PredictionForm({ match }: { match: Match }) {
+export default function PredictionForm({ match, onClose }: { match: Match; onClose?: () => void }) {
   const user = useStore(s => s.user);
   const existing = useStore(s => s.predictions[match.id]);
   const setPrediction = useStore(s => s.setPrediction);
@@ -190,6 +190,11 @@ export default function PredictionForm({ match }: { match: Match }) {
         }}>
           📷 שתף בסטורי באינסטה
         </button>
+        {existing && onClose && (
+          <button className="btn" onClick={onClose}>
+            ✕ סגירה
+          </button>
+        )}
       </div>
 
       {!user && (

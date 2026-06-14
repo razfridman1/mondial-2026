@@ -305,7 +305,7 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
                 <div className="odd"><span className="odd-k">תיקו</span><span className="odd-v">{p.draw}%</span></div>
                 <div className="odd"><span className="odd-k">{away.name}</span><span className="odd-v">{p.away}%</span></div>
               </div>
-              <PredictionForm match={m} />
+              <PredictionForm match={m} onClose={onClose} />
             </section>
           );
         })()}
@@ -313,7 +313,7 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
         {!m.odds && (
           <section className="modal-section">
             <h3>🔮 ניחוש תוצאה</h3>
-            <PredictionForm match={m} />
+            <PredictionForm match={m} onClose={onClose} />
           </section>
         )}
 
