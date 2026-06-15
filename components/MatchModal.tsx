@@ -39,7 +39,7 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
   const currentGroupId = useStore(s => s.currentGroupId);
   const groups = useStore(s => s.groups);
   const [lineups, setLineups] = useState<{ home: TeamLineup; away: TeamLineup } | null>(null);
-  const [lineupSource, setLineupSource] = useState<"not_published" | "live" | "placeholder">("not_published");
+  const [lineupSource, setLineupSource] = useState<"not_published" | "live" | "ai" | "placeholder">("not_published");
   const [preview, setPreview] = useState<PreviewEntry | null>(null);
   const [summary, setSummary] = useState<SummaryEntry | null>(null);
   const [friendPreds, setFriendPreds] = useState<FriendPrediction[] | null>(null);
@@ -323,8 +323,11 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
               {lineupSource === "live" && (
                 <span className="muted" style={{ fontSize: 12, marginRight: 8 }}>(הרכב רשמי שפורסם)</span>
               )}
+              {lineupSource === "ai" && (
+                <span className="muted" style={{ fontSize: 12, marginRight: 8 }}>(הרכב רשמי שאותר באמצעות AI)</span>
+              )}
             </h3>
-            {lineupSource === "live" && lineups ? (
+            {(lineupSource === "live" || lineupSource === "ai") && lineups ? (
               <Pitch home={lineups.home} away={lineups.away} />
             ) : (
               <p className="muted" style={{ margin: 0 }}>

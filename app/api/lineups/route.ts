@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { MATCHES } from "@/lib/data";
-import { fetchLiveLineups } from "@/lib/lineups-api";
+import { fetchLiveLineups, fetchAiLineups } from "@/lib/lineups-api";
 import { applyOverride } from "@/lib/utils";
 import { getAdmin } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 /* GET /api/lineups?matchId=M001
  *
- * Returns the OFFICIAL published lineup from API-Football, if and only if
- * it has actually been published (typically ~1 hour before kickoff). We
+ * Returns the OFFICIAL published lineup — from API-Football if configured,
+ * otherwise via an AI web-search fallback (lookupLineupsViaAI) — if and only
+ * if it has actually been published (typically ~1 hour before kickoff). We
  * never fabricate or guess a lineup — if nothing real has been published
  * yet, we return lineups: null and the client shows a "not published yet"
  * notice instead of any estimated/fictional XI.
@@ -38,6 +40,9 @@ export async function GET(req: Request) {
   /* Only ever return a real, officially published lineup */
   const live = await fetchLiveLineups(matchId, m.utc, m.home, m.away);
   if (live) return NextResponse.json({ source: "live", lineups: live });
+
+  const ai = await fetchAiLineups(matchId, m.utc, m.home, m.away);
+  if (ai) return NextResponse.json({ source: "ai", lineups: ai });
 
   return NextResponse.json({ source: "not_published", lineups: null });
 }

@@ -13,10 +13,13 @@
  * ===================================================================*/
 import { getAdmin } from "./firebase-admin";
 import type { TeamLineup, Formation } from "./lineups";
+import { lineupFromAiXI } from "./lineups";
 import type { Player, Position } from "./players";
 import { TEAMS } from "./data";
+import { lookupLineupsViaAI } from "./ai-result-fallback";
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const AI_NEGATIVE_CACHE_MS = 10 * 60 * 1000; // 10 minutes between AI re-checks
 
 /* API-Football team-id mapping (subset; extend in production) */
 const AF_TEAM_IDS: Record<string, number> = {
@@ -99,6 +102,50 @@ export async function fetchLiveLineups(matchId: string, dateIso: string, homeCod
   } catch (e) {
     return null;
   }
+}
+
+/* =====================================================================
+ * AI fallback (no API_FOOTBALL_KEY needed) — used when fetchLiveLineups()
+ * returns null. Asks Claude (web search) for the OFFICIAL published Starting
+ * XI, same no-fabrication policy: found:false until lineups are actually
+ * published (typically ~1h before kickoff).
+ *
+ * Only attempted in a window around kickoff (-2h .. +2.5h) — official
+ * lineups simply don't exist outside that window, so we avoid burning AI
+ * calls on long-shot lookups. Cached in the same live_lineups/{matchId} doc
+ * as the API-Football path; a "not found yet" result is negative-cached for
+ * AI_NEGATIVE_CACHE_MS so repeated page loads don't re-trigger AI on every
+ * request while waiting for the official announcement.
+ * ===================================================================*/
+export async function fetchAiLineups(matchId: string, dateIso: string, homeCode: string, awayCode: string): Promise<{ home: TeamLineup; away: TeamLineup } | null> {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+
+  const kickoff = new Date(dateIso).getTime();
+  const now = Date.now();
+  if (now < kickoff - 2 * 60 * 60 * 1000 || now > kickoff + 2.5 * 60 * 60 * 1000) return null;
+
+  const { db } = getAdmin();
+  const cacheRef = db.collection("live_lineups").doc(matchId);
+  const cache = await cacheRef.get();
+  if (cache.exists) {
+    const data = cache.data() as any;
+    if (data.home && data.away) return { home: data.home, away: data.away };
+    if (data.aiCheckedAt && now - data.aiCheckedAt < AI_NEGATIVE_CACHE_MS) return null;
+  }
+
+  const home = TEAMS[homeCode], away = TEAMS[awayCode];
+  if (!home || !away) return null;
+
+  const lookup = await lookupLineupsViaAI({ homeName: home.nameEn, awayName: away.nameEn, dateISO: dateIso });
+  if (!lookup.found || !lookup.home || !lookup.away) {
+    await cacheRef.set({ aiCheckedAt: now, aiReason: lookup.reason || null }, { merge: true });
+    return null;
+  }
+
+  const homeLineup = lineupFromAiXI(homeCode, lookup.home.formation, lookup.home.startXI);
+  const awayLineup = lineupFromAiXI(awayCode, lookup.away.formation, lookup.away.startXI);
+  await cacheRef.set({ home: homeLineup, away: awayLineup, cachedAt: now, source: "ai" }, { merge: true });
+  return { home: homeLineup, away: awayLineup };
 }
 
 function toTeamLineup(teamCode: string, raw: any): TeamLineup {

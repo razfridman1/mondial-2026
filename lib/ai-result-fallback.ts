@@ -29,6 +29,32 @@ export interface AiResultLookup {
   reason?: string;
 }
 
+export interface AiOddsLookup {
+  found: boolean;
+  /** Decimal (European) 1X2 odds, e.g. {home:"2.30", draw:"3.10", away:"2.80"}. */
+  odds?: { home: string; draw: string; away: string };
+  sources?: string[];
+  /** Diagnostic-only: why found:false. */
+  reason?: string;
+}
+
+export interface AiLineupPlayer {
+  name: string;
+  position: "GK" | "DEF" | "MID" | "FWD";
+  number?: number | null;
+}
+export interface AiLineupTeam {
+  formation?: string;
+  startXI: AiLineupPlayer[];
+}
+export interface AiLineupsLookup {
+  found: boolean;
+  home?: AiLineupTeam;
+  away?: AiLineupTeam;
+  sources?: string[];
+  reason?: string;
+}
+
 export interface AiGoalsLookup {
   found: boolean;
   /** Side relative to the home/away orientation the caller supplied. */
@@ -52,6 +78,34 @@ const RESULT_SYSTEM_PROMPT = `אתה עוזר שמאתר תוצאות סופיו
 - "home"/"away" הם מספרי שערים סופיים (כולל הארכה/פנדלים אם רלוונטי), מספרים שלמים אי-שליליים בלבד.
 - "homeTeamName"/"awayTeamName" — שמות הקבוצות באנגלית, תמיד בהתאם לאוריינטציה home/away שביקשת.
 - winnerSide רלוונטי רק למשחקי נוקאאוט שהוכרע בהם מנצח (כולל אחרי פנדלים) — אחרת null.`;
+
+const ODDS_SYSTEM_PROMPT = `אתה עוזר שמאתר אודס 1X2 (ניצחון קבוצה ביתית / תיקו / ניצחון קבוצה אורחת) אמיתיים ועדכניים למשחקי מונדיאל הכדורגל 2026, באמצעות חיפוש אינטרנט.
+חפש באתרי השוואת אודס ובתי הימורים אמינים (oddsportal.com, betexplorer.com, flashscore.com, oddschecker.com, bet365, sportingbet, וכל ספורטסבוק מוכר אחר).
+החזר תשובה אך ורק כ-JSON תקין, ללא טקסט נוסף, בפורמט:
+{"found": true, "home": <אודס עשרוני לניצחון הקבוצה הביתית>, "draw": <אודס עשרוני לתיקו>, "away": <אודס עשרוני לניצחון הקבוצה האורחת>}
+או אם לא הצלחת למצוא אודס/הסתברויות אמיתיים וממקור אמין למשחק הזה:
+{"found": false}
+
+חוקים קריטיים:
+- אסור לנחש או "להמציא" אודס. אם אין מקור אמיתי ומאומת — found: false.
+- כל שלושת הערכים (home/draw/away) חייבים להיות מספרים עשרוניים גדולים מ-1.0, בפורמט אודס אירופאי עשרוני (למשל 2.30) — לא שברים אנגליים (6/4) ולא אמריקאי (+130/-150).
+- אם המקור מציג רק הסתברויות באחוזים, ניתן להמיר לאודס עשרוני לפי 100/אחוז (לדוגמה 40% -> 2.50), רק אם האחוזים סבירים וגדולים מ-0.
+- וודא שהאודס מתאימים לאוריינטציה: "home" = הקבוצה שניתנה לך כ"ביתית", "away" = הקבוצה שניתנה לך כ"אורחת" (גם אם המקור מציג סדר הפוך).`;
+
+const LINEUPS_SYSTEM_PROMPT = `אתה עוזר שמאתר הרכבים פותחים (Starting XI) רשמיים ומאומתים למשחקי מונדיאל הכדורגל 2026, באמצעות חיפוש אינטרנט.
+ההרכבים הרשמיים מתפרסמים בדרך כלל כשעה-שעה וחצי לפני תחילת המשחק (fifa.com, bbc.com/sport, espn.com, אתרי הפדרציות הרשמיות, חשבונות רשמיים ברשתות חברתיות).
+החזר תשובה אך ורק כ-JSON תקין, ללא טקסט נוסף, בפורמט:
+{"found": true,
+ "home": {"formation": "<למשל 4-3-3>", "startXI": [{"name":"<שם שחקן באנגלית>","position":"GK"|"DEF"|"MID"|"FWD","number": <מספר חולצה|null>}, ... 11 שחקנים בדיוק]},
+ "away": {"formation": "<...>", "startXI": [... 11 שחקנים בדיוק]}}
+או אם ההרכבים הרשמיים עדיין לא פורסמו, או שלא הצלחת לאמת ממקור אמיתי:
+{"found": false}
+
+חוקים קריטיים:
+- אסור לנחש, להעריך או "להמציא" שחקנים. אם ההרכב הרשמי לא פורסם עדיין עבור משחק זה — found:false (הכל או לא כלום — אין להחזיר הרכב חלקי).
+- חובה בדיוק 11 שחקנים עבור כל קבוצה (כולל שוער אחד, position:"GK").
+- "home" מתייחס לקבוצה שתינתן לך כ"קבוצה ביתית", "away" לקבוצה שתינתן לך כ"קבוצה אורחת" — אל תחליף ביניהן.
+- "position" משקף את תפקיד השחקן בהרכב הזה (GK/DEF/MID/FWD), ו-"formation" הוא הפורמציה שבה שיחקה הקבוצה (כמיטב הידיעה, למשל "4-3-3").`;
 
 const GOALS_SYSTEM_PROMPT = `אתה עוזר שמאתר את רשימת מבקיעי השערים והמבשלים האמיתית של משחק כדורגל מסוים, באמצעות חיפוש אינטרנט באתרים אמינים (fifa.com, bbc.com/sport, espn.com, uefa.com, אתרי הפדרציות).
 קיבלת את שתי הקבוצות, התאריך, והתוצאה הסופית שכבר אומתה.
@@ -175,6 +229,91 @@ export async function lookupResultViaAI(opts: {
     winnerSide,
     sources: sources.slice(0, 5),
   };
+}
+
+/**
+ * Look up real 1X2 odds for an upcoming match from odds-comparison sites,
+ * used as a fallback when footballdata.io hasn't priced the match yet
+ * (returns {0,0,0} for far-future fixtures). Returns decimal odds matching
+ * the Odds type ({home,draw,away} as strings) so they can be merged
+ * directly into live_data/match_odds and consumed by oddsToProbabilities().
+ */
+export async function lookupOddsViaAI(opts: {
+  homeName: string;
+  awayName: string;
+  dateISO: string;
+}): Promise<AiOddsLookup> {
+  const userMsg =
+    `מצא אודס 1X2 (ניצחון בית / תיקו / ניצחון חוץ) עדכניים למשחק מונדיאל הכדורגל 2026: ` +
+    `${opts.homeName} (קבוצה ביתית) מול ${opts.awayName} (קבוצה אורחת), שמתוכנן לתאריך ${opts.dateISO}. ` +
+    `אם אין עדיין אודס פעיל ממקור אמין למשחק הזה — החזר found:false.`;
+
+  const data = await callClaude(ODDS_SYSTEM_PROMPT, userMsg, 500);
+  if ("error" in data) return { found: false, reason: data.error };
+
+  const { sources, parsed, rawText } = extractSourcesAndJson(data);
+  if (!parsed) return { found: false, reason: `no_json_in_response: ${rawText.slice(0, 200)}` };
+  if (parsed.found !== true) return { found: false, reason: "ai_returned_found_false" };
+
+  const h = Number(parsed.home), d = Number(parsed.draw), a = Number(parsed.away);
+  if (!Number.isFinite(h) || !Number.isFinite(d) || !Number.isFinite(a)) {
+    return { found: false, reason: `bad_odds_type: ${JSON.stringify({ home: parsed.home, draw: parsed.draw, away: parsed.away })}` };
+  }
+  if (h <= 1 || d <= 1 || a <= 1) return { found: false, reason: "odds_out_of_range" };
+
+  return {
+    found: true,
+    odds: { home: h.toFixed(2), draw: d.toFixed(2), away: a.toFixed(2) },
+    sources: sources.slice(0, 5),
+  };
+}
+
+/**
+ * Look up the OFFICIAL starting XI lineups for both teams in an upcoming/live
+ * match. Used as a fallback for /api/lineups when API_FOOTBALL_KEY isn't
+ * configured (or the fixture isn't mapped). Same no-fabrication policy: only
+ * returns lineups that were actually published by official sources;
+ * found:false (and the caller retries later) until then.
+ */
+export async function lookupLineupsViaAI(opts: {
+  homeName: string;
+  awayName: string;
+  dateISO: string;
+}): Promise<AiLineupsLookup> {
+  const userMsg =
+    `מצא את ההרכבים הפותחים (Starting XI) הרשמיים שפורסמו למשחק מונדיאל הכדורגל 2026: ` +
+    `${opts.homeName} (קבוצה ביתית) מול ${opts.awayName} (קבוצה אורחת), שמתוכנן/נערך בתאריך ${opts.dateISO}. ` +
+    `אם ההרכבים הרשמיים עדיין לא פורסמו עבור משחק זה — החזר found:false.`;
+
+  const data = await callClaude(LINEUPS_SYSTEM_PROMPT, userMsg, 1600);
+  if ("error" in data) return { found: false, reason: data.error };
+
+  const { sources, parsed, rawText } = extractSourcesAndJson(data);
+  if (!parsed) return { found: false, reason: `no_json_in_response: ${rawText.slice(0, 200)}` };
+  if (parsed.found !== true) return { found: false, reason: "ai_returned_found_false" };
+
+  const VALID_POS = new Set(["GK", "DEF", "MID", "FWD"]);
+  function parseTeam(raw: any): AiLineupTeam | null {
+    if (!raw || !Array.isArray(raw.startXI) || raw.startXI.length !== 11) return null;
+    const startXI: AiLineupPlayer[] = [];
+    for (const p of raw.startXI) {
+      if (!p || typeof p.name !== "string" || !p.name.trim()) return null;
+      if (!VALID_POS.has(p.position)) return null;
+      startXI.push({
+        name: p.name.trim(),
+        position: p.position,
+        number: typeof p.number === "number" ? p.number : null,
+      });
+    }
+    if (!startXI.some(p => p.position === "GK")) return null;
+    return { formation: typeof raw.formation === "string" ? raw.formation : undefined, startXI };
+  }
+
+  const home = parseTeam(parsed.home);
+  const away = parseTeam(parsed.away);
+  if (!home || !away) return { found: false, reason: "invalid_or_incomplete_lineups" };
+
+  return { found: true, home, away, sources: sources.slice(0, 5) };
 }
 
 /**

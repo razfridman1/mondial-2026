@@ -141,3 +141,54 @@ export function buildMatchLineups(homeTeam: string, awayTeam: string, liveSquads
     away: defaultLineup(awayTeam, pickFormation(awayTeam), liveSquads),
   };
 }
+
+const KNOWN_FORMATIONS: Formation[] = ["4-3-3", "4-4-2", "3-5-2", "4-2-3-1", "5-3-2"];
+
+/** Build a TeamLineup from an AI-sourced starting XI (name + position + optional
+ * shirt number). Players are placed into the closest matching formation layout
+ * — exact match if `formationStr` is one of our 5 supported formations,
+ * otherwise positions are filled in formation order on a best-effort basis
+ * (any leftovers fill remaining slots regardless of position). Never
+ * fabricates players — only arranges the ones it was given. */
+export function lineupFromAiXI(
+  teamCode: string,
+  formationStr: string | undefined,
+  startXI: { name: string; position: Position; number?: number | null }[],
+): TeamLineup {
+  const formation: Formation = KNOWN_FORMATIONS.includes(formationStr as Formation)
+    ? (formationStr as Formation)
+    : "4-3-3";
+  const layout = FORMATIONS[formation];
+
+  const byPos: Record<Position, typeof startXI> = { GK: [], DEF: [], MID: [], FWD: [] };
+  const remaining = [...startXI];
+  for (const p of startXI) (byPos[p.position] || byPos.MID).push(p);
+
+  const slots: LineupSlot[] = [];
+  for (const slotDef of layout) {
+    let pick = byPos[slotDef.pos]?.shift();
+    if (!pick) pick = remaining.find(p => remaining.includes(p)); // any leftover
+    if (!pick) continue;
+    const ri = remaining.indexOf(pick);
+    if (ri >= 0) remaining.splice(ri, 1);
+    // also drop it from its position bucket if still present (leftover path)
+    const bi = byPos[pick.position]?.indexOf(pick);
+    if (bi != null && bi >= 0) byPos[pick.position].splice(bi, 1);
+
+    slots.push({
+      ...slotDef,
+      player: {
+        id: `${teamCode}-ai-${pick.name.replace(/\s+/g, "_")}`,
+        teamCode,
+        name: pick.name,
+        nameEn: pick.name,
+        position: pick.position,
+        jersey: pick.number ?? undefined,
+        club: "—",
+        age: 0,
+      } as Player,
+    });
+  }
+
+  return { teamCode, formation, slots };
+}
