@@ -87,6 +87,7 @@ type StoredResult = MatchResult & {
   source?: string;
   lastVerifiedAt?: number;
   aiMismatch?: unknown;
+  finalCheckedAt?: number;
 };
 
 export interface SyncResult {
@@ -131,6 +132,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
         source: data.source,
         lastVerifiedAt: data.lastVerifiedAt || 0,
         aiMismatch: data.aiMismatch,
+        finalCheckedAt: data.finalCheckedAt || 0,
       };
     });
     const resolved = resolveAllStages(existingResults);
@@ -265,6 +267,16 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
       const GROUP_BUFFER_MS = 120 * 60 * 1000; // ~2h: regulation + halftime + stoppage time
       const KO_BUFFER_MS = 185 * 60 * 1000;    // ~3h05m: regulation + ET + penalties, worst case
       const RECHECK_MS = 3 * 60 * 1000;
+      /* Final correction pass: ~1h after a result was first written, do ONE
+       * more lookup and, if it disagrees with what's stored — for ANY
+       * reason, including a result that was already "verified" via the
+       * 3x same-score recheck above, or one already flagged aiMismatch —
+       * OVERWRITE it with the (by-now more reliable) AI-sourced score. This
+       * is the user-requested final accuracy check: by an hour after the
+       * result first appeared, enough sources have caught up that we trust
+       * a fresh lookup enough to actively correct a wrong entry, not just
+       * flag it for manual review. Runs once per match (finalCheckedAt). */
+      const FINAL_CHECK_MS = 60 * 60 * 1000;
 
       if (opts.debug) {
         debugCandidates.push(
@@ -295,7 +307,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
         const existing = existingResults[m.id];
         if (existing?.setByAdmin) continue;
 
-        let candidate: "new" | "recheck" | null = null;
+        let candidate: "new" | "recheck" | "finalCheck" | null = null;
         if (!existing) candidate = "new";
         else if (
           existing.source === "ai-websearch" &&
@@ -303,6 +315,11 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
           (existing.verificationCount || 0) < 3 &&
           now - (existing.lastVerifiedAt || 0) >= RECHECK_MS
         ) candidate = "recheck";
+        else if (
+          existing.source === "ai-websearch" &&
+          !existing.finalCheckedAt &&
+          now - (existing.finishedAt || 0) >= FINAL_CHECK_MS
+        ) candidate = "finalCheck";
 
         if (opts.debug && debugCandidates.length < 15) {
           debugCandidates.push({
@@ -384,7 +401,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             source: doc.source, verificationCount: doc.verificationCount, lastVerifiedAt: doc.lastVerifiedAt,
           } as StoredResult;
           aiFallbackResults.push({ matchId: m.id, candidate, found: true, written: true });
-        } else {
+        } else if (candidate === "recheck") {
           const sameScore = existing!.home === lookup.home && existing!.away === lookup.away;
           if (sameScore) {
             const newCount = (existing!.verificationCount || 0) + 1;
@@ -403,6 +420,53 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             updated++;
             existingResults[m.id] = { ...existing!, aiMismatch: { home: lookup.home, away: lookup.away }, lastVerifiedAt: now };
             aiFallbackResults.push({ matchId: m.id, candidate, found: true, mismatch: true });
+          }
+        } else {
+          /* finalCheck — ~1h after the result first appeared, this is the
+           * user-requested final accuracy pass: if the fresh AI lookup
+           * agrees with what's stored, just mark it checked. If it
+           * DISAGREES — even if the prior result was already "verified" or
+           * flagged aiMismatch — OVERWRITE home/away/winner with the new
+           * (more reliable, by now) score. The previous value is kept in
+           * correctedFrom for an audit trail. Runs once per match. */
+          const sameScore = existing!.home === lookup.home && existing!.away === lookup.away;
+          if (sameScore) {
+            await ref.set({
+              finalCheckedAt: now,
+              ...(existing!.aiMismatch ? { aiMismatch: null, needsReview: false } : {}),
+            }, { merge: true });
+            updated++;
+            existingResults[m.id] = { ...existing!, finalCheckedAt: now, aiMismatch: undefined };
+            aiFallbackResults.push({ matchId: m.id, candidate, found: true, confirmed: true });
+          } else {
+            const correction: any = {
+              home: lookup.home,
+              away: lookup.away,
+              source: "ai-websearch",
+              aiSources: lookup.sources || [],
+              verificationCount: 1,
+              lastVerifiedAt: now,
+              finalCheckedAt: now,
+              verified: true,
+              correctedAt: now,
+              correctedFrom: { home: existing!.home, away: existing!.away },
+              aiMismatch: null,
+              needsReview: false,
+            };
+            if (isKO) {
+              if (lookup.winnerSide === "HOME" && homeCode) correction.winner = homeCode;
+              else if (lookup.winnerSide === "AWAY" && awayCode) correction.winner = awayCode;
+              else correction.winner = null;
+            }
+            await ref.set(correction, { merge: true });
+            updated++;
+            existingResults[m.id] = {
+              ...existing!, home: lookup.home, away: lookup.away,
+              winner: correction.winner ?? existing!.winner,
+              source: "ai-websearch", verificationCount: 1, lastVerifiedAt: now,
+              finalCheckedAt: now, aiMismatch: undefined,
+            };
+            aiFallbackResults.push({ matchId: m.id, candidate, found: true, corrected: true, from: { home: existing!.home, away: existing!.away }, to: { home: lookup.home, away: lookup.away } });
           }
         }
       }
