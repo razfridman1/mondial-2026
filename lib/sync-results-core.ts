@@ -350,8 +350,20 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
      * re-checked ~3 minutes later. A disagreeing re-check does NOT
      * overwrite — it flags aiMismatch + needsReview for admin review.
      *
-     * Limited to ONE AI result lookup per run (cost + time budget). */
-    let aiFallback: any = null;
+     * Up to RESULT_FALLBACK_BUDGET matches per run (instead of just 1):
+     * with football-data.org/footballdata.io currently reporting every
+     * match as not-yet-finished (status TIMED/incomplete — see
+     * debugExternalMatches), this AI lookup is the ONLY path that can ever
+     * fill in a result automatically. Previously a single match whose
+     * lookup returned found:false (e.g. ambiguous bracket slot, or the AI
+     * just hasn't found a source yet) permanently `break`'d the loop and
+     * starved every later match of a chance to be checked — so a finished
+     * match later in the schedule could sit unfilled forever while an
+     * earlier, still-unresolved one kept "using up" the per-run budget.
+     * Failed lookups are simply retried on a later run. */
+    const RESULT_FALLBACK_BUDGET = 3;
+    let resultCallsUsed = 0;
+    const aiFallbackResults: any[] = [];
     const debugCandidates: any[] = [];
     if (process.env.ANTHROPIC_API_KEY) {
       const now = Date.now();
@@ -430,6 +442,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
         }
 
         if (!candidate) continue;
+        if (resultCallsUsed >= RESULT_FALLBACK_BUDGET) continue; // budget reached — retry on a later run
 
         let homeCode: string | undefined = m.home;
         let awayCode: string | undefined = m.away;
@@ -465,10 +478,11 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
           const awayName = TEAMS[awayCode]?.nameEn || TEAMS[awayCode]?.name || awayCode;
           lookup = await lookupResultViaAI({ homeName, awayName, dateISO: m.utc, isKnockout: false });
         }
+        resultCallsUsed++;
 
         if (!lookup.found || lookup.home == null || lookup.away == null || !homeCode || !awayCode) {
-          aiFallback = { matchId: m.id, candidate, found: false, reason: lookup.reason || (!homeCode || !awayCode ? "missing_team_code" : undefined) };
-          break; // try at most one match per run, regardless of outcome
+          aiFallbackResults.push({ matchId: m.id, candidate, found: false, reason: lookup.reason || (!homeCode || !awayCode ? "missing_team_code" : undefined) });
+          continue; // try other matches this run too — retried on a later run
         }
 
         const ref = db.collection("match_results").doc(m.id);
@@ -495,7 +509,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             home: doc.home, away: doc.away, finishedAt: doc.finishedAt, winner: doc.winner,
             source: doc.source, verificationCount: doc.verificationCount, lastVerifiedAt: doc.lastVerifiedAt,
           } as StoredResult;
-          aiFallback = { matchId: m.id, candidate, found: true, written: true };
+          aiFallbackResults.push({ matchId: m.id, candidate, found: true, written: true });
         } else {
           const sameScore = existing!.home === lookup.home && existing!.away === lookup.away;
           if (sameScore) {
@@ -505,7 +519,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             await ref.set(update, { merge: true });
             updated++;
             existingResults[m.id] = { ...existing!, verificationCount: newCount, lastVerifiedAt: now };
-            aiFallback = { matchId: m.id, candidate, found: true, confirmed: true };
+            aiFallbackResults.push({ matchId: m.id, candidate, found: true, confirmed: true });
           } else {
             await ref.set({
               aiMismatch: { home: lookup.home, away: lookup.away, sources: lookup.sources || [], checkedAt: now },
@@ -514,12 +528,12 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             }, { merge: true });
             updated++;
             existingResults[m.id] = { ...existing!, aiMismatch: { home: lookup.home, away: lookup.away }, lastVerifiedAt: now };
-            aiFallback = { matchId: m.id, candidate, found: true, mismatch: true };
+            aiFallbackResults.push({ matchId: m.id, candidate, found: true, mismatch: true });
           }
         }
-        break; // one AI result lookup per run
       }
     }
+    const aiFallback = aiFallbackResults.length ? aiFallbackResults : null;
 
     /* ----- Post-match summaries + goal data (real data + AI narrative) -
      * summaryUpdates/goalsUpdates are shared with the AI-goals fallback
