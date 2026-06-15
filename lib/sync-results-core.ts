@@ -6,7 +6,6 @@ import type { MatchResult } from "@/lib/standings";
 import { fetchExternalMatchDetails } from "@/lib/football-data-api";
 import { generateMatchSummaryNarrative } from "@/lib/matchSummary";
 import { lookupResultViaAI, lookupGoalsViaAI, aiGoalsToExternalGoals, type AiResultLookup } from "@/lib/ai-result-fallback";
-import { listSeasonMatches, parseFdMatchResult, hasFootballDataIoKey, WC_SEASON_ID, type FdMatch } from "@/lib/footballdata-io";
 
 /* =====================================================================
  * Core results-sync logic, shared by:
@@ -17,16 +16,25 @@ import { listSeasonMatches, parseFdMatchResult, hasFootballDataIoKey, WC_SEASON_
  *     Vercel Cron actually firing (per user requirement: "אם ה-cron נכשל
  *     — אין מנגנון גיבוי אוטומטי מלא").
  *
- * TWO INDEPENDENT EXTERNAL SOURCES, checked in parallel:
- *   1. football-data.org (PRIMARY) — full match feed incl. knockout
- *      winner/penalties, used to build post-match summaries + goals.
- *   2. footballdata.io   (SECONDARY, group stage) — used to CONFIRM the
- *      primary result (doc.confirmedBy) or flag a discrepancy
- *      (doc.secondarySourceMismatch).
+ * RESULT POLICY (match_results/{matchId}.home / .away / .winner /
+ * .finishedAt) — per explicit user instruction: the FINAL SCORE of a
+ * match that has ended is determined EXCLUSIVELY via the AI web-search
+ * fallback (lookupResultViaAI in lib/ai-result-fallback.ts, which calls
+ * the Anthropic API). football-data.org and footballdata.io are NEVER
+ * used to write match_results — only the AI path below does. The
+ * "trigger" for when a match has ended is the kickoff+buffer check in the
+ * AI fallback loop below (GROUP_BUFFER_MS / KO_BUFFER_MS), which retries
+ * every cron minute until the AI confirms a real, sourced final score.
  *
- * AI WEB-SEARCH FALLBACK (lib/ai-result-fallback.ts), used ONLY when the
- * above sources haven't (yet) reported something we need:
- *   - Final score for a match that should already be over.
+ * football-data.org (PRIMARY, if FOOTBALL_API_KEY is configured) is still
+ * used for a SEPARATE concern: enriching already-decided matches with a
+ * goalscorer/assist breakdown and an AI-written post-match summary
+ * narrative (live_data/match_goals, live_data/match_summaries). It plays
+ * no role in determining the result itself.
+ *
+ * AI WEB-SEARCH FALLBACK (lib/ai-result-fallback.ts):
+ *   - Final score for a match that should already be over (PRIMARY/ONLY
+ *     source for match_results).
  *   - Identifying BOTH teams + score for an unresolved knockout bracket
  *     slot (by stage + date, when neither prior-round result is in yet).
  *   - Goalscorer/assist breakdown for /api/scorers when football-data.org
@@ -35,10 +43,11 @@ import { listSeasonMatches, parseFdMatchResult, hasFootballDataIoKey, WC_SEASON_
  * left alone and retried on a later run.
  *
  * Configuration (Vercel env vars):
- *   FOOTBALL_API_KEY        — football-data.org (primary)
- *   FOOTBALLDATA_IO_API_KEY — footballdata.io (secondary/cross-check)
+ *   ANTHROPIC_API_KEY       — AI web-search fallback (results + goals) —
+ *                              REQUIRED for match_results to ever be filled.
+ *   FOOTBALL_API_KEY        — football-data.org — optional, used only for
+ *                              goal breakdowns + summary narratives.
  *   FOOTBALL_API_URL        — default: https://api.football-data.org/v4
- *   ANTHROPIC_API_KEY       — AI web-search fallback (results + goals)
  *
  * Manual fallback: admin-entered results (/api/admin/results, which set
  * `setByAdmin: true`) are NEVER overwritten by this sync.
@@ -89,13 +98,13 @@ export interface SyncResult {
 export async function runResultsSync(opts: { force?: boolean; debug?: boolean } = {}): Promise<SyncResult> {
   const apiKey = process.env.FOOTBALL_API_KEY;
   const hasFD = !!apiKey;
-  const hasFDIO = hasFootballDataIoKey();
+  const hasAI = !!process.env.ANTHROPIC_API_KEY;
 
-  if (!hasFD && !hasFDIO) {
+  if (!hasAI && !hasFD) {
     return {
       ok: true,
       skipped: "no result source configured",
-      docs: "Set FOOTBALL_API_KEY and/or FOOTBALLDATA_IO_API_KEY in Vercel env vars when the tournament starts. The free tier of football-data.org works.",
+      docs: "Set ANTHROPIC_API_KEY in Vercel env vars — it is the sole source for match_results. FOOTBALL_API_KEY (football-data.org) is optional and only used for goal breakdowns + summaries.",
     };
   }
 
@@ -126,49 +135,13 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
     });
     const resolved = resolveAllStages(existingResults);
 
-    /* ----- Fetch both sources in parallel ---------------------------- */
-    const [fdOrg, fdio] = await Promise.all([
-      hasFD ? fetchFootballDataOrgMatches(baseUrl, apiKey!) : Promise.resolve(null),
-      hasFDIO ? listSeasonMatches(WC_SEASON_ID, { limit: 100, maxPages: 1 }).catch(() => [] as FdMatch[]) : Promise.resolve([] as FdMatch[]),
-    ]);
-
-    if (!fdOrg && !hasFDIO) {
-      return { ok: false, status: 502, error: "api_failed", details: "football-data.org request failed" };
-    }
-
+    /* ----- Fetch football-data.org (optional) -------------------------
+     * Used ONLY for goal breakdowns + post-match summary narratives below
+     * (summaryCandidates). It is NOT used to determine match_results — see
+     * the RESULT POLICY note at the top of this file. */
+    const fdOrg = hasFD ? await fetchFootballDataOrgMatches(baseUrl, apiKey!) : null;
     const externalMatches: any[] = fdOrg?.matches || [];
     const fdOrgError = fdOrg?.error || null;
-
-    /* Map footballdata.io's finished group-stage matches to our match ids,
-     * normalized to OUR home/away order. */
-    const fdioResultsByMatch: Record<string, { home: number; away: number }> = {};
-    for (const fm of fdio) {
-      const result = parseFdMatchResult(fm);
-      if (!result) continue;
-
-      const homeCode = teamCodeFromApiName(fm.home_team?.team_name);
-      const awayCode = teamCodeFromApiName(fm.away_team?.team_name);
-      if (!homeCode || !awayCode) continue;
-
-      const fdDate = fm.date_unix
-        ? new Date(fm.date_unix * 1000).toISOString().slice(0, 10)
-        : (fm.match_date || "").slice(0, 10);
-      if (!fdDate) continue;
-
-      const our = MATCHES.find(m => {
-        if (m.stage !== "GROUP") return false;
-        const ourDate = new Date(m.utc).toISOString().slice(0, 10);
-        if (ourDate !== fdDate) return false;
-        const direct = m.home === homeCode && m.away === awayCode;
-        const swap = m.home === awayCode && m.away === homeCode;
-        return direct || swap;
-      });
-      if (!our) continue;
-
-      let home = result.home, away = result.away;
-      if (our.home === awayCode && our.away === homeCode) { [home, away] = [away, home]; }
-      fdioResultsByMatch[our.id] = { home, away };
-    }
 
     /* Existing post-match summaries / goal data — used to avoid
      * regenerating (and re-calling the AI / external API) for matches
@@ -196,146 +169,50 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
       return !Array.isArray(entry.goals) || entry.goals.length !== totalScore;
     };
 
-    let inserted = 0, updated = 0, skipped = 0, skippedAdminLocked = 0, confirmed = 0, mismatches = 0;
-    let batch = db.batch();
-    let ops = 0;
+    let inserted = 0, updated = 0, skipped = 0;
 
+    /* Queue a post-match summary and/or goals fetch for matches
+     * football-data.org reports as FINISHED. This is enrichment only
+     * (goalscorers + narrative) — it never writes match_results. */
     for (const ext of externalMatches) {
-      if (ext.status !== "FINISHED" && ext.status !== "LIVE" && ext.status !== "IN_PLAY") continue;
+      if (ext.status !== "FINISHED") continue;
       if (!ext.score || ext.score.fullTime?.home == null || ext.score.fullTime?.away == null) continue;
 
       const ourMatch = findOurMatch(ext, resolved);
       if (!ourMatch) { skipped++; continue; }
 
-      /* Respect a manually-entered admin result. */
-      if (existingResults[ourMatch.id]?.setByAdmin) { skippedAdminLocked++; continue; }
-
-      const ref = db.collection("match_results").doc(ourMatch.id);
-      const existing = await ref.get();
-      const finishedAt = ext.lastUpdated ? new Date(ext.lastUpdated).getTime() : Date.now();
-
-      /* Look up our match to know stage / knockout / and resolved teams. */
       const ourMatchRecord = MATCHES.find(mm => mm.id === ourMatch.id);
       const isKO = !!(ourMatchRecord && ourMatchRecord.stage !== "GROUP");
 
-      const doc: any = {
+      const needsSummary = !existingSummaries[ourMatch.id];
+      const needsGoals = goalsIncomplete(ourMatch.id, ext.score.fullTime.home + ext.score.fullTime.away);
+      if (!needsSummary && !needsGoals) continue;
+
+      let homeCode = ourMatchRecord?.home;
+      let awayCode = ourMatchRecord?.away;
+      if (isKO) {
+        const r = resolved[ourMatch.id];
+        if (r?.home && r?.away) { homeCode = r.home; awayCode = r.away; }
+      }
+      if (!homeCode || !awayCode) continue;
+
+      summaryCandidates.push({
         matchId: ourMatch.id,
-        home: ext.score.fullTime.home,
-        away: ext.score.fullTime.away,
-        finishedAt,
-        sim: false,
-        source: "live",
-        liveStatus: ext.status,
-        liveExternalId: ext.id,
-        ...(isKO ? { isKnockout: true } : {}),
-      };
-
-      /* For knockouts: pick the real winner (after ET/pens if present),
-       * using football-data.org's `winner` field on score. */
-      if (isKO && ext.status === "FINISHED") {
-        const koResolved = resolved[ourMatch.id];
-        const winnerSide = ext.score.winner; // "HOME_TEAM" | "AWAY_TEAM" | "DRAW"
-        if (winnerSide === "HOME_TEAM" && koResolved?.home) doc.winner = koResolved.home;
-        else if (winnerSide === "AWAY_TEAM" && koResolved?.away) doc.winner = koResolved.away;
-      }
-
-      /* Self-verification pass (~3 min after first write). */
-      if (ext.status === "FINISHED") {
-        const prev = existingResults[ourMatch.id];
-        const sameScore = !!prev && prev.home === doc.home && prev.away === doc.away;
-        doc.verificationCount = sameScore ? (prev!.verificationCount || 0) + 1 : 1;
-        doc.lastVerifiedAt = Date.now();
-        if (doc.verificationCount >= 3) doc.verified = true;
-      }
-
-      /* Cross-check against the secondary source (group stage only). */
-      const fdioResult = fdioResultsByMatch[ourMatch.id];
-      if (fdioResult) {
-        if (fdioResult.home === doc.home && fdioResult.away === doc.away) {
-          doc.confirmedBy = "footballdata.io";
-          confirmed++;
-        } else {
-          doc.secondarySourceMismatch = { source: "footballdata.io", home: fdioResult.home, away: fdioResult.away, checkedAt: Date.now() };
-          mismatches++;
-        }
-        delete fdioResultsByMatch[ourMatch.id];
-      }
-
-      batch.set(ref, doc, { merge: true });
-      ops++;
-      if (existing.exists) updated++;
-      else inserted++;
-
-      /* Also keep our in-memory existingResults view fresh so later steps
-       * (AI fallbacks) see this run's writes. */
-      existingResults[ourMatch.id] = {
-        ...(existingResults[ourMatch.id] || {}),
-        home: doc.home, away: doc.away, finishedAt: doc.finishedAt,
-        winner: doc.winner ?? existingResults[ourMatch.id]?.winner,
-        source: doc.source, verificationCount: doc.verificationCount,
-        lastVerifiedAt: doc.lastVerifiedAt,
-      } as StoredResult;
-
-      /* Queue a post-match summary and/or goals fetch for finished matches
-       * missing either piece. */
-      if (ext.status === "FINISHED") {
-        const needsSummary = !existingSummaries[ourMatch.id];
-        const needsGoals = goalsIncomplete(ourMatch.id, ext.score.fullTime.home + ext.score.fullTime.away);
-        if (needsSummary || needsGoals) {
-          let homeCode = ourMatchRecord?.home;
-          let awayCode = ourMatchRecord?.away;
-          if (isKO) {
-            const r = resolved[ourMatch.id];
-            if (r?.home && r?.away) { homeCode = r.home; awayCode = r.away; }
-          }
-          if (homeCode && awayCode) {
-            summaryCandidates.push({
-              matchId: ourMatch.id,
-              externalId: ext.id,
-              homeCode,
-              awayCode,
-              homeScore: ext.score.fullTime.home,
-              awayScore: ext.score.fullTime.away,
-              needsSummary,
-              needsGoals,
-            });
-          }
-        }
-      }
-
-      if (ops >= 450) { await batch.commit(); batch = db.batch(); ops = 0; }
+        externalId: ext.id,
+        homeCode,
+        awayCode,
+        homeScore: ext.score.fullTime.home,
+        awayScore: ext.score.fullTime.away,
+        needsSummary,
+        needsGoals,
+      });
     }
 
-    /* ----- Secondary-only writes -------------------------------------- */
-    let fdioOnlyWrites = 0;
-    for (const [matchId, fres] of Object.entries(fdioResultsByMatch)) {
-      const existing = existingResults[matchId];
-      if (existing?.setByAdmin) { skippedAdminLocked++; continue; }
-      if (existing && existing.home === fres.home && existing.away === fres.away) continue;
-
-      const ref = db.collection("match_results").doc(matchId);
-      batch.set(ref, {
-        matchId,
-        home: fres.home,
-        away: fres.away,
-        finishedAt: Date.now(),
-        sim: false,
-        source: "live-footballdata.io",
-      }, { merge: true });
-      ops++;
-      fdioOnlyWrites++;
-      if (existing) updated++; else inserted++;
-      existingResults[matchId] = { ...(existing || {}), home: fres.home, away: fres.away, finishedAt: Date.now(), source: "live-footballdata.io" } as StoredResult;
-      if (ops >= 450) { await batch.commit(); batch = db.batch(); ops = 0; }
-    }
-
-    if (ops > 0) await batch.commit();
-
-    /* ----- AI web-search fallback for RESULTS (safety net) -------------
-     * If a match should already be over (kickoff + buffer) but NEITHER
-     * football-data.org NOR footballdata.io reported a result for it,
-     * ask Claude — with the web_search tool — to find the real final
-     * score from a citable source.
+    /* ----- AI web-search fallback for RESULTS (SOLE SOURCE) -------------
+     * match_results/{matchId}.home/.away/.winner/.finishedAt are written
+     * EXCLUSIVELY here, via lookupResultViaAI (Anthropic API + web search).
+     * Once a match is past kickoff + buffer (i.e. it has "ended"), ask
+     * Claude to find the real final score from a citable source.
      *
      * Handles unresolved knockout bracket slots too: if the bracket
      * resolver doesn't yet know which two teams play this fixture, ask
@@ -351,16 +228,15 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
      * overwrite — it flags aiMismatch + needsReview for admin review.
      *
      * Up to RESULT_FALLBACK_BUDGET matches per run (instead of just 1):
-     * with football-data.org/footballdata.io currently reporting every
-     * match as not-yet-finished (status TIMED/incomplete — see
-     * debugExternalMatches), this AI lookup is the ONLY path that can ever
-     * fill in a result automatically. Previously a single match whose
-     * lookup returned found:false (e.g. ambiguous bracket slot, or the AI
-     * just hasn't found a source yet) permanently `break`'d the loop and
-     * starved every later match of a chance to be checked — so a finished
-     * match later in the schedule could sit unfilled forever while an
-     * earlier, still-unresolved one kept "using up" the per-run budget.
-     * Failed lookups are simply retried on a later run. */
+     * this AI lookup is the ONLY path that can ever fill in a result
+     * automatically (see RESULT POLICY at the top of this file), so a
+     * single match whose lookup returned found:false (e.g. ambiguous
+     * bracket slot, or the AI just hasn't found a source yet) must NOT
+     * permanently `break` the loop and starve every later match of a
+     * chance to be checked — a finished match later in the schedule could
+     * otherwise sit unfilled forever while an earlier, still-unresolved one
+     * kept "using up" the per-run budget. Failed lookups are simply retried
+     * on a later run. */
     const RESULT_FALLBACK_BUDGET = 3;
     let resultCallsUsed = 0;
     const aiFallbackResults: any[] = [];
@@ -671,14 +547,12 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
     return {
       ok: true,
       inserted, updated, skipped,
-      skippedAdminLocked,
       total: externalMatches.length,
       summariesGenerated,
       sources: {
-        "football-data.org": hasFD ? (fdOrgError ? `error: ${fdOrgError}` : "ok") : "not configured",
-        "footballdata.io": hasFDIO ? "ok" : "not configured",
+        "anthropic (results)": hasAI ? "ok" : "not configured",
+        "football-data.org (goals/summaries only)": hasFD ? (fdOrgError ? `error: ${fdOrgError}` : "ok") : "not configured",
       },
-      crossCheck: { confirmed, mismatches, fdioOnlyWrites },
       aiFallback,
       aiGoalsFallback,
       ...(opts.debug ? {
@@ -690,12 +564,6 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
           home: ext.homeTeam?.name,
           away: ext.awayTeam?.name,
           score: ext.score?.fullTime,
-        })),
-        debugFdio: fdio.slice(0, 30).map((fm: any) => ({
-          date: fm.date_unix ? new Date(fm.date_unix * 1000).toISOString() : fm.match_date,
-          home: fm.home_team?.team_name,
-          away: fm.away_team?.team_name,
-          status: fm.status,
         })),
       } : {}),
     };
