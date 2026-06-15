@@ -7,7 +7,7 @@ import { lookupOddsViaAI } from "@/lib/ai-result-fallback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /* =====================================================================
  * GET /api/cron/sync-odds
