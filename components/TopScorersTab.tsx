@@ -6,14 +6,16 @@
  * aggregated server-side from real match data by /api/scorers (polled
  * every 60s, same pattern as StandingsTab/MyTeamsTab).
  *
- * Below the leaderboards: a ONE-TIME pick — each user picks one player
- * they think will end up as the tournament's top scorer, and one for top
- * assists. Once submitted, the pick is permanent (enforced server-side by
- * /api/top-picks) and shown read-only from then on.
+ * Below the leaderboards: each user picks one player they think will end
+ * up as the tournament's top scorer, and one for top assists. The pick can
+ * be changed freely until the group stage is complete (groupStageComplete,
+ * enforced server-side by /api/top-picks); after that it's locked and shown
+ * read-only.
  * ===================================================================*/
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
+import { groupStageComplete } from "@/lib/bracket";
 import { TEAMS } from "@/lib/data";
 import { squadFor } from "@/lib/players";
 import { openScorersShareCard } from "@/lib/share-cards";
@@ -67,7 +69,7 @@ export default function TopScorersTab() {
       </div>
       <p className="muted" style={{ marginTop: 4, marginBottom: 16, fontSize: 13 }}>
         טבלאות השערים והבישולים מתעדכנות אוטומטית לאחר כל משחק שמסתיים.
-        בנוסף, ניתן לבחור פעם אחת בלבד מי לדעתך יהיה מלך השערים ומלך הבישולים של הטורניר — ללא אפשרות לשנות בהמשך. אפשר למלא עד סוף שלב הבתים.
+        בנוסף, ניתן לבחור מי לדעתך יהיה מלך השערים ומלך הבישולים של הטורניר — ואפשר להחליף את הבחירה כל עוד שלב הבתים לא הסתיים. לאחר סיום שלב הבתים הבחירה ננעלת.
       </p>
 
       <div className="topscorers-grid">
@@ -271,12 +273,26 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks }: {
   liveSquads: Record<string, import("@/lib/players").Player[]>;
   setTopPicks: ReturnType<typeof useStore.getState>["setTopPicks"];
 }) {
+  const matchResults = useStore(s => s.matchResults);
+  const locked = groupStageComplete(matchResults);
+
   const [scorerTeam, setScorerTeam] = useState("");
   const [scorerPlayer, setScorerPlayer] = useState("");
   const [assistTeam, setAssistTeam] = useState("");
   const [assistPlayer, setAssistPlayer] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const existingScorer = profile?.topScorerPick;
+  const existingAssist = profile?.topAssistPick;
+
+  /* Pre-fill the form with the user's current pick once the profile loads,
+   * so editing shows what's already saved. */
+  useEffect(() => {
+    if (existingScorer) { setScorerTeam(existingScorer.teamCode); setScorerPlayer(existingScorer.playerName); }
+    if (existingAssist) { setAssistTeam(existingAssist.teamCode); setAssistPlayer(existingAssist.playerName); }
+  }, [existingScorer?.teamCode, existingScorer?.playerName, existingAssist?.teamCode, existingAssist?.playerName]);
 
   const scorerSquad = useMemo(() => scorerTeam ? squadFor(scorerTeam, liveSquads) : [], [scorerTeam, liveSquads]);
   const assistSquad = useMemo(() => assistTeam ? squadFor(assistTeam, liveSquads) : [], [assistTeam, liveSquads]);
@@ -285,36 +301,40 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks }: {
     return (
       <div className="topscorers-pick-panel">
         <h3>🔮 הניחוש שלי</h3>
-        <p className="muted">היכנס כדי לבחור (פעם אחת בלבד) מי יהיה מלך השערים ומלך הבישולים של הטורניר.</p>
+        <p className="muted">היכנס כדי לבחור מי יהיה מלך השערים ומלך הבישולים של הטורניר. אפשר להחליף את הבחירה כל עוד שלב הבתים לא הסתיים.</p>
         <Link className="btn btn-primary" href="/login">כניסה</Link>
       </div>
     );
   }
 
-  const existingScorer = profile?.topScorerPick;
-  const existingAssist = profile?.topAssistPick;
-
-  if (existingScorer && existingAssist) {
-    const scorerTeamInfo = TEAMS[existingScorer.teamCode];
-    const assistTeamInfo = TEAMS[existingAssist.teamCode];
+  /* Once the group stage is complete, picks are locked — show read-only. */
+  if (locked) {
+    const scorerTeamInfo = existingScorer ? TEAMS[existingScorer.teamCode] : null;
+    const assistTeamInfo = existingAssist ? TEAMS[existingAssist.teamCode] : null;
     return (
       <div className="topscorers-pick-panel">
-        <h3>🔮 הניחוש שלי (חד-פעמי — לא ניתן לשנות)</h3>
-        <div className="topscorers-pick-result">
-          <div>
-            <span className="muted">מלך השערים: </span>
-            <strong>{existingScorer.playerName}</strong>
-            {scorerTeamInfo && <span> ({scorerTeamInfo.flag} {scorerTeamInfo.name})</span>}
+        <h3>🔮 הניחוש שלי (שלב הבתים הסתיים — נעול)</h3>
+        {existingScorer && existingAssist ? (
+          <div className="topscorers-pick-result">
+            <div>
+              <span className="muted">מלך השערים: </span>
+              <strong>{existingScorer.playerName}</strong>
+              {scorerTeamInfo && <span> ({scorerTeamInfo.flag} {scorerTeamInfo.name})</span>}
+            </div>
+            <div>
+              <span className="muted">מלך הבישולים: </span>
+              <strong>{existingAssist.playerName}</strong>
+              {assistTeamInfo && <span> ({assistTeamInfo.flag} {assistTeamInfo.name})</span>}
+            </div>
           </div>
-          <div>
-            <span className="muted">מלך הבישולים: </span>
-            <strong>{existingAssist.playerName}</strong>
-            {assistTeamInfo && <span> ({assistTeamInfo.flag} {assistTeamInfo.name})</span>}
-          </div>
-        </div>
+        ) : (
+          <p className="muted">לא נבחר ניחוש לפני סיום שלב הבתים.</p>
+        )}
       </div>
     );
   }
+
+  const hasExisting = !!(existingScorer && existingAssist);
 
   async function submit() {
     if (!scorerTeam || !scorerPlayer || !assistTeam || !assistPlayer) {
@@ -323,11 +343,13 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks }: {
     }
     setSaving(true);
     setError(null);
+    setSaved(false);
     try {
       await setTopPicks(
         { teamCode: scorerTeam, playerName: scorerPlayer },
         { teamCode: assistTeam, playerName: assistPlayer },
       );
+      setSaved(true);
     } catch (e: any) {
       setError(e.message || "שגיאה בשמירה");
     } finally {
@@ -339,34 +361,35 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks }: {
     <div className="topscorers-pick-panel">
       <h3>🔮 הניחוש שלי</h3>
       <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
-        בחירה חד-פעמית — לאחר השליחה לא ניתן לשנות.
+        ניתן לבחור ולהחליף את הבחירה כל עוד שלב הבתים לא הסתיים. לאחר סיום שלב הבתים הבחירה תינעל.
       </p>
       <div className="topscorers-pick-form">
         <div className="topscorers-pick-row">
           <span className="topscorers-pick-label">מלך השערים:</span>
-          <select value={scorerTeam} onChange={e => { setScorerTeam(e.target.value); setScorerPlayer(""); }}>
+          <select value={scorerTeam} onChange={e => { setScorerTeam(e.target.value); setScorerPlayer(""); setSaved(false); }}>
             <option value="">בחר נבחרת</option>
             {ALL_TEAMS.map(t => <option key={t.code} value={t.code}>{t.flag} {t.name}</option>)}
           </select>
-          <select value={scorerPlayer} onChange={e => setScorerPlayer(e.target.value)} disabled={!scorerTeam}>
+          <select value={scorerPlayer} onChange={e => { setScorerPlayer(e.target.value); setSaved(false); }} disabled={!scorerTeam}>
             <option value="">בחר שחקן</option>
             {scorerSquad.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
           </select>
         </div>
         <div className="topscorers-pick-row">
           <span className="topscorers-pick-label">מלך הבישולים:</span>
-          <select value={assistTeam} onChange={e => { setAssistTeam(e.target.value); setAssistPlayer(""); }}>
+          <select value={assistTeam} onChange={e => { setAssistTeam(e.target.value); setAssistPlayer(""); setSaved(false); }}>
             <option value="">בחר נבחרת</option>
             {ALL_TEAMS.map(t => <option key={t.code} value={t.code}>{t.flag} {t.name}</option>)}
           </select>
-          <select value={assistPlayer} onChange={e => setAssistPlayer(e.target.value)} disabled={!assistTeam}>
+          <select value={assistPlayer} onChange={e => { setAssistPlayer(e.target.value); setSaved(false); }} disabled={!assistTeam}>
             <option value="">בחר שחקן</option>
             {assistSquad.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
           </select>
         </div>
         {error && <div className="error-text">{error}</div>}
+        {saved && !error && <div className="muted" style={{ fontSize: 12 }}>✅ הניחוש נשמר</div>}
         <button className="btn btn-primary" onClick={submit} disabled={saving}>
-          {saving ? "שומר..." : "שלח ניחוש (חד-פעמי)"}
+          {saving ? "שומר..." : hasExisting ? "עדכן ניחוש" : "שלח ניחוש"}
         </button>
       </div>
     </div>
