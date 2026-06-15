@@ -516,8 +516,8 @@ function MatchCardModern({ match, result, live, onOpen }: {
     if (status !== "live") return null;
     const m = Math.floor((Date.now() - +new Date(match.utc)) / 60000);
     if (m < 45) return `${m}'`;
-    if (m < 60) return "HT";
-    const second = m - 15; // second-half game minute, after the HT break
+    if (m < 63) return "HT"; // 45' + ~3' stoppage + 15' HT break
+    const second = m - 18; // second-half game minute (wall-clock - ~3' stoppage - 15' HT)
     if (second >= 105) return "FT?";
     if (second >= 90) return `90+${second - 90}`;
     return `${second}'`;

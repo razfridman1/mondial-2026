@@ -518,6 +518,32 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
     const liveUpdates: Record<string, any> = {};
     const liveFallback: any[] = [];
     if (process.env.ANTHROPIC_API_KEY) {
+      /* Pre-fetch existing live scores so we can merge goals rather than
+       * replacing them. The AI may return a subset of goals on any given
+       * call (e.g., stale halftime search missing second-half goals), so we
+       * accumulate: keep any goal seen in a prior sync that the new call
+       * doesn't return. */
+      let existingLiveScores: Record<string, any> = {};
+      try {
+        const snap = await db.collection("live_data").doc("live_scores").get();
+        if (snap.exists) existingLiveScores = snap.data() ?? {};
+      } catch { /* read error — proceed without merge, no data loss beyond this run */ }
+
+      function mergeGoals(
+        existing: Array<{ minute?: number | null; team?: string; player?: string; assist?: string; type?: string }>,
+        incoming: Array<{ minute?: number | null; team?: string; player?: string; assist?: string; type?: string }>,
+      ) {
+        const merged = [...existing];
+        for (const g of incoming) {
+          const dup = merged.some(e =>
+            e.player === g.player && e.team === g.team &&
+            (e.minute == null ? g.minute == null : e.minute === g.minute)
+          );
+          if (!dup) merged.push(g);
+        }
+        return merged.sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0));
+      }
+
       for (const m of MATCHES) {
         const isKO = m.stage !== "GROUP";
         const kickoff = new Date(m.utc).getTime();
@@ -545,17 +571,19 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
         liveCallsUsed++;
 
         if (live.found && live.home != null && live.away != null) {
+          const newGoals = aiGoalsToLiveGoals(live.goals || []);
+          const prevGoals: any[] = existingLiveScores[m.id]?.goals ?? [];
           liveUpdates[m.id] = {
             home: live.home,
             away: live.away,
             minuteLabel: live.minuteLabel || null,
-            goals: aiGoalsToLiveGoals(live.goals || []),
+            goals: mergeGoals(prevGoals, newGoals),
             homeCode,
             awayCode,
             updatedAt: now,
             sources: live.sources || [],
           };
-          liveFallback.push({ matchId: m.id, found: true, score: `${live.home}:${live.away}`, minuteLabel: live.minuteLabel });
+          liveFallback.push({ matchId: m.id, found: true, score: `${live.home}:${live.away}`, minuteLabel: live.minuteLabel, goals: liveUpdates[m.id].goals.length });
         } else {
           liveFallback.push({ matchId: m.id, found: false, reason: live.reason });
         }
