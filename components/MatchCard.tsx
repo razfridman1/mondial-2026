@@ -39,35 +39,13 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
    * landed yet — the live ticker then doubles as a provisional result. */
   const showLiveTicker = status === "live" || (status === "finished" && !isFinished);
 
-  /* Live clock fallback (minutes since kickoff) — used when the AI live
-   * ticker (live_data/live_scores) hasn't produced a minuteLabel yet. */
-  const liveMinuteFallback = useMemo(() => {
-    if (status !== "live") return null;
-    const m = Math.floor((Date.now() - +new Date(match.utc)) / 60000);
-    // Rough estimate only (used until the AI live ticker provides a real
-    // minuteLabel): first half ~45', then a ~15' halftime break before the
-    // second half kicks off, so wall-clock minute 45-60 is shown as "HT".
-    if (m < 45) return `${m}'`;
-    if (m < 63) return "HT"; // 45' + ~3' stoppage + 15' HT break
-    const second = m - 18; // second-half game minute (wall-clock - ~3' stoppage - 15' HT)
-    if (second >= 105) return "FT?";
-    if (second >= 90) return `90+${second - 90}`;
-    return `${second}'`;
-  }, [status, match.utc]);
-
-  /* Live ticker clock label. Prefers the AI-sourced minuteLabel — but
-   * guards against a stale "HT": halftime breaks don't realistically run
-   * past ~20 minutes of wall-clock time, so if the AI still says "HT" well
-   * after that, fall back to our own estimate instead. Once the match is
-   * presumed over, show "הסתיים" regardless of source. */
-  const liveClockLabel = useMemo(() => {
-    if (status === "finished") return "הסתיים";
-    if (status !== "live") return null;
-    const m = Math.floor((Date.now() - +new Date(match.utc)) / 60000);
-    const aiLabel = live?.minuteLabel;
-    if (aiLabel && !(aiLabel === "HT" && m > 65)) return aiLabel;
-    return liveMinuteFallback;
-  }, [status, match.utc, live?.minuteLabel, liveMinuteFallback]);
+  /* Live ticker clock label — shows exactly what the AI fetched.
+   * No local calculation: we don't know stoppage time, so we trust
+   * the live feed exclusively. If no minuteLabel yet, shows nothing. */
+  const liveClockLabel =
+    status === "finished" ? "הסתיים"
+    : status === "live"   ? (live?.minuteLabel ?? null)
+    : null;
 
   /* Goals scored so far (live ticker), sorted by minute and split by team
    * so each list can render under that team's own flag. */
