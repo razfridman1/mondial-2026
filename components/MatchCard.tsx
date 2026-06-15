@@ -21,6 +21,24 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
   const status = matchLiveStatus(match);
   const rel = relativeLabel(match.utc);
 
+  /* Pull user's prediction + actual result for this match (if any) */
+  const myPrediction = useStore(s => s.predictions[match.id]);
+  const matchResult  = useStore(s => s.matchResults[match.id]);
+  const matchResults = useStore(s => s.matchResults);
+  const user = useStore(s => s.user);
+  const refreshMatchResults = useStore(s => s.refreshMatchResults);
+  const currentGroupId = useStore(s => s.currentGroupId);
+  const groups = useStore(s => s.groups);
+  const [sharingPreds, setSharingPreds] = useState(false);
+
+  /* A result existing in the DB *is* the source of truth for "finished". */
+  const isFinished = !!matchResult;
+
+  /* Show the live ticker (score / clock / goals) while the match is
+   * actually live, OR once it's presumed over but match_results hasn't
+   * landed yet — the live ticker then doubles as a provisional result. */
+  const showLiveTicker = status === "live" || (status === "finished" && !isFinished);
+
   /* Live clock fallback (minutes since kickoff) — used when the AI live
    * ticker (live_data/live_scores) hasn't produced a minuteLabel yet. */
   const liveMinuteFallback = useMemo(() => {
@@ -36,24 +54,32 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
     if (second >= 90) return `90+${second - 90}`;
     return `${second}'`;
   }, [status, match.utc]);
-  const liveClockLabel = (status === "live" && live?.minuteLabel) || liveMinuteFallback;
 
-  /* Goals scored so far (live ticker), sorted by minute. */
-  const liveGoals = useMemo(() => {
+  /* Live ticker clock label. Prefers the AI-sourced minuteLabel — but
+   * guards against a stale "HT": halftime breaks don't realistically run
+   * past ~20 minutes of wall-clock time, so if the AI still says "HT" well
+   * after that, fall back to our own estimate instead. Once the match is
+   * presumed over, show "הסתיים" regardless of source. */
+  const liveClockLabel = useMemo(() => {
+    if (status === "finished") return "הסתיים";
+    if (status !== "live") return null;
+    const m = Math.floor((Date.now() - +new Date(match.utc)) / 60000);
+    const aiLabel = live?.minuteLabel;
+    if (aiLabel && !(aiLabel === "HT" && m > 65)) return aiLabel;
+    return liveMinuteFallback;
+  }, [status, match.utc, live?.minuteLabel, liveMinuteFallback]);
+
+  /* Goals scored so far (live ticker), sorted by minute and split by team
+   * so each list can render under that team's own flag. */
+  const { homeGoals, awayGoals } = useMemo(() => {
     const goals = live?.goals;
-    if (status !== "live" || !goals || goals.length === 0) return [];
-    return [...goals].sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0));
-  }, [status, live]);
-
-  /* Pull user's prediction + actual result for this match (if any) */
-  const myPrediction = useStore(s => s.predictions[match.id]);
-  const matchResult  = useStore(s => s.matchResults[match.id]);
-  const matchResults = useStore(s => s.matchResults);
-  const user = useStore(s => s.user);
-  const refreshMatchResults = useStore(s => s.refreshMatchResults);
-  const currentGroupId = useStore(s => s.currentGroupId);
-  const groups = useStore(s => s.groups);
-  const [sharingPreds, setSharingPreds] = useState(false);
+    if (!showLiveTicker || !goals || goals.length === 0) return { homeGoals: [], awayGoals: [] };
+    const sorted = [...goals].sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0));
+    return {
+      homeGoals: sorted.filter(g => g.team !== "away"),
+      awayGoals: sorted.filter(g => g.team === "away"),
+    };
+  }, [showLiveTicker, live]);
 
   /* Admin-only inline "set final result" editor — lets the admin record
    * the final score directly from the match card the moment a match ends,
@@ -173,10 +199,6 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
     [match.utc]
   );
   const predictionLocked = minutesToKick <= 3;
-  /* A result existing in the DB *is* the source of truth for "finished".
-   * In simulation, "instant results" writes results to matches whose clock
-   * hasn't reached kickoff yet, so we must not gate on matchLiveStatus. */
-  const isFinished = !!matchResult;
 
   const isKnockout = match.stage !== "GROUP";
 
@@ -241,9 +263,18 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
         <div className="team team-home">
           <span className="flag">{home.flag}</span>
           <span className="team-name">{home.name}</span>
+          {homeGoals.length > 0 && (
+            <div className="mc-team-goals">
+              {homeGoals.map((g, i) => (
+                <span key={i} className="mc-live-goal">
+                  ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="mc-vs">
-          {status === "live" ? (
+          {showLiveTicker ? (
             <>
               <div className="mc-live-score">
                 <span className="mc-live-score-num">{live ? live.home : "–"}</span>
@@ -251,7 +282,7 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
                 <span className="mc-live-score-num">{live ? live.away : "–"}</span>
               </div>
               <div className="vs-label mc-live-clock">
-                <span className="mt-live-dot" aria-hidden /> {liveClockLabel}
+                {status === "live" && <span className="mt-live-dot" aria-hidden />} {liveClockLabel}
               </div>
             </>
           ) : (
@@ -265,6 +296,15 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
         <div className="team team-away">
           <span className="team-name">{away.name}</span>
           <span className="flag">{away.flag}</span>
+          {awayGoals.length > 0 && (
+            <div className="mc-team-goals">
+              {awayGoals.map((g, i) => (
+                <span key={i} className="mc-live-goal">
+                  ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -272,19 +312,6 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
         <span>🏟️ {venue.name}</span>
         <span>📍 {venue.city}{venue.country ? ", " + venue.country : ""} {venue.flag || ""}</span>
       </div>
-
-      {liveGoals.length > 0 && (
-        <div className="mc-live-goals">
-          {liveGoals.map((g, i) => {
-            const team = g.team === "away" ? away : home;
-            return (
-              <span key={i} className="mc-live-goal">
-                ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""} ({team.flag})
-              </span>
-            );
-          })}
-        </div>
-      )}
 
       <div className="status-chips">
         {isFinished && myPrediction ? (
@@ -309,6 +336,32 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
             <div className="pred-result-row">
               <span className="pred-result-key">🏁 תוצאה:</span>
               <span className="pred-result-val">{matchResult.home} : {matchResult.away}</span>
+            </div>
+            <div className="pred-result-row muted">
+              <span>לא הוזן ניחוש למשחק זה</span>
+            </div>
+          </div>
+        ) : status === "finished" && live && myPrediction ? (
+          /* Match presumed over but official result not yet recorded —
+           * show the live ticker score as a provisional final result. */
+          <div className="pred-result-stack">
+            <div className="pred-result-row">
+              <span className="pred-result-key">🔮 ההימור שלך:</span>
+              <span className="pred-result-val">{myPrediction.homeScore} : {myPrediction.awayScore}</span>
+            </div>
+            <div className="pred-result-row">
+              <span className="pred-result-key">🏁 תוצאה (טרם אושרה רשמית):</span>
+              <span className="pred-result-val">{live.home} : {live.away}</span>
+            </div>
+            <div className="pred-result-row muted">
+              <span>הניקוד יחושב לאחר אישור התוצאה הרשמית</span>
+            </div>
+          </div>
+        ) : status === "finished" && live ? (
+          <div className="pred-result-stack">
+            <div className="pred-result-row">
+              <span className="pred-result-key">🏁 תוצאה (טרם אושרה רשמית):</span>
+              <span className="pred-result-val">{live.home} : {live.away}</span>
             </div>
             <div className="pred-result-row muted">
               <span>לא הוזן ניחוש למשחק זה</span>

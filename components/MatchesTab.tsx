@@ -498,13 +498,21 @@ function MatchCardModern({ match, result, live, onOpen }: {
   const status = result ? "finished" : baseStatus;
   const channels = (match.channels || []).map(c => CHANNELS[c]).filter(Boolean);
 
+  /* A result existing in DB is the source of truth for "finished". */
+  const isFinished = !!result;
+
+  /* Show the live ticker (score / clock / goals) while the match is
+   * actually live, OR once it's presumed over but the result hasn't
+   * landed yet — the live ticker then doubles as a provisional result. */
+  const showLiveTicker = status === "live" || (status === "finished" && !isFinished);
+
   /* Live minute estimate (approx, since we don't have a real live feed):
    * minutes since kickoff capped at 90 + ET. Used as a fallback when the
    * AI live ticker (lib/sync-results-core.ts → live_data/live_scores)
    * hasn't produced a minuteLabel yet. First half ~45', then a ~15' halftime
    * break before the second half kicks off, so wall-clock minute 45-60 is
    * shown as "HT". */
-  const liveMinute = useMemo(() => {
+  const liveMinuteFallback = useMemo(() => {
     if (status !== "live") return null;
     const m = Math.floor((Date.now() - +new Date(match.utc)) / 60000);
     if (m < 45) return `${m}'`;
@@ -515,15 +523,30 @@ function MatchCardModern({ match, result, live, onOpen }: {
     return `${second}'`;
   }, [status, match.utc]);
 
-  /* Live ticker clock label — prefer the AI-sourced minuteLabel when present. */
-  const clockLabel = (status === "live" && live?.minuteLabel) || liveMinute;
+  /* Live ticker clock label. Prefers the AI-sourced minuteLabel — but
+   * guards against a stale "HT": halftime breaks don't realistically run
+   * past ~20 minutes of wall-clock time, so if the AI still says "HT" well
+   * after that, fall back to our own estimate instead. */
+  const clockLabel = useMemo(() => {
+    if (status === "finished") return "הסתיים";
+    if (status !== "live") return null;
+    const m = Math.floor((Date.now() - +new Date(match.utc)) / 60000);
+    const aiLabel = live?.minuteLabel;
+    if (aiLabel && !(aiLabel === "HT" && m > 65)) return aiLabel;
+    return liveMinuteFallback;
+  }, [status, match.utc, live?.minuteLabel, liveMinuteFallback]);
 
-  /* Goals scored so far, sorted by minute, for the live-goals strip. */
-  const liveGoals = useMemo(() => {
+  /* Goals scored so far, sorted by minute and split by team so each list
+   * can render under that team's own flag. */
+  const { homeGoals, awayGoals } = useMemo(() => {
     const goals = live?.goals;
-    if (status !== "live" || !goals || goals.length === 0) return [];
-    return [...goals].sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0));
-  }, [status, live]);
+    if (!showLiveTicker || !goals || goals.length === 0) return { homeGoals: [], awayGoals: [] };
+    const sorted = [...goals].sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0));
+    return {
+      homeGoals: sorted.filter(g => g.team !== "away"),
+      awayGoals: sorted.filter(g => g.team === "away"),
+    };
+  }, [showLiveTicker, live]);
 
   return (
     <article className={`mt-card status-${status}`}
@@ -555,6 +578,15 @@ function MatchCardModern({ match, result, live, onOpen }: {
         <div className="mt-team home">
           <span className="mt-flag">{home.flag}</span>
           <span className="mt-team-name">{home.name}</span>
+          {homeGoals.length > 0 && (
+            <div className="mc-team-goals">
+              {homeGoals.map((g, i) => (
+                <span key={i} className="mt-live-goal">
+                  ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Score / vs */}
@@ -565,7 +597,7 @@ function MatchCardModern({ match, result, live, onOpen }: {
               <span className="mt-score-sep">:</span>
               <span className="mt-score-num">{result.away}</span>
             </div>
-          ) : status === "live" ? (
+          ) : showLiveTicker ? (
             <div className="mt-score live">
               <span className="mt-score-num">{live ? live.home : "–"}</span>
               <span className="mt-score-sep">:</span>
@@ -583,21 +615,17 @@ function MatchCardModern({ match, result, live, onOpen }: {
         <div className="mt-team away">
           <span className="mt-team-name">{away.name}</span>
           <span className="mt-flag">{away.flag}</span>
+          {awayGoals.length > 0 && (
+            <div className="mc-team-goals">
+              {awayGoals.map((g, i) => (
+                <span key={i} className="mt-live-goal">
+                  ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-
-      {liveGoals.length > 0 && (
-        <div className="mt-live-goals">
-          {liveGoals.map((g, i) => {
-            const team = g.team === "away" ? away : home;
-            return (
-              <span key={i} className="mt-live-goal">
-                ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""} ({team.flag})
-              </span>
-            );
-          })}
-        </div>
-      )}
 
       <footer className="mt-card-foot">
         <span className="mt-venue">🏟 {venue.name}{venue.city ? ` · ${venue.city}` : ""}</span>

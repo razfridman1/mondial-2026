@@ -4231,6 +4231,22 @@ html[data-theme="light"] .chat-panel {
   font-variant-numeric: tabular-nums;
 }
 
+.mc-team-goals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  margin-top: 4px;
+}
+.team-away .mc-team-goals,
+.mt-team.away .mc-team-goals {
+  align-items: flex-end;
+}
+.mc-team-goals .mc-live-goal {
+  font-size: 11px;
+  padding: 1px 6px;
+}
+
 /* ---- MatchCard live score (stages view) ---- */
 .mc-live-score {
   display: flex;
