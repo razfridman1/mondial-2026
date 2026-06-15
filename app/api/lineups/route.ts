@@ -20,6 +20,8 @@ export const maxDuration = 30;
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const matchId = url.searchParams.get("matchId");
+  const force = url.searchParams.get("force") === "1";
+  const debug = url.searchParams.get("debug") === "1";
   if (!matchId) return NextResponse.json({ error: "missing matchId" }, { status: 400 });
 
   const base = MATCHES.find(m => m.id === matchId);
@@ -41,8 +43,14 @@ export async function GET(req: Request) {
   const live = await fetchLiveLineups(matchId, m.utc, m.home, m.away);
   if (live) return NextResponse.json({ source: "live", lineups: live });
 
-  const ai = await fetchAiLineups(matchId, m.utc, m.home, m.away);
+  const ai = await fetchAiLineups(matchId, m.utc, m.home, m.away, { force });
   if (ai) return NextResponse.json({ source: "ai", lineups: ai });
+
+  if (debug) {
+    const { db } = getAdmin();
+    const doc = await db.collection("live_lineups").doc(matchId).get();
+    return NextResponse.json({ source: "not_published", lineups: null, debug: doc.exists ? doc.data() : null, kickoffUtc: m.utc, nowUtc: new Date().toISOString() });
+  }
 
   return NextResponse.json({ source: "not_published", lineups: null });
 }

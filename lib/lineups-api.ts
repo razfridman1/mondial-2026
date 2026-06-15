@@ -117,12 +117,12 @@ export async function fetchLiveLineups(matchId: string, dateIso: string, homeCod
  * AI_NEGATIVE_CACHE_MS so repeated page loads don't re-trigger AI on every
  * request while waiting for the official announcement.
  * ===================================================================*/
-export async function fetchAiLineups(matchId: string, dateIso: string, homeCode: string, awayCode: string): Promise<{ home: TeamLineup; away: TeamLineup } | null> {
+export async function fetchAiLineups(matchId: string, dateIso: string, homeCode: string, awayCode: string, opts?: { force?: boolean }): Promise<{ home: TeamLineup; away: TeamLineup } | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
 
   const kickoff = new Date(dateIso).getTime();
   const now = Date.now();
-  if (now < kickoff - 2 * 60 * 60 * 1000 || now > kickoff + 2.5 * 60 * 60 * 1000) return null;
+  if (!opts?.force && (now < kickoff - 2 * 60 * 60 * 1000 || now > kickoff + 2.5 * 60 * 60 * 1000)) return null;
 
   const { db } = getAdmin();
   const cacheRef = db.collection("live_lineups").doc(matchId);
@@ -130,7 +130,7 @@ export async function fetchAiLineups(matchId: string, dateIso: string, homeCode:
   if (cache.exists) {
     const data = cache.data() as any;
     if (data.home && data.away) return { home: data.home, away: data.away };
-    if (data.aiCheckedAt && now - data.aiCheckedAt < AI_NEGATIVE_CACHE_MS) return null;
+    if (!opts?.force && data.aiCheckedAt && now - data.aiCheckedAt < AI_NEGATIVE_CACHE_MS) return null;
   }
 
   const home = TEAMS[homeCode], away = TEAMS[awayCode];
