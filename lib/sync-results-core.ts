@@ -243,29 +243,27 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
     const debugCandidates: any[] = [];
     if (process.env.ANTHROPIC_API_KEY) {
       const now = Date.now();
-      /* IMPORTANT: this `buffer` is only a cheap pre-filter to avoid asking
-       * the AI about matches that obviously can't have ended yet — it is
-       * NOT what enforces "5 minutes after the match actually ended".
+      /* IMPORTANT: this `buffer` is a pre-filter to avoid asking the AI
+       * about a match before it has REALISTICALLY ended — i.e. including
+       * halftime break + stoppage time for regulation matches, and (for
+       * knockout matches) extra time + penalties on top of that. We don't
+       * have a live-status feed, so these are conservative real-world
+       * estimates of "kickoff to final whistle":
+       *   - Group/regulation: 90 min play + ~15 min halftime + ~15 min
+       *     stoppage/added time  -> ~120 min.
+       *   - Knockout: regulation (~120 min incl. halftime+stoppage) + ~15
+       *     min break before extra time + 30 min extra time + up to ~20
+       *     min for a penalty shootout -> ~185 min.
        *
-       * We have no independent feed of the *real* final whistle time (that
-       * would require a live-status source, which is exactly what's
-       * missing for a match that reaches this fallback at all — see below).
-       * So the buffer below is intentionally set to the EARLIEST plausible
-       * end time (regulation length only, no stoppage/ET assumed), kept
-       * short on purpose.
-       *
-       * The actual "has this match REALLY finished" check — including any
-       * referee-added stoppage time, extra time, or penalties — is done by
-       * lookupResultViaAI() itself via live web search: it returns
-       * found:false if its sources show the match still in progress, and
-       * only returns found:true (writing a result) once real sources
-       * confirm the match has officially ended. Since this fallback retries
-       * every cron minute, the effective behavior is: "as soon as possible
-       * after the real, official end of the match — whatever that turns
-       * out to be — fill in the result if the primary APIs still haven't."
+       * Even after the buffer, lookupResultViaAI() itself does the REAL
+       * "has this match finished" check via live web search: it returns
+       * found:false if its sources show the match still in progress (e.g.
+       * a knockout match that didn't need extra time would already be
+       * findable before the full 185 min buffer, but if it's still
+       * found:false we simply retry every cron minute until it's true).
        * No result is ever written before the match has truly finished. */
-      const GROUP_BUFFER_MS = 90 * 60 * 1000;  // 90 min: earliest a group match could end
-      const KO_BUFFER_MS = 90 * 60 * 1000;     // 90 min: earliest a KO match could end (before any ET/pens)
+      const GROUP_BUFFER_MS = 120 * 60 * 1000; // ~2h: regulation + halftime + stoppage time
+      const KO_BUFFER_MS = 185 * 60 * 1000;    // ~3h05m: regulation + ET + penalties, worst case
       const RECHECK_MS = 3 * 60 * 1000;
 
       if (opts.debug) {
