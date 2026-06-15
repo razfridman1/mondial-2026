@@ -1,11 +1,12 @@
 import { getAdmin } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { MATCHES, TEAMS } from "@/lib/data";
 import { resolveAllStages } from "@/lib/bracket";
 import { teamCodeFromApiName } from "@/lib/team-name-mapper";
 import type { MatchResult } from "@/lib/standings";
 import { fetchExternalMatchDetails } from "@/lib/football-data-api";
 import { generateMatchSummaryNarrative } from "@/lib/matchSummary";
-import { lookupResultViaAI, lookupGoalsViaAI, aiGoalsToExternalGoals, type AiResultLookup } from "@/lib/ai-result-fallback";
+import { lookupResultViaAI, lookupGoalsViaAI, lookupLiveScoreViaAI, aiGoalsToExternalGoals, type AiResultLookup } from "@/lib/ai-result-fallback";
 
 /* =====================================================================
  * Core results-sync logic, shared by:
@@ -51,6 +52,15 @@ import { lookupResultViaAI, lookupGoalsViaAI, aiGoalsToExternalGoals, type AiRes
  *
  * Manual fallback: admin-entered results (/api/admin/results, which set
  * `setByAdmin: true`) are NEVER overwritten by this sync.
+ *
+ * LIVE SCORE TRACKING (separate, informational-only concern): while a match
+ * is in progress (kickoff <= now < kickoff + buffer, no match_results entry
+ * yet), an AI lookup (lookupLiveScoreViaAI) fetches the current score +
+ * goals-so-far (with minute labels) and writes them to
+ * `live_data/live_scores/{matchId}`. This is a live ticker for the UI ONLY —
+ * it is never read by, and never written to, match_results, so it can NEVER
+ * affect prediction scoring. Once the real final result lands in
+ * match_results, the live ticker entry for that match is deleted.
  * ===================================================================*/
 
 /* ----- Active-window guard -------------------------------------------
@@ -243,8 +253,14 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
     let resultCallsUsed = 0;
     const aiFallbackResults: any[] = [];
     const debugCandidates: any[] = [];
+
+    /* Hoisted so the LIVE SCORE TRACKING section below (and the result
+     * fallback section) share the same "now" + buffer definitions. */
+    const now = Date.now();
+    const GROUP_BUFFER_MS = 120 * 60 * 1000; // ~2h: regulation + halftime + stoppage time
+    const KO_BUFFER_MS = 185 * 60 * 1000;    // ~3h05m: regulation + ET + penalties, worst case
+
     if (process.env.ANTHROPIC_API_KEY) {
-      const now = Date.now();
       /* IMPORTANT: this `buffer` is a pre-filter to avoid asking the AI
        * about a match before it has REALISTICALLY ended — i.e. including
        * halftime break + stoppage time for regulation matches, and (for
@@ -264,8 +280,6 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
        * findable before the full 185 min buffer, but if it's still
        * found:false we simply retry every cron minute until it's true).
        * No result is ever written before the match has truly finished. */
-      const GROUP_BUFFER_MS = 120 * 60 * 1000; // ~2h: regulation + halftime + stoppage time
-      const KO_BUFFER_MS = 185 * 60 * 1000;    // ~3h05m: regulation + ET + penalties, worst case
       const RECHECK_MS = 3 * 60 * 1000;
       /* Final correction pass: ~1h after a result was first written, do ONE
        * more lookup and, if it disagrees with what's stored — for ANY
@@ -401,6 +415,17 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             source: doc.source, verificationCount: doc.verificationCount, lastVerifiedAt: doc.lastVerifiedAt,
           } as StoredResult;
           aiFallbackResults.push({ matchId: m.id, candidate, found: true, written: true });
+          /* The match has now officially ended — drop the (now-stale) live
+           * ticker entry, if any. live_data/live_scores is purely
+           * informational and never feeds predictions; once match_results
+           * exists the UI shows that instead. */
+          try {
+            await db.collection("live_data").doc("live_scores").set(
+              { [m.id]: FieldValue.delete() }, { merge: true }
+            );
+          } catch {
+            // best-effort cleanup only
+          }
         } else if (candidate === "recheck") {
           const sameScore = existing!.home === lookup.home && existing!.away === lookup.away;
           if (sameScore) {
@@ -472,6 +497,73 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
       }
     }
     const aiFallback = aiFallbackResults.length ? aiFallbackResults : null;
+
+    /* ----- LIVE SCORE TRACKING (informational only — NEVER affects
+     * match_results / prediction scoring) ---------------------------------
+     * While a match is presumed to be in progress (kickoff has passed but
+     * the GROUP_BUFFER_MS/KO_BUFFER_MS "has it really ended" buffer hasn't,
+     * AND no match_results entry exists yet), ask the AI for the CURRENT
+     * live score + the list of goals scored so far via
+     * lookupLiveScoreViaAI. Written to live_data/live_scores/{matchId} —
+     * a separate doc from match_results, polled by the client for a live
+     * ticker. The user's guesses are scored ONLY once the AI result
+     * fallback above writes the real, final match_results entry (per the
+     * RESULT POLICY at the top of this file) — this section never writes
+     * there.
+     *
+     * Small, separate budget (per run) so live ticking for one match can't
+     * starve the result/goals AI calls above. */
+    const LIVE_FALLBACK_BUDGET = 2;
+    let liveCallsUsed = 0;
+    const liveUpdates: Record<string, any> = {};
+    const liveFallback: any[] = [];
+    if (process.env.ANTHROPIC_API_KEY) {
+      for (const m of MATCHES) {
+        const isKO = m.stage !== "GROUP";
+        const kickoff = new Date(m.utc).getTime();
+        const buffer = isKO ? KO_BUFFER_MS : GROUP_BUFFER_MS;
+
+        // Only while presumed in-progress: kickoff has passed, the "has it
+        // really ended" buffer hasn't, and we don't have a final result yet.
+        if (now < kickoff || now >= kickoff + buffer) continue;
+        if (existingResults[m.id]) continue;
+
+        let homeCode: string | undefined = m.home;
+        let awayCode: string | undefined = m.away;
+        if (isKO) {
+          const r = resolved[m.id];
+          if (!r?.home || !r?.away) continue; // unresolved bracket slot — nothing to track yet
+          homeCode = r.home; awayCode = r.away;
+        }
+        if (!homeCode || !awayCode) continue;
+
+        if (liveCallsUsed >= LIVE_FALLBACK_BUDGET) continue; // retry on a later run
+
+        const homeName = TEAMS[homeCode]?.nameEn || TEAMS[homeCode]?.name || homeCode;
+        const awayName = TEAMS[awayCode]?.nameEn || TEAMS[awayCode]?.name || awayCode;
+        const live = await lookupLiveScoreViaAI({ homeName, awayName, dateISO: m.utc, isKnockout: isKO });
+        liveCallsUsed++;
+
+        if (live.found && live.home != null && live.away != null) {
+          liveUpdates[m.id] = {
+            home: live.home,
+            away: live.away,
+            minuteLabel: live.minuteLabel || null,
+            goals: aiGoalsToExternalGoals(live.goals || [], homeCode, awayCode),
+            homeCode,
+            awayCode,
+            updatedAt: now,
+            sources: live.sources || [],
+          };
+          liveFallback.push({ matchId: m.id, found: true, score: `${live.home}:${live.away}`, minuteLabel: live.minuteLabel });
+        } else {
+          liveFallback.push({ matchId: m.id, found: false, reason: live.reason });
+        }
+      }
+      if (Object.keys(liveUpdates).length) {
+        await db.collection("live_data").doc("live_scores").set(liveUpdates, { merge: true });
+      }
+    }
 
     /* ----- Post-match summaries + goal data (real data + AI narrative) -
      * summaryUpdates/goalsUpdates are shared with the AI-goals fallback
@@ -617,6 +709,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
       },
       aiFallback,
       aiGoalsFallback,
+      liveFallback: liveFallback.length ? liveFallback : null,
       ...(opts.debug ? {
         debugCandidates,
         matchResultsDocIds: existingResSnap.docs.map(d => d.id),

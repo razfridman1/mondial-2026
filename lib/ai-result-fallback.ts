@@ -66,6 +66,21 @@ export interface AiGoalsLookup {
   reason?: string;
 }
 
+export interface AiLiveScoreLookup {
+  found: boolean;
+  /** Current (live, not necessarily final) score. */
+  home?: number;
+  away?: number;
+  /** Human-readable clock, e.g. "67'", "HT", "90+3", "הסתיים". */
+  minuteLabel?: string;
+  /** All goals scored so far — same shape as AiGoalsLookup.goals, but
+   * lenient: malformed individual entries are skipped rather than failing
+   * the whole lookup (live data is partial/evolving by nature). */
+  goals?: AiGoalsLookup["goals"];
+  sources?: string[];
+  reason?: string;
+}
+
 const RESULT_SYSTEM_PROMPT = `אתה עוזר שמאתר תוצאות סופיות אמיתיות של משחקי מונדיאל הכדורגל 2026 באמצעות חיפוש אינטרנט.
 חפש מידע באתרים אמינים בלבד (fifa.com, bbc.com/sport, espn.com, uefa.com, reuters, sky sports, אתרי הפדרציות הרשמיות).
 החזר תשובה אך ורק כ-JSON תקין, ללא טקסט נוסף, בפורמט:
@@ -106,6 +121,19 @@ const LINEUPS_SYSTEM_PROMPT = `אתה עוזר שמאתר הרכבים פותח�
 - חובה בדיוק 11 שחקנים עבור כל קבוצה (כולל שוער אחד, position:"GK").
 - "home" מתייחס לקבוצה שתינתן לך כ"קבוצה ביתית", "away" לקבוצה שתינתן לך כ"קבוצה אורחת" — אל תחליף ביניהן.
 - "position" משקף את תפקיד השחקן בהרכב הזה (GK/DEF/MID/FWD), ו-"formation" הוא הפורמציה שבה שיחקה הקבוצה (כמיטב הידיעה, למשל "4-3-3").`;
+
+const LIVE_SCORE_SYSTEM_PROMPT = `אתה עוזר שמאתר את התוצאה החיה (LIVE) הנוכחית של משחק כדורגל מתמשך במונדיאל 2026, באמצעות חיפוש אינטרנט באתרי תוצאות חיות אמינים (flashscore.com, sofascore.com, bbc.com/sport, espn.com, fifa.com).
+החזר תשובה אך ורק כ-JSON תקין, ללא טקסט נוסף, בפורמט:
+{"found": true, "home": <מספר>, "away": <מספר>, "minuteLabel": "<למשל: 67' או HT או 90+3 או הסתיים>", "goals": [{"minute": <מספר|null>, "side": "home"|"away", "scorer": "<שם>", "assist": "<שם>"|null, "type": "PENALTY"|"OWN"|null}, ...]}
+או אם המשחק עדיין לא התחיל, או שאין מידע חי אמין עליו כרגע:
+{"found": false}
+
+חוקים קריטיים:
+- אסור לנחש או להמציא תוצאה, דקה, או שערים. אם אין מקור חי/עדכני אמין — found:false.
+- "home"/"away" הם התוצאה הנוכחית (חיה, לאו דווקא סופית), מספרים שלמים אי-שליליים.
+- "goals" היא רשימת כל השערים שהובקעו עד כה במשחק (רשימה ריקה אם 0:0), עם המבקיע, הדקה, ואם ידוע - המבשל.
+- "side" מציין איזו קבוצה הבקיעה (home/away לפי האוריינטציה שניתנה לך), לא איזו קבוצה ניזוקה (שער עצמי משויך לקבוצה שהבקיעה אותו בפועל למול שערה שלה — type:"OWN").
+- אם המשחק כבר הסתיים — עדיין החזר found:true עם התוצאה הסופית ו-minuteLabel:"הסתיים", אל תחזיר found:false רק בגלל שהמשחק נגמר.`;
 
 const GOALS_SYSTEM_PROMPT = `אתה עוזר שמאתר את רשימת מבקיעי השערים והמבשלים האמיתית של משחק כדורגל מסוים, באמצעות חיפוש אינטרנט באתרים אמינים (fifa.com, bbc.com/sport, espn.com, uefa.com, אתרי הפדרציות).
 קיבלת את שתי הקבוצות, התאריך, והתוצאה הסופית שכבר אומתה.
@@ -361,6 +389,63 @@ export async function lookupGoalsViaAI(opts: {
   }
 
   return { found: true, goals, sources: sources.slice(0, 5) };
+}
+
+/**
+ * Look up the CURRENT live score (+ goals scored so far) of a match that is
+ * presumed to be in progress right now. Unlike lookupResultViaAI (which is
+ * the SOLE source for match_results / prediction-scoring and only returns
+ * found:true once a match has truly ENDED), this is a purely informational
+ * live ticker: callers must write it to a separate place (live_data/live_scores)
+ * that never feeds predictions. Lenient on individual goal entries — a
+ * malformed scorer/side on one goal doesn't discard the whole lookup, since
+ * live data is partial and changes minute to minute.
+ */
+export async function lookupLiveScoreViaAI(opts: {
+  homeName: string;
+  awayName: string;
+  dateISO: string;
+  isKnockout?: boolean;
+}): Promise<AiLiveScoreLookup> {
+  const userMsg =
+    `מצא את התוצאה החיה הנוכחית (LIVE) של משחק מונדיאל הכדורגל 2026 שמתקיים כרגע (או התקיים לאחרונה): ` +
+    `${opts.homeName} (קבוצה ביתית) מול ${opts.awayName} (קבוצה אורחת), שמתוכנן/נערך בתאריך ${opts.dateISO}. ` +
+    `כלול את רשימת השערים שהובקעו עד כה (מבקיע, דקה, ואם ידוע - מבשל). ` +
+    `אם המשחק עדיין לא התחיל, או שאין מידע חי/עדכני אמין כרגע — החזר found:false.`;
+
+  const data = await callClaude(LIVE_SCORE_SYSTEM_PROMPT, userMsg, 1200);
+  if ("error" in data) return { found: false, reason: data.error };
+
+  const { sources, parsed, rawText } = extractSourcesAndJson(data);
+  if (!parsed) return { found: false, reason: `no_json_in_response: ${rawText.slice(0, 200)}` };
+  if (parsed.found !== true) return { found: false, reason: "ai_returned_found_false" };
+  if (typeof parsed.home !== "number" || typeof parsed.away !== "number") return { found: false, reason: `bad_score_type: ${JSON.stringify({ home: parsed.home, away: parsed.away })}` };
+  if (!Number.isInteger(parsed.home) || !Number.isInteger(parsed.away)) return { found: false, reason: "non_integer_score" };
+  if (parsed.home < 0 || parsed.away < 0) return { found: false, reason: "negative_score" };
+
+  const goals: NonNullable<AiGoalsLookup["goals"]> = [];
+  if (Array.isArray(parsed.goals)) {
+    for (const g of parsed.goals) {
+      if (!g || typeof g.scorer !== "string" || !g.scorer.trim()) continue;
+      if (g.side !== "home" && g.side !== "away") continue;
+      goals.push({
+        minute: typeof g.minute === "number" ? g.minute : null,
+        side: g.side === "home" ? "HOME" : "AWAY",
+        scorer: g.scorer.trim(),
+        assist: typeof g.assist === "string" && g.assist.trim() ? g.assist.trim() : undefined,
+        type: typeof g.type === "string" ? g.type : undefined,
+      });
+    }
+  }
+
+  return {
+    found: true,
+    home: parsed.home,
+    away: parsed.away,
+    minuteLabel: typeof parsed.minuteLabel === "string" ? parsed.minuteLabel.slice(0, 20) : undefined,
+    goals,
+    sources: sources.slice(0, 5),
+  };
 }
 
 /** Convenience: map an AiGoalsLookup result to ExternalGoal[] given the

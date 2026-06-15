@@ -12,7 +12,7 @@ import { computeGroupStandings } from "@/lib/standings";
 import type { Match } from "@/lib/types";
 import Countdown from "./Countdown";
 
-export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id: string) => void }) {
+export default function MatchCard({ match, onOpen, live }: { match: Match; onOpen: (id: string) => void; live?: import("@/lib/store").LiveScore }) {
   const home = TEAMS[match.home] || { code: match.home, name: match.home, flag: "❓" };
   const away = TEAMS[match.away] || { code: match.away, name: match.away, flag: "❓" };
   const venue = VENUES[match.venue] || { name: match.venue, city: "", country: "", flag: "" };
@@ -20,6 +20,25 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
   const channels = (match.channels || []).map(c => CHANNELS[c]).filter(Boolean);
   const status = matchLiveStatus(match);
   const rel = relativeLabel(match.utc);
+
+  /* Live clock fallback (minutes since kickoff) — used when the AI live
+   * ticker (live_data/live_scores) hasn't produced a minuteLabel yet. */
+  const liveMinuteFallback = useMemo(() => {
+    if (status !== "live") return null;
+    const m = Math.floor((Date.now() - +new Date(match.utc)) / 60000);
+    if (m >= 105) return "FT?";
+    if (m >= 90)  return `90+${m - 90}`;
+    if (m >= 45 && m < 50) return "HT";
+    return `${m}'`;
+  }, [status, match.utc]);
+  const liveClockLabel = (status === "live" && live?.minuteLabel) || liveMinuteFallback;
+
+  /* Goals scored so far (live ticker), sorted by minute. */
+  const liveGoals = useMemo(() => {
+    const goals = live?.goals;
+    if (status !== "live" || !goals || goals.length === 0) return [];
+    return [...goals].sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0));
+  }, [status, live]);
 
   /* Pull user's prediction + actual result for this match (if any) */
   const myPrediction = useStore(s => s.predictions[match.id]);
@@ -219,9 +238,24 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
           <span className="team-name">{home.name}</span>
         </div>
         <div className="mc-vs">
-          <div className="vs-line"></div>
-          <Countdown utc={match.utc} className="vs-cd" />
-          <div className="vs-label">נגד</div>
+          {status === "live" ? (
+            <>
+              <div className="mc-live-score">
+                <span className="mc-live-score-num">{live ? live.home : "–"}</span>
+                <span className="mc-live-score-sep">:</span>
+                <span className="mc-live-score-num">{live ? live.away : "–"}</span>
+              </div>
+              <div className="vs-label mc-live-clock">
+                <span className="mt-live-dot" aria-hidden /> {liveClockLabel}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="vs-line"></div>
+              <Countdown utc={match.utc} className="vs-cd" />
+              <div className="vs-label">נגד</div>
+            </>
+          )}
         </div>
         <div className="team team-away">
           <span className="team-name">{away.name}</span>
@@ -233,6 +267,19 @@ export default function MatchCard({ match, onOpen }: { match: Match; onOpen: (id
         <span>🏟️ {venue.name}</span>
         <span>📍 {venue.city}{venue.country ? ", " + venue.country : ""} {venue.flag || ""}</span>
       </div>
+
+      {liveGoals.length > 0 && (
+        <div className="mc-live-goals">
+          {liveGoals.map((g, i) => {
+            const team = g.team === "away" ? away : home;
+            return (
+              <span key={i} className="mc-live-goal">
+                ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""} ({team.flag})
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       <div className="status-chips">
         {isFinished && myPrediction ? (

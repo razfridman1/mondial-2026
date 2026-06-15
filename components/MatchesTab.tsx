@@ -43,6 +43,8 @@ export default function MatchesTab() {
   const simConfig    = useStore(s => s.simConfig);
   const matchResults = useStore(s => s.matchResults);
   const refreshMatchResults = useStore(s => s.refreshMatchResults);
+  const liveScores   = useStore(s => s.liveScores);
+  const refreshLiveScores = useStore(s => s.refreshLiveScores);
 
   const [section, setSection] = useState<Section>("stages");
   const [openId, setOpenId]   = useState<string | null>(null);
@@ -121,6 +123,18 @@ export default function MatchesTab() {
     document.addEventListener("visibilitychange", onVisible);
     return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
   }, [simConfig?.enabled, refreshMatchResults]);
+
+  /* Live score ticker — same cadence as results polling. Informational
+   * only (live_data/live_scores); never affects predictions. */
+  useEffect(() => {
+    refreshLiveScores?.();
+    const fast = !!simConfig?.enabled;
+    const interval = fast ? 3_000 : 10_000;
+    const id = setInterval(() => refreshLiveScores?.(), interval);
+    const onVisible = () => { if (document.visibilityState === "visible") refreshLiveScores?.(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
+  }, [simConfig?.enabled, refreshLiveScores]);
 
   /* While simulation is active, drive the server-side tick worker from the
    * client every 3s. The tick endpoint is idempotent and scans for matches
@@ -269,12 +283,12 @@ export default function MatchesTab() {
       {/* List body */}
       <div className="mt-body" ref={bodyRef}>
         {section === "stages" ? (
-          <AllStagesSchedule matches={matches} onOpen={setOpenId} />
+          <AllStagesSchedule matches={matches} onOpen={setOpenId} liveScores={liveScores} />
         ) : visible.length === 0 ? (
           <EmptyState section={section} />
         ) : (
           <GroupedList list={visible} section={section} results={matchResults}
-                       onOpen={setOpenId} />
+                       liveScores={liveScores} onOpen={setOpenId} />
         )}
       </div>
 
@@ -322,9 +336,10 @@ function PillBtn({ active, onClick, icon, label, badge, highlight }: {
 function LiveDot() { return <span className="mt-live-dot" aria-hidden /> ; }
 
 /* ----------- All-stages schedule (classic MatchCard view) ----------- */
-function AllStagesSchedule({ matches, onOpen }: {
+function AllStagesSchedule({ matches, onOpen, liveScores }: {
   matches: Match[];
   onOpen: (id: string) => void;
+  liveScores: Record<string, any>;
 }) {
   /* Group matches by stage, then by day (within each stage). */
   const stageBlocks = useMemo(() => {
@@ -371,7 +386,7 @@ function AllStagesSchedule({ matches, onOpen }: {
                 <span className="muted">{ms.length} משחקים</span>
               </h3>
               <div className="card-grid">
-                {ms.map(m => <MatchCard key={m.id} match={m} onOpen={onOpen} />)}
+                {ms.map(m => <MatchCard key={m.id} match={m} onOpen={onOpen} live={liveScores[m.id]} />)}
               </div>
             </section>
           ))}
@@ -393,9 +408,10 @@ function EmptyState({ section }: { section: Section }) {
   );
 }
 
-function GroupedList({ list, section, results, onOpen }: {
+function GroupedList({ list, section, results, liveScores, onOpen }: {
   list: Match[]; section: Section;
   results: Record<string, { home: number; away: number; finishedAt: number }>;
+  liveScores: Record<string, any>;
   onOpen: (id: string) => void;
 }) {
   const byDay = useMemo(() => {
@@ -419,7 +435,7 @@ function GroupedList({ list, section, results, onOpen }: {
           </div>
           <div className="mt-cards">
             {ms.map(m => (
-              <MatchCardModern key={m.id} match={m} result={results[m.id]}
+              <MatchCardModern key={m.id} match={m} result={results[m.id]} live={liveScores[m.id]}
                 onOpen={() => onOpen(m.id)} />
             ))}
           </div>
@@ -431,9 +447,10 @@ function GroupedList({ list, section, results, onOpen }: {
 
 /* ---------------------- Modern Match Card ------------------------- */
 
-function MatchCardModern({ match, result, onOpen }: {
+function MatchCardModern({ match, result, live, onOpen }: {
   match: Match;
   result?: { home: number; away: number; finishedAt: number };
+  live?: import("@/lib/store").LiveScore;
   onOpen: () => void;
 }) {
   const home = TEAMS[match.home] || { code: match.home, name: match.home, flag: "❓" };
@@ -447,7 +464,9 @@ function MatchCardModern({ match, result, onOpen }: {
   const channels = (match.channels || []).map(c => CHANNELS[c]).filter(Boolean);
 
   /* Live minute estimate (approx, since we don't have a real live feed):
-   * minutes since kickoff capped at 90 + ET. */
+   * minutes since kickoff capped at 90 + ET. Used as a fallback when the
+   * AI live ticker (lib/sync-results-core.ts → live_data/live_scores)
+   * hasn't produced a minuteLabel yet. */
   const liveMinute = useMemo(() => {
     if (status !== "live") return null;
     const m = Math.floor((Date.now() - +new Date(match.utc)) / 60000);
@@ -457,6 +476,16 @@ function MatchCardModern({ match, result, onOpen }: {
     if (m >= 45 && m < 50) return "HT";
     return `${m}'`;
   }, [status, match.utc]);
+
+  /* Live ticker clock label — prefer the AI-sourced minuteLabel when present. */
+  const clockLabel = (status === "live" && live?.minuteLabel) || liveMinute;
+
+  /* Goals scored so far, sorted by minute, for the live-goals strip. */
+  const liveGoals = useMemo(() => {
+    const goals = live?.goals;
+    if (status !== "live" || !goals || goals.length === 0) return [];
+    return [...goals].sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0));
+  }, [status, live]);
 
   return (
     <article className={`mt-card status-${status}`}
@@ -470,7 +499,7 @@ function MatchCardModern({ match, result, onOpen }: {
         <div className="mt-card-status">
           {status === "live" && (
             <span className="mt-live-pill">
-              <span className="mt-live-dot" aria-hidden /> חי · {liveMinute}
+              <span className="mt-live-dot" aria-hidden /> חי · {clockLabel}
             </span>
           )}
           {status === "pregame"  && <span className="mt-status-pill pregame">קדם-משחק</span>}
@@ -500,9 +529,9 @@ function MatchCardModern({ match, result, onOpen }: {
             </div>
           ) : status === "live" ? (
             <div className="mt-score live">
-              <span className="mt-score-num">–</span>
+              <span className="mt-score-num">{live ? live.home : "–"}</span>
               <span className="mt-score-sep">:</span>
-              <span className="mt-score-num">–</span>
+              <span className="mt-score-num">{live ? live.away : "–"}</span>
             </div>
           ) : (
             <div className="mt-vs">
@@ -518,6 +547,19 @@ function MatchCardModern({ match, result, onOpen }: {
           <span className="mt-flag">{away.flag}</span>
         </div>
       </div>
+
+      {liveGoals.length > 0 && (
+        <div className="mt-live-goals">
+          {liveGoals.map((g, i) => {
+            const team = g.team === "away" ? away : home;
+            return (
+              <span key={i} className="mt-live-goal">
+                ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""} ({team.flag})
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       <footer className="mt-card-foot">
         <span className="mt-venue">🏟 {venue.name}{venue.city ? ` · ${venue.city}` : ""}</span>

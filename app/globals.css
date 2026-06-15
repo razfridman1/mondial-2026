@@ -4210,6 +4210,46 @@ html[data-theme="light"] .chat-panel {
   gap: 4px;
 }
 
+/* ---- Live goals strip (live ticker — informational only) ---- */
+.mt-live-goals, .mc-live-goals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+}
+.mt-live-goal, .mc-live-goal {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 59, 94, 0.08);
+  border: 1px solid rgba(255, 59, 94, 0.18);
+  color: var(--text, #e7ecff);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- MatchCard live score (stages view) ---- */
+.mc-live-score {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  color: #ffb3c0;
+}
+.mc-live-score-sep { opacity: 0.5; font-weight: 400; }
+.mc-live-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #ff7a45;
+  font-weight: 700;
+}
+
 /* ---- Empty state ---- */
 .mt-empty {
   text-align: center;

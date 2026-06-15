@@ -28,12 +28,23 @@ interface Prefs {
 
 export type MatchResult = { home: number; away: number; finishedAt: number; winner?: string };
 
+export type LiveGoal = { minute?: number; team?: "home" | "away"; player?: string; assist?: string; type?: string };
+export type LiveScore = {
+  home: number; away: number;
+  minuteLabel?: string | null;
+  goals?: LiveGoal[];
+  homeCode?: string; awayCode?: string;
+  updatedAt?: number;
+  sources?: string[];
+};
+
 interface MondialState {
   user: AppUser | null;
   loadingAuth: boolean;
   profile: UserProfile | null;
   predictions: Record<string, Prediction>;  // by matchId
   matchResults: Record<string, MatchResult>; // by matchId
+  liveScores: Record<string, LiveScore>; // by matchId — live ticker, informational only
   overrides: Record<string, BroadcastOverrideDoc>;
   groups: Group[];           // active groups the user belongs to
   leftGroups: Group[];       // groups the user has soft-left (can rejoin)
@@ -59,6 +70,7 @@ interface MondialState {
   rejoinGroup: (groupId: string) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
   refreshMatchResults: () => Promise<void>;
+  refreshLiveScores: () => Promise<void>;
   setPref: <K extends keyof Prefs>(key: K, val: Prefs[K]) => void;
   hydrateFromFirestore: (uid: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -76,6 +88,7 @@ export const useStore = create<MondialState>()(
       profile: null,
       predictions: {},
       matchResults: {},
+      liveScores: {},
       overrides: {},
       groups: [],
       leftGroups: [],
@@ -213,6 +226,15 @@ export const useStore = create<MondialState>()(
           if (r.ok) {
             const data = await r.json();
             set({ matchResults: data });
+          }
+        } catch {}
+      },
+      refreshLiveScores: async () => {
+        try {
+          const r = await fetch("/api/live-scores");
+          if (r.ok) {
+            const data = await r.json();
+            set({ liveScores: data });
           }
         } catch {}
       },
