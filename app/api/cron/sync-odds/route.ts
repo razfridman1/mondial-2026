@@ -34,14 +34,18 @@ export const maxDuration = 60;
  * odds-comparison sites — same no-fabrication policy as the results
  * fallback. Limited to AI_ODDS_BUDGET matches/run (soonest-first) to keep
  * this within the cron's time/cost budget; any still-missing matches are
- * retried on a later run.
+ * retried on a later run. Each AI-found match is written to Firestore
+ * IMMEDIATELY (not batched at the end) — a single web-search-enabled Claude
+ * call can take 20-40s, so with a budget >1 the whole request can exceed
+ * the function's time limit; writing incrementally means whatever finished
+ * before a timeout is still persisted.
  *
  * Auth: same CRON_SECRET pattern as other cron routes (no-op if unset).
  * ===================================================================*/
 
 const SECRET = process.env.CRON_SECRET || "";
 const SEASON_ID = WC_SEASON_ID; // World Cup 2026 on footballdata.io (league_id=50)
-const AI_ODDS_BUDGET = 3;
+const AI_ODDS_BUDGET = 1;
 
 export async function GET(req: Request) {
   if (SECRET) {
@@ -113,7 +117,10 @@ export async function GET(req: Request) {
     });
     if (lookup.found && lookup.odds) {
       aiFound++;
-      updates[m.id] = { ...lookup.odds, updatedAt: Date.now(), source: "ai" };
+      const entry = { ...lookup.odds, updatedAt: Date.now(), source: "ai" };
+      updates[m.id] = entry;
+      // Write immediately — don't risk losing this on a later timeout.
+      await db.collection("live_data").doc("match_odds").set({ [m.id]: entry }, { merge: true });
     } else {
       aiDebug.push({ matchId: m.id, reason: lookup.reason });
     }
