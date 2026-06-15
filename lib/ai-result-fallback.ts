@@ -468,6 +468,26 @@ export function aiGoalsToExternalGoals(goals: AiGoalsLookup["goals"], homeCode: 
   });
 }
 
+/** Convenience: map an AiGoalsLookup result to the LiveGoal[] shape expected
+ * by the client (lib/store.ts LiveGoal: {minute, team: "home"|"away",
+ * player, assist?, type?}) — used when writing live_data/live_scores.
+ * Distinct from aiGoalsToExternalGoals (which uses {teamCode, scorer} and
+ * feeds live_data/match_goals / /api/scorers); the field names differ
+ * deliberately so each consumer's shape stays self-describing. Same
+ * Firestore-no-undefined handling as aiGoalsToExternalGoals. */
+export function aiGoalsToLiveGoals(goals: AiGoalsLookup["goals"]): Array<{ minute: number | null; team: "home" | "away"; player: string; assist?: string; type?: string }> {
+  return (goals || []).map(g => {
+    const goal: { minute: number | null; team: "home" | "away"; player: string; assist?: string; type?: string } = {
+      minute: g.minute,
+      team: g.side === "HOME" ? "home" : "away",
+      player: g.scorer,
+    };
+    if (g.assist) goal.assist = g.assist;
+    if (g.type) goal.type = g.type;
+    return goal;
+  });
+}
+
 const TRANSLATE_SYSTEM_PROMPT = `אתה מומחה לתעתיק שמות שחקני כדורגל מאנגלית לעברית, בדיוק כפי שמקובל בתקשורת הספורט הישראלית (כמו ONE, ספורט 5, ynet ספורט, מאקו ספורט).
 קיבלת רשימת שמות שחקנים באנגלית. עבור כל שם, החזר את התעתיק העברי הטבעי והמדויק ביותר (כפי שהיה נכתב בכתבה ישראלית), ולא תרגום מילולי.
 החזר תשובה אך ורק כ-JSON תקין, ללא טקסט נוסף, בפורמט:

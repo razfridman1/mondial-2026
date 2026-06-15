@@ -190,18 +190,31 @@ export default function MatchesTab() {
     [overrides, simConfig, resolved, oddsMap]
   );
 
-  /* Bucketed lists */
+  /* Bucketed lists. "live"/"today" put currently-live matches FIRST so
+   * users land on them without scrolling. */
   const buckets = useMemo(() => {
     const today = todayKey();
     const live: Match[] = [];
     const todays: Match[] = [];
+    const liveOnly: Match[] = [];
     for (const m of matches) {
       const st = matchLiveStatus(m);
       const key = israelDateKey(m.utc);
       if (st === "live" || st === "pregame") live.push(m);
+      if (st === "live") liveOnly.push(m);
       if (key === today) todays.push(m);
     }
-    return { live, today: todays };
+    const byLiveFirst = (a: Match, b: Match) => {
+      const aLive = matchLiveStatus(a) === "live";
+      const bLive = matchLiveStatus(b) === "live";
+      if (aLive !== bLive) return aLive ? -1 : 1;
+      return 0; // keep existing chronological order otherwise
+    };
+    return {
+      live: [...live].sort(byLiveFirst),
+      today: [...todays].sort(byLiveFirst),
+      liveOnly,
+    };
   }, [matches, now]);
 
   const visible: Match[] = useMemo(() => {
@@ -227,12 +240,16 @@ export default function MatchesTab() {
     if (typeof window === "undefined") return;
     try { (history as any).scrollRestoration = "manual"; } catch {}
     if (section !== "stages" || didInitialScroll.current) return;
+    /* If a match is live right now, the pinned "חי כרגע" block at the very
+     * top of the page already shows it — stay at the top instead of
+     * jumping to today's section, so the live card needs no scrolling. */
+    if (buckets.liveOnly.length > 0) { didInitialScroll.current = true; return; }
     const id = requestAnimationFrame(() => {
       scrollToToday("auto");
       didInitialScroll.current = true;
     });
     return () => cancelAnimationFrame(id);
-  }, [section, matches]);
+  }, [section, matches, buckets.liveOnly.length]);
 
   /* Hide the floating "back to today" button when today's section is already
    * in view. Falls back to "any matches at all" check otherwise. */
@@ -283,7 +300,7 @@ export default function MatchesTab() {
       {/* List body */}
       <div className="mt-body" ref={bodyRef}>
         {section === "stages" ? (
-          <AllStagesSchedule matches={matches} onOpen={setOpenId} liveScores={liveScores} />
+          <AllStagesSchedule matches={matches} onOpen={setOpenId} liveScores={liveScores} liveNow={buckets.liveOnly} />
         ) : visible.length === 0 ? (
           <EmptyState section={section} />
         ) : (
@@ -336,10 +353,13 @@ function PillBtn({ active, onClick, icon, label, badge, highlight }: {
 function LiveDot() { return <span className="mt-live-dot" aria-hidden /> ; }
 
 /* ----------- All-stages schedule (classic MatchCard view) ----------- */
-function AllStagesSchedule({ matches, onOpen, liveScores }: {
+function AllStagesSchedule({ matches, onOpen, liveScores, liveNow }: {
   matches: Match[];
   onOpen: (id: string) => void;
   liveScores: Record<string, any>;
+  /** Matches currently live (status === "live") — pinned at the very top
+   *  of the page so users see them immediately, without scrolling. */
+  liveNow: Match[];
 }) {
   /* Group matches by stage, then by day (within each stage). */
   const stageBlocks = useMemo(() => {
@@ -373,6 +393,21 @@ function AllStagesSchedule({ matches, onOpen, liveScores }: {
 
   return (
     <>
+      {/* Pinned "live now" block — shown at the very top of the page when a
+       * match is currently live, so users see it immediately with no
+       * scrolling. The same match still appears in its normal chronological
+       * spot below for browsing. */}
+      {liveNow.length > 0 && (
+        <section className="mt-stage-block mt-live-pinned">
+          <h3 className="day-heading mt-live-pinned-heading">
+            <span className="mt-live-dot" aria-hidden />
+            <span>חי כרגע</span>
+          </h3>
+          <div className="card-grid">
+            {liveNow.map(m => <MatchCard key={`live-${m.id}`} match={m} onOpen={onOpen} live={liveScores[m.id]} />)}
+          </div>
+        </section>
+      )}
       {stageBlocks.map(block => (
         <section key={block.stage} className="mt-stage-block">
           {/* Stage title removed — each MatchCard shows its own stage chip. */}
@@ -466,15 +501,18 @@ function MatchCardModern({ match, result, live, onOpen }: {
   /* Live minute estimate (approx, since we don't have a real live feed):
    * minutes since kickoff capped at 90 + ET. Used as a fallback when the
    * AI live ticker (lib/sync-results-core.ts → live_data/live_scores)
-   * hasn't produced a minuteLabel yet. */
+   * hasn't produced a minuteLabel yet. First half ~45', then a ~15' halftime
+   * break before the second half kicks off, so wall-clock minute 45-60 is
+   * shown as "HT". */
   const liveMinute = useMemo(() => {
     if (status !== "live") return null;
     const m = Math.floor((Date.now() - +new Date(match.utc)) / 60000);
-    if (m >= 105) return "FT?";
-    if (m >= 90)  return `90+${m - 90}`;
-    if (m >= 60 && m < 65) return "HT";
-    if (m >= 45 && m < 50) return "HT";
-    return `${m}'`;
+    if (m < 45) return `${m}'`;
+    if (m < 60) return "HT";
+    const second = m - 15; // second-half game minute, after the HT break
+    if (second >= 105) return "FT?";
+    if (second >= 90) return `90+${second - 90}`;
+    return `${second}'`;
   }, [status, match.utc]);
 
   /* Live ticker clock label — prefer the AI-sourced minuteLabel when present. */

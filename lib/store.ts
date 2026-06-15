@@ -28,7 +28,7 @@ interface Prefs {
 
 export type MatchResult = { home: number; away: number; finishedAt: number; winner?: string };
 
-export type LiveGoal = { minute?: number; team?: "home" | "away"; player?: string; assist?: string; type?: string };
+export type LiveGoal = { minute?: number | null; team?: "home" | "away"; player?: string; assist?: string; type?: string };
 export type LiveScore = {
   home: number; away: number;
   minuteLabel?: string | null;

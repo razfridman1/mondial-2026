@@ -4280,6 +4280,18 @@ html[data-theme="light"] .chat-panel {
   gap: 14px;
   margin-bottom: 32px;
 }
+
+/* ---- Pinned "live now" block — sits above all stage blocks ---- */
+.mt-live-pinned-heading {
+  border-right: 4px solid #ff3b5e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mt-live-pinned-heading .mt-live-dot {
+  width: 10px;
+  height: 10px;
+}
 .mt-stage-title {
   display: flex;
   align-items: center;

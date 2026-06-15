@@ -6,7 +6,7 @@ import { teamCodeFromApiName } from "@/lib/team-name-mapper";
 import type { MatchResult } from "@/lib/standings";
 import { fetchExternalMatchDetails } from "@/lib/football-data-api";
 import { generateMatchSummaryNarrative } from "@/lib/matchSummary";
-import { lookupResultViaAI, lookupGoalsViaAI, lookupLiveScoreViaAI, aiGoalsToExternalGoals, type AiResultLookup } from "@/lib/ai-result-fallback";
+import { lookupResultViaAI, lookupGoalsViaAI, lookupLiveScoreViaAI, aiGoalsToExternalGoals, aiGoalsToLiveGoals, type AiResultLookup } from "@/lib/ai-result-fallback";
 
 /* =====================================================================
  * Core results-sync logic, shared by:
@@ -549,7 +549,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             home: live.home,
             away: live.away,
             minuteLabel: live.minuteLabel || null,
-            goals: aiGoalsToExternalGoals(live.goals || [], homeCode, awayCode),
+            goals: aiGoalsToLiveGoals(live.goals || []),
             homeCode,
             awayCode,
             updatedAt: now,

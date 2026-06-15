@@ -26,10 +26,15 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
   const liveMinuteFallback = useMemo(() => {
     if (status !== "live") return null;
     const m = Math.floor((Date.now() - +new Date(match.utc)) / 60000);
-    if (m >= 105) return "FT?";
-    if (m >= 90)  return `90+${m - 90}`;
-    if (m >= 45 && m < 50) return "HT";
-    return `${m}'`;
+    // Rough estimate only (used until the AI live ticker provides a real
+    // minuteLabel): first half ~45', then a ~15' halftime break before the
+    // second half kicks off, so wall-clock minute 45-60 is shown as "HT".
+    if (m < 45) return `${m}'`;
+    if (m < 60) return "HT";
+    const second = m - 15; // second-half game minute, after the HT break
+    if (second >= 105) return "FT?";
+    if (second >= 90) return `90+${second - 90}`;
+    return `${second}'`;
   }, [status, match.utc]);
   const liveClockLabel = (status === "live" && live?.minuteLabel) || liveMinuteFallback;
 
