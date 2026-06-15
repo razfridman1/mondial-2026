@@ -667,7 +667,23 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
       crossCheck: { confirmed, mismatches, fdioOnlyWrites },
       aiFallback,
       aiGoalsFallback,
-      ...(opts.debug ? { debugCandidates, matchResultsDocIds: existingResSnap.docs.map(d => d.id) } : {}),
+      ...(opts.debug ? {
+        debugCandidates,
+        matchResultsDocIds: existingResSnap.docs.map(d => d.id),
+        debugExternalMatches: externalMatches.map((ext: any) => ({
+          utcDate: ext.utcDate,
+          status: ext.status,
+          home: ext.homeTeam?.name,
+          away: ext.awayTeam?.name,
+          score: ext.score?.fullTime,
+        })),
+        debugFdio: fdio.slice(0, 30).map((fm: any) => ({
+          date: fm.date_unix ? new Date(fm.date_unix * 1000).toISOString() : fm.match_date,
+          home: fm.home_team?.team_name,
+          away: fm.away_team?.team_name,
+          status: fm.status,
+        })),
+      } : {}),
     };
   } catch (e: any) {
     return { ok: false, status: 500, error: "sync_failed", message: e?.message || String(e) };
