@@ -416,14 +416,35 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             if (lookup.winnerSide === "HOME") doc.winner = homeCode;
             else if (lookup.winnerSide === "AWAY") doc.winner = awayCode;
           }
-          await ref.set(doc, { merge: true });
-          inserted++;
-          existingResults[m.id] = {
-            home: doc.home, away: doc.away, finishedAt: doc.finishedAt, winner: doc.winner,
-            source: doc.source, verificationCount: doc.verificationCount, lastVerifiedAt: doc.lastVerifiedAt,
-          } as StoredResult;
-          console.log(`[sync-result] ${m.id} WRITTEN new result ${lookup.home}:${lookup.away} winner=${doc.winner ?? "n/a"} sources=${(lookup.sources || []).slice(0, 2).join(", ")}`);
-          aiFallbackResults.push({ matchId: m.id, candidate, found: true, written: true });
+          /* Atomic conditional write — only creates the document if it does
+           * not already exist at write time.  Two concurrent cron jobs can
+           * both reach this point with different AI responses (different
+           * search-cache hits); without a transaction, the last writer would
+           * win and potentially overwrite a correct score with a wrong one.
+           * The transaction guarantees exactly-once creation: whichever cron
+           * commits first wins; the second sees an existing doc and aborts
+           * silently — it will be picked up on its next run as "recheck". */
+          let written = false;
+          await db.runTransaction(async (tx) => {
+            const snap = await tx.get(ref);
+            if (snap.exists) {
+              console.log(`[sync-result] ${m.id} race: result already written by concurrent job (stored=${snap.data()?.home}:${snap.data()?.away}), skipping`);
+              return;
+            }
+            tx.set(ref, doc);
+            written = true;
+          });
+          if (written) {
+            inserted++;
+            existingResults[m.id] = {
+              home: doc.home, away: doc.away, finishedAt: doc.finishedAt, winner: doc.winner,
+              source: doc.source, verificationCount: doc.verificationCount, lastVerifiedAt: doc.lastVerifiedAt,
+            } as StoredResult;
+            console.log(`[sync-result] ${m.id} WRITTEN new result ${lookup.home}:${lookup.away} winner=${doc.winner ?? "n/a"} sources=${(lookup.sources || []).slice(0, 2).join(", ")}`);
+            aiFallbackResults.push({ matchId: m.id, candidate, found: true, written: true });
+          } else {
+            aiFallbackResults.push({ matchId: m.id, candidate, found: true, written: false, reason: "race_concurrent_write" });
+          }
           /* Keep live_data/live_scores entry so finished match cards can
            * still display goal scorers. The UI ignores the live score
            * once match_results is written (isFinished=true takes precedence). */
