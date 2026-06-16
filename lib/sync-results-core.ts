@@ -148,6 +148,18 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
     });
     const resolved = resolveAllStages(existingResults);
 
+    /* Pre-fetch the live scores document BEFORE the result loop so the
+     * reconciliation layer in the result loop can cross-validate each
+     * AI result lookup against the accumulated live score for the same
+     * match.  This is the same single Firestore read that was previously
+     * only done inside the live tracking section; hoisting it here gives
+     * both loops access without an extra round-trip. */
+    let existingLiveScores: Record<string, any> = {};
+    try {
+      const liveSnap = await db.collection("live_data").doc("live_scores").get();
+      if (liveSnap.exists) existingLiveScores = liveSnap.data() ?? {};
+    } catch { /* read error — proceed without cross-validation for this run */ }
+
     /* ----- Fetch football-data.org (optional) -------------------------
      * Used ONLY for goal breakdowns + post-match summary narratives below
      * (summaryCandidates). It is NOT used to determine match_results — see
@@ -416,6 +428,43 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             if (lookup.winnerSide === "HOME") doc.winner = homeCode;
             else if (lookup.winnerSide === "AWAY") doc.winner = awayCode;
           }
+          /* ---- Reconciliation: cross-validate against accumulated live score ----
+           * live_data/live_scores[matchId] has been updated every cron minute
+           * during the match with Math.max anti-regression protection, so it
+           * holds the highest score any AI call has returned throughout the
+           * match — an independent witness.  If that accumulated score is
+           * HIGHER than what this result lookup just returned, the result
+           * lookup almost certainly hit a stale search-cache page.  Defer
+           * this write and retry on the next run (the result lookup will
+           * eventually return the higher score once search caches refresh).
+           * If the accumulated live score is LOWER or equal, the result
+           * lookup is at least as current — proceed to write. */
+          const liveEntry = existingLiveScores[m.id];
+          if (
+            liveEntry &&
+            typeof liveEntry.home === "number" &&
+            typeof liveEntry.away === "number"
+          ) {
+            const liveH: number = liveEntry.home;
+            const liveA: number = liveEntry.away;
+            const resultH: number = lookup.home!;
+            const resultA: number = lookup.away!;
+            if (liveH > resultH || liveA > resultA) {
+              console.log(
+                `[sync-result] ${m.id} RECONCILIATION DEFERRED — live accumulated=${liveH}:${liveA} > result=${resultH}:${resultA}; result lookup is stale, will retry`
+              );
+              aiFallbackResults.push({
+                matchId: m.id, candidate, found: true, written: false,
+                reason: `live_higher_than_result live=${liveH}:${liveA} result=${resultH}:${resultA}`,
+              });
+              resultCallsUsed--; // don't penalise the budget for a deferred run
+              continue;
+            }
+            console.log(
+              `[sync-result] ${m.id} reconciliation: live=${liveH}:${liveA} result=${resultH}:${resultA} — ${liveH === resultH && liveA === resultA ? "AGREE (high confidence)" : "result higher (may include ET/pens), trusting result"}`
+            );
+          }
+
           /* Atomic conditional write — only creates the document if it does
            * not already exist at write time.  Two concurrent cron jobs can
            * both reach this point with different AI responses (different
@@ -508,16 +557,44 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
               else if (lookup.winnerSide === "AWAY" && awayCode) correction.winner = awayCode;
               else correction.winner = null;
             }
-            await ref.set(correction, { merge: true });
-            updated++;
-            existingResults[m.id] = {
-              ...existing!, home: lookup.home, away: lookup.away,
-              winner: correction.winner ?? existing!.winner,
-              source: "ai-websearch", verificationCount: 1, lastVerifiedAt: now,
-              finalCheckedAt: now, aiMismatch: undefined,
-            };
-            console.log(`[sync-result] ${m.id} finalCheck CORRECTED ${existing!.home}:${existing!.away} → ${lookup.home}:${lookup.away}`);
-            aiFallbackResults.push({ matchId: m.id, candidate, found: true, corrected: true, from: { home: existing!.home, away: existing!.away }, to: { home: lookup.home, away: lookup.away } });
+            /* Atomic correction write — prevents two concurrent crons that
+             * both reach finalCheck from writing different AI responses.
+             * The transaction re-reads the document: if finalCheckedAt is
+             * already set (written by the concurrent job), this job aborts.
+             * Also blocks correction if the document was deleted or if
+             * someone set setByAdmin between our read and write. */
+            let corrected = false;
+            await db.runTransaction(async (tx) => {
+              const snap = await tx.get(ref);
+              if (!snap.exists) {
+                console.log(`[sync-result] ${m.id} finalCheck correction aborted — doc missing`);
+                return;
+              }
+              const live = snap.data() as any;
+              if (live.setByAdmin) {
+                console.log(`[sync-result] ${m.id} finalCheck correction aborted — setByAdmin set between read and write`);
+                return;
+              }
+              if (live.finalCheckedAt) {
+                console.log(`[sync-result] ${m.id} finalCheck correction aborted — already finalized by concurrent job (stored=${live.home}:${live.away})`);
+                return;
+              }
+              tx.set(ref, correction, { merge: true });
+              corrected = true;
+            });
+            if (corrected) {
+              updated++;
+              existingResults[m.id] = {
+                ...existing!, home: lookup.home, away: lookup.away,
+                winner: correction.winner ?? existing!.winner,
+                source: "ai-websearch", verificationCount: 1, lastVerifiedAt: now,
+                finalCheckedAt: now, aiMismatch: undefined,
+              };
+              console.log(`[sync-result] ${m.id} finalCheck CORRECTED ${existing!.home}:${existing!.away} → ${lookup.home}:${lookup.away}`);
+              aiFallbackResults.push({ matchId: m.id, candidate, found: true, corrected: true, from: { home: existing!.home, away: existing!.away }, to: { home: lookup.home, away: lookup.away } });
+            } else {
+              aiFallbackResults.push({ matchId: m.id, candidate, found: true, corrected: false, reason: "race_or_guard_blocked" });
+            }
           }
         }
       }
@@ -544,16 +621,8 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
     const liveUpdates: Record<string, any> = {};
     const liveFallback: any[] = [];
     if (process.env.ANTHROPIC_API_KEY) {
-      /* Pre-fetch existing live scores so we can merge goals rather than
-       * replacing them. The AI may return a subset of goals on any given
-       * call (e.g., stale halftime search missing second-half goals), so we
-       * accumulate: keep any goal seen in a prior sync that the new call
-       * doesn't return. */
-      let existingLiveScores: Record<string, any> = {};
-      try {
-        const snap = await db.collection("live_data").doc("live_scores").get();
-        if (snap.exists) existingLiveScores = snap.data() ?? {};
-      } catch { /* read error — proceed without merge, no data loss beyond this run */ }
+      /* existingLiveScores was pre-fetched above (before the result loop)
+       * so both loops share the same snapshot without an extra read. */
 
       function mergeGoals(
         existing: Array<{ minute?: number | null; team?: string; player?: string; assist?: string; type?: string }>,
