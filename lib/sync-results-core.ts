@@ -106,6 +106,158 @@ export interface SyncResult {
   [k: string]: any;
 }
 
+
+/* =====================================================================
+ * resolveMatchTruth — deterministic Truth Engine for match score
+ * resolution.  Pure function: no I/O, no side effects, fully testable.
+ *
+ * Called from the result loop for candidate="new" before any DB write.
+ * Encapsulates all source-ranking, regression-blocking, and cross-
+ * validation rules in one place so behaviour is explicit and auditable.
+ *
+ * ADMIN LOCK IS ABSOLUTE: if dbState.setByAdmin is true, this function
+ * always returns action="SKIP" regardless of any incoming source.
+ * The super-admin's manual result is the final authority — no automated
+ * sync may ever override it.  This rule cannot be changed here.
+ * ===================================================================*/
+interface TruthResolution {
+  action: "WRITE" | "DEFER" | "SKIP";
+  home?: number;
+  away?: number;
+  /** Start verificationCount at 2 when two independent sources agree —
+   *  reaches the verified:true threshold (3) in one fewer recheck cycle,
+   *  locking a correct result faster. */
+  initialVerificationCount: number;
+  confidence: number; // 0-100, for logging/audit only
+  reason: string;
+}
+
+function resolveMatchTruth(
+  aiResult: { found: boolean; home?: number | null; away?: number | null } | null,
+  liveAccum: { home: number; away: number } | null,
+  dbState: { home?: number; away?: number; setByAdmin?: boolean; finalCheckedAt?: number } | null,
+): TruthResolution {
+  /* RULE 0 — ADMIN LOCK (absolute, immutable rule per product requirement):
+   * A result set by the super-admin is the single source of truth.  No
+   * external data, no AI output, and no automated process may ever override
+   * it.  The only way to change it is another explicit admin action. */
+  if (dbState?.setByAdmin) {
+    return { action: "SKIP", reason: "ADMIN_LOCK", initialVerificationCount: 0, confidence: 100 };
+  }
+
+  /* RULE 1 — FINAL LOCK: once a result has completed its full verification
+   * cycle (finalCheckedAt set), it is permanently immutable by automation.
+   * This mirrors the candidate-selection guard in the outer loop; keeping
+   * it here makes the pure function self-contained and testable. */
+  if (dbState?.finalCheckedAt) {
+    return { action: "SKIP", reason: "FT_FINAL_CHECKED", initialVerificationCount: 0, confidence: 100 };
+  }
+
+  /* RULE 6 — NULL / INVALID SAFETY: any null, partial, non-integer, or
+   * negative score is silently ignored.  Valid DB state is never overwritten
+   * by empty or malformed source data. */
+  if (
+    !aiResult ||
+    !aiResult.found ||
+    aiResult.home == null ||
+    aiResult.away == null ||
+    !Number.isInteger(aiResult.home) ||
+    !Number.isInteger(aiResult.away) ||
+    aiResult.home < 0 ||
+    aiResult.away < 0
+  ) {
+    return { action: "DEFER", reason: "SOURCE_NULL_OR_INVALID", initialVerificationCount: 0, confidence: 0 };
+  }
+
+  const resultH = aiResult.home;
+  const resultA = aiResult.away;
+
+  /* RULE 2 — NO REGRESSION: an incoming score may never be lower than the
+   * score currently stored in the DB (for either team independently).  The
+   * live accumulator already enforces this at the per-observation level via
+   * Math.max; this rule adds the same guarantee at the final-result write
+   * level, catching cases where the AI searched too early and returned a
+   * lower score than what a prior result write (or recheck) already stored.
+   * Only applies when a DB result already exists (for candidate="new" with
+   * no prior DB entry, dbState is null and this check is vacuously safe). */
+  if (dbState && typeof dbState.home === "number" && typeof dbState.away === "number") {
+    if (resultH < dbState.home || resultA < dbState.away) {
+      return {
+        action: "DEFER",
+        reason: `REGRESSION_BLOCKED stored=${dbState.home}:${dbState.away} incoming=${resultH}:${resultA}`,
+        initialVerificationCount: 0,
+        confidence: 0,
+      };
+    }
+  }
+
+  /* RULES 4+5 — SOURCE AGREEMENT + LIVE vs FINAL RECONCILIATION:
+   * The live accumulator is an independent second observation of the score:
+   * it is produced by a different AI prompt (lookupLiveScoreViaAI vs
+   * lookupResultViaAI), sampled at different moments throughout the match,
+   * and Math.max-protected so it represents the HIGH-WATER MARK across all
+   * live observations.
+   *
+   * Three cases when a live accumulator entry exists:
+   *
+   *   liveAccum > aiResult  (either team)
+   *     → The result lookup hit a stale search-cache page.  The live
+   *       accumulator, which has been anti-regression protected for 2+ hours,
+   *       shows a higher score that the result lookup hasn't caught up to yet.
+   *       DEFER — retry on the next cron run.  The result lookup will
+   *       eventually converge to the correct higher score.
+   *
+   *   liveAccum === aiResult  (both teams exactly)
+   *     → Two independent AI observations AGREE.  This is the highest
+   *       confidence state the system can reach automatically.
+   *       WRITE with initialVerificationCount=2 — reaches the verified:true
+   *       threshold (≥3) in one fewer recheck cycle, locking the correct
+   *       result ~3 minutes sooner.
+   *
+   *   aiResult > liveAccum  (either team)
+   *     → The result lookup returned a higher score than the live tracker.
+   *       This is expected for knockout matches that went to extra time or
+   *       penalties: the live tracker may have stopped early or missed late
+   *       goals, while the dedicated final-result prompt captures the full
+   *       score.  WRITE — trust the result lookup.
+   *
+   * If no live accumulator exists (first cron run after buffer, or read
+   * failed), fall through to the single-source path below. */
+  if (liveAccum) {
+    if (liveAccum.home > resultH || liveAccum.away > resultA) {
+      return {
+        action: "DEFER",
+        reason: `LIVE_ACCUMULATED_HIGHER live=${liveAccum.home}:${liveAccum.away} result=${resultH}:${resultA}`,
+        initialVerificationCount: 0,
+        confidence: 0,
+      };
+    }
+    const sourcesAgree = liveAccum.home === resultH && liveAccum.away === resultA;
+    return {
+      action: "WRITE",
+      home: resultH,
+      away: resultA,
+      initialVerificationCount: sourcesAgree ? 2 : 1,
+      confidence: sourcesAgree ? 80 : 60,
+      reason: sourcesAgree
+        ? "SOURCES_AGREE_HIGH_CONFIDENCE"
+        : `RESULT_HIGHER_THAN_LIVE result=${resultH}:${resultA} live=${liveAccum.home}:${liveAccum.away}`,
+    };
+  }
+
+  /* Single source only (no live accumulator available) — proceed at base
+   * confidence.  The recheck cycle (~3 min, ~1h) provides eventual
+   * confirmation and corrects any wrong first-run response. */
+  return {
+    action: "WRITE",
+    home: resultH,
+    away: resultA,
+    initialVerificationCount: 1,
+    confidence: 50,
+    reason: "AI_RESULT_NO_LIVE_CROSS_CHECK",
+  };
+}
+
 export async function runResultsSync(opts: { force?: boolean; debug?: boolean } = {}): Promise<SyncResult> {
   console.log(`[sync] runResultsSync start force=${!!opts.force} debug=${!!opts.debug}`);
   const apiKey = process.env.FOOTBALL_API_KEY;
@@ -428,42 +580,25 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             if (lookup.winnerSide === "HOME") doc.winner = homeCode;
             else if (lookup.winnerSide === "AWAY") doc.winner = awayCode;
           }
-          /* ---- Reconciliation: cross-validate against accumulated live score ----
-           * live_data/live_scores[matchId] has been updated every cron minute
-           * during the match with Math.max anti-regression protection, so it
-           * holds the highest score any AI call has returned throughout the
-           * match — an independent witness.  If that accumulated score is
-           * HIGHER than what this result lookup just returned, the result
-           * lookup almost certainly hit a stale search-cache page.  Defer
-           * this write and retry on the next run (the result lookup will
-           * eventually return the higher score once search caches refresh).
-           * If the accumulated live score is LOWER or equal, the result
-           * lookup is at least as current — proceed to write. */
+          /* Truth Engine — deterministic reconciliation of all score sources.
+           * Replaces the previous inline cross-validation block.  The pure
+           * function enforces: admin lock, FT lock, null safety, no
+           * regression, source agreement bonus, and live/final staleness
+           * detection — in that fixed priority order, every run. */
           const liveEntry = existingLiveScores[m.id];
-          if (
-            liveEntry &&
-            typeof liveEntry.home === "number" &&
-            typeof liveEntry.away === "number"
-          ) {
-            const liveH: number = liveEntry.home;
-            const liveA: number = liveEntry.away;
-            const resultH: number = lookup.home!;
-            const resultA: number = lookup.away!;
-            if (liveH > resultH || liveA > resultA) {
-              console.log(
-                `[sync-result] ${m.id} RECONCILIATION DEFERRED — live accumulated=${liveH}:${liveA} > result=${resultH}:${resultA}; result lookup is stale, will retry`
-              );
-              aiFallbackResults.push({
-                matchId: m.id, candidate, found: true, written: false,
-                reason: `live_higher_than_result live=${liveH}:${liveA} result=${resultH}:${resultA}`,
-              });
-              resultCallsUsed--; // don't penalise the budget for a deferred run
-              continue;
-            }
-            console.log(
-              `[sync-result] ${m.id} reconciliation: live=${liveH}:${liveA} result=${resultH}:${resultA} — ${liveH === resultH && liveA === resultA ? "AGREE (high confidence)" : "result higher (may include ET/pens), trusting result"}`
-            );
+          const liveAccumForEngine = (liveEntry && typeof liveEntry.home === "number" && typeof liveEntry.away === "number")
+            ? { home: liveEntry.home as number, away: liveEntry.away as number }
+            : null;
+          const resolution = resolveMatchTruth(lookup, liveAccumForEngine, null);
+          console.log(`[sync-result] ${m.id} truth-engine action=${resolution.action} confidence=${resolution.confidence} reason=${resolution.reason}`);
+          if (resolution.action !== "WRITE") {
+            if (resolution.action === "DEFER") resultCallsUsed--; // don't penalise budget for deferred run
+            aiFallbackResults.push({ matchId: m.id, candidate, found: true, written: false, reason: resolution.reason });
+            continue;
           }
+          // Use engine's initialVerificationCount — 2 when two sources agree (high confidence)
+          doc.verificationCount = resolution.initialVerificationCount;
+
 
           /* Atomic conditional write — only creates the document if it does
            * not already exist at write time.  Two concurrent cron jobs can
@@ -538,62 +673,73 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             console.log(`[sync-result] ${m.id} finalCheck confirmed ${existing!.home}:${existing!.away} — result locked`);
             aiFallbackResults.push({ matchId: m.id, candidate, found: true, confirmed: true });
           } else {
-            const correction: any = {
-              home: lookup.home,
-              away: lookup.away,
-              source: "ai-websearch",
-              aiSources: lookup.sources || [],
-              verificationCount: 1,
-              lastVerifiedAt: now,
-              finalCheckedAt: now,
-              verified: true,
-              correctedAt: now,
-              correctedFrom: { home: existing!.home, away: existing!.away },
-              aiMismatch: null,
-              needsReview: false,
-            };
-            if (isKO) {
-              if (lookup.winnerSide === "HOME" && homeCode) correction.winner = homeCode;
-              else if (lookup.winnerSide === "AWAY" && awayCode) correction.winner = awayCode;
-              else correction.winner = null;
-            }
-            /* Atomic correction write — prevents two concurrent crons that
-             * both reach finalCheck from writing different AI responses.
-             * The transaction re-reads the document: if finalCheckedAt is
-             * already set (written by the concurrent job), this job aborts.
-             * Also blocks correction if the document was deleted or if
-             * someone set setByAdmin between our read and write. */
-            let corrected = false;
-            await db.runTransaction(async (tx) => {
-              const snap = await tx.get(ref);
-              if (!snap.exists) {
-                console.log(`[sync-result] ${m.id} finalCheck correction aborted — doc missing`);
-                return;
-              }
-              const live = snap.data() as any;
-              if (live.setByAdmin) {
-                console.log(`[sync-result] ${m.id} finalCheck correction aborted — setByAdmin set between read and write`);
-                return;
-              }
-              if (live.finalCheckedAt) {
-                console.log(`[sync-result] ${m.id} finalCheck correction aborted — already finalized by concurrent job (stored=${live.home}:${live.away})`);
-                return;
-              }
-              tx.set(ref, correction, { merge: true });
-              corrected = true;
-            });
-            if (corrected) {
-              updated++;
-              existingResults[m.id] = {
-                ...existing!, home: lookup.home, away: lookup.away,
-                winner: correction.winner ?? existing!.winner,
-                source: "ai-websearch", verificationCount: 1, lastVerifiedAt: now,
-                finalCheckedAt: now, aiMismatch: undefined,
-              };
-              console.log(`[sync-result] ${m.id} finalCheck CORRECTED ${existing!.home}:${existing!.away} → ${lookup.home}:${lookup.away}`);
-              aiFallbackResults.push({ matchId: m.id, candidate, found: true, corrected: true, from: { home: existing!.home, away: existing!.away }, to: { home: lookup.home, away: lookup.away } });
+            /* REGRESSION CHECK before finalCheck correction: never allow
+             * the 1h correction pass to write a score lower than what is
+             * already stored (admin lock is checked first in the outer guard;
+             * this catches AI stale responses at the correction stage). */
+            if (
+              typeof lookup.home === "number" && typeof lookup.away === "number" &&
+              (lookup.home < existing!.home || lookup.away < existing!.away)
+            ) {
+              console.log(`[sync-result] ${m.id} finalCheck regression blocked: stored=${existing!.home}:${existing!.away} ai=${lookup.home}:${lookup.away} — deferring correction`);
+              aiFallbackResults.push({ matchId: m.id, candidate, found: true, corrected: false, reason: `finalCheck_regression_blocked stored=${existing!.home}:${existing!.away} ai=${lookup.home}:${lookup.away}` });
             } else {
-              aiFallbackResults.push({ matchId: m.id, candidate, found: true, corrected: false, reason: "race_or_guard_blocked" });
+              const correction: any = {
+                home: lookup.home,
+                away: lookup.away,
+                source: "ai-websearch",
+                aiSources: lookup.sources || [],
+                verificationCount: 1,
+                lastVerifiedAt: now,
+                finalCheckedAt: now,
+                verified: true,
+                correctedAt: now,
+                correctedFrom: { home: existing!.home, away: existing!.away },
+                aiMismatch: null,
+                needsReview: false,
+              };
+              if (isKO) {
+                if (lookup.winnerSide === "HOME" && homeCode) correction.winner = homeCode;
+                else if (lookup.winnerSide === "AWAY" && awayCode) correction.winner = awayCode;
+                else correction.winner = null;
+              }
+              /* Atomic correction write — prevents two concurrent crons that
+               * both reach finalCheck from writing different AI responses.
+               * The transaction re-reads the document: if finalCheckedAt is
+               * already set (written by the concurrent job) or if setByAdmin
+               * was set between our read and write, this job aborts safely. */
+              let corrected = false;
+              await db.runTransaction(async (tx) => {
+                const snap = await tx.get(ref);
+                if (!snap.exists) {
+                  console.log(`[sync-result] ${m.id} finalCheck correction aborted — doc missing`);
+                  return;
+                }
+                const live = snap.data() as any;
+                if (live.setByAdmin) {
+                  console.log(`[sync-result] ${m.id} finalCheck correction aborted — setByAdmin set between read and write`);
+                  return;
+                }
+                if (live.finalCheckedAt) {
+                  console.log(`[sync-result] ${m.id} finalCheck correction aborted — already finalized by concurrent job (stored=${live.home}:${live.away})`);
+                  return;
+                }
+                tx.set(ref, correction, { merge: true });
+                corrected = true;
+              });
+              if (corrected) {
+                updated++;
+                existingResults[m.id] = {
+                  ...existing!, home: lookup.home, away: lookup.away,
+                  winner: correction.winner ?? existing!.winner,
+                  source: "ai-websearch", verificationCount: 1, lastVerifiedAt: now,
+                  finalCheckedAt: now, aiMismatch: undefined,
+                };
+                console.log(`[sync-result] ${m.id} finalCheck CORRECTED ${existing!.home}:${existing!.away} → ${lookup.home}:${lookup.away}`);
+                aiFallbackResults.push({ matchId: m.id, candidate, found: true, corrected: true, from: { home: existing!.home, away: existing!.away }, to: { home: lookup.home, away: lookup.away } });
+              } else {
+                aiFallbackResults.push({ matchId: m.id, candidate, found: true, corrected: false, reason: "race_or_guard_blocked" });
+              }
             }
           }
         }
@@ -798,10 +944,8 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
 
       /* Up to 3 AI lookups per run (instead of just 1): a match whose
        * goalscorers the AI can't find yet (found:false) must NOT permanently
-       * block later matches in the list — previously this `break`'d after
-       * the very first candidate regardless of outcome, so a single
-       * stubborn match (e.g. M001) starved every match after it of goal
-       * data forever. Failed lookups are simply retried on a later run. */
+       * block later matches in the list. Failed lookups are simply retried
+       * on a later run. */
       const aiGoalsResults: any[] = [];
       let aiCallsUsed = 0;
       for (const gc of goalCandidates) {
