@@ -51,13 +51,13 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
    * so each list can render under that team's own flag. */
   const { homeGoals, awayGoals } = useMemo(() => {
     const goals = live?.goals;
-    if (!showLiveTicker || !goals || goals.length === 0) return { homeGoals: [], awayGoals: [] };
+    if (!goals || goals.length === 0) return { homeGoals: [], awayGoals: [] };
     const sorted = [...goals].sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0));
     return {
       homeGoals: sorted.filter(g => g.team !== "away"),
       awayGoals: sorted.filter(g => g.team === "away"),
     };
-  }, [showLiveTicker, live]);
+  }, [live]);
 
   /* Admin-only inline "set final result" editor — lets the admin record
    * the final score directly from the match card the moment a match ends,

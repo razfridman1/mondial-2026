@@ -107,6 +107,7 @@ export interface SyncResult {
 }
 
 export async function runResultsSync(opts: { force?: boolean; debug?: boolean } = {}): Promise<SyncResult> {
+  console.log(`[sync] runResultsSync start force=${!!opts.force} debug=${!!opts.debug}`);
   const apiKey = process.env.FOOTBALL_API_KEY;
   const hasFD = !!apiKey;
   const hasAI = !!process.env.ANTHROPIC_API_KEY;
@@ -319,7 +320,10 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
         if (now < kickoff + buffer) continue;
 
         const existing = existingResults[m.id];
-        if (existing?.setByAdmin) continue;
+        if (existing?.setByAdmin) {
+          console.log(`[sync-result] ${m.id} skipped — setByAdmin lock, stored=${existing.home}:${existing.away}`);
+          continue;
+        }
 
         let candidate: "new" | "recheck" | "finalCheck" | null = null;
         if (!existing) candidate = "new";
@@ -386,9 +390,13 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
         resultCallsUsed++;
 
         if (!lookup.found || lookup.home == null || lookup.away == null || !homeCode || !awayCode) {
+          const reason = lookup.reason || (!homeCode || !awayCode ? "missing_team_code" : "found_false");
+          console.log(`[sync-result] ${m.id} candidate=${candidate} found=false reason=${reason}`);
           aiFallbackResults.push({ matchId: m.id, candidate, found: false, reason: lookup.reason || (!homeCode || !awayCode ? "missing_team_code" : undefined) });
           continue; // try other matches this run too — retried on a later run
         }
+
+        console.log(`[sync-result] ${m.id} candidate=${candidate} provider=ai-websearch score=${lookup.home}:${lookup.away} prev=${existing ? `${existing.home}:${existing.away}` : "none"}`);
 
         const ref = db.collection("match_results").doc(m.id);
         if (candidate === "new") {
@@ -414,18 +422,11 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             home: doc.home, away: doc.away, finishedAt: doc.finishedAt, winner: doc.winner,
             source: doc.source, verificationCount: doc.verificationCount, lastVerifiedAt: doc.lastVerifiedAt,
           } as StoredResult;
+          console.log(`[sync-result] ${m.id} WRITTEN new result ${lookup.home}:${lookup.away} winner=${doc.winner ?? "n/a"} sources=${(lookup.sources || []).slice(0, 2).join(", ")}`);
           aiFallbackResults.push({ matchId: m.id, candidate, found: true, written: true });
-          /* The match has now officially ended — drop the (now-stale) live
-           * ticker entry, if any. live_data/live_scores is purely
-           * informational and never feeds predictions; once match_results
-           * exists the UI shows that instead. */
-          try {
-            await db.collection("live_data").doc("live_scores").set(
-              { [m.id]: FieldValue.delete() }, { merge: true }
-            );
-          } catch {
-            // best-effort cleanup only
-          }
+          /* Keep live_data/live_scores entry so finished match cards can
+           * still display goal scorers. The UI ignores the live score
+           * once match_results is written (isFinished=true takes precedence). */
         } else if (candidate === "recheck") {
           const sameScore = existing!.home === lookup.home && existing!.away === lookup.away;
           if (sameScore) {
@@ -435,6 +436,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             await ref.set(update, { merge: true });
             updated++;
             existingResults[m.id] = { ...existing!, verificationCount: newCount, lastVerifiedAt: now };
+            console.log(`[sync-result] ${m.id} recheck confirmed ${existing!.home}:${existing!.away} verificationCount=${newCount}`);
             aiFallbackResults.push({ matchId: m.id, candidate, found: true, confirmed: true });
           } else {
             await ref.set({
@@ -444,6 +446,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             }, { merge: true });
             updated++;
             existingResults[m.id] = { ...existing!, aiMismatch: { home: lookup.home, away: lookup.away }, lastVerifiedAt: now };
+            console.log(`[sync-result] ${m.id} recheck MISMATCH stored=${existing!.home}:${existing!.away} ai=${lookup.home}:${lookup.away} — flagged needsReview`);
             aiFallbackResults.push({ matchId: m.id, candidate, found: true, mismatch: true });
           }
         } else {
@@ -462,6 +465,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             }, { merge: true });
             updated++;
             existingResults[m.id] = { ...existing!, finalCheckedAt: now, aiMismatch: undefined };
+            console.log(`[sync-result] ${m.id} finalCheck confirmed ${existing!.home}:${existing!.away} — result locked`);
             aiFallbackResults.push({ matchId: m.id, candidate, found: true, confirmed: true });
           } else {
             const correction: any = {
@@ -491,6 +495,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
               source: "ai-websearch", verificationCount: 1, lastVerifiedAt: now,
               finalCheckedAt: now, aiMismatch: undefined,
             };
+            console.log(`[sync-result] ${m.id} finalCheck CORRECTED ${existing!.home}:${existing!.away} → ${lookup.home}:${lookup.away}`);
             aiFallbackResults.push({ matchId: m.id, candidate, found: true, corrected: true, from: { home: existing!.home, away: existing!.away }, to: { home: lookup.home, away: lookup.away } });
           }
         }
@@ -573,18 +578,42 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
         if (live.found && live.home != null && live.away != null) {
           const newGoals = aiGoalsToLiveGoals(live.goals || []);
           const prevGoals: any[] = existingLiveScores[m.id]?.goals ?? [];
+          const mergedGoals = mergeGoals(prevGoals, newGoals);
+
+          /* Never reduce a live score — the AI may return a stale cached
+           * result from a search engine that hasn't updated yet.  We keep
+           * whichever score is higher for each side independently.
+           * minuteLabel is accepted from the AI only when its numeric score
+           * is at least as high as what we already have (i.e. the feed is
+           * at least as current); otherwise we keep the stored label so the
+           * clock stays consistent with the higher score we're preserving. */
+          const prevHome: number = existingLiveScores[m.id]?.home ?? 0;
+          const prevAway: number = existingLiveScores[m.id]?.away ?? 0;
+          const safeHome = Math.max(live.home, prevHome);
+          const safeAway = Math.max(live.away, prevAway);
+          const scoreAdvanced = live.home >= prevHome && live.away >= prevAway;
+          const safeMinuteLabel = scoreAdvanced
+            ? (live.minuteLabel || null)
+            : (existingLiveScores[m.id]?.minuteLabel ?? null);
+
+          if (!scoreAdvanced) {
+            console.log(`[sync-live] ${m.id} score regression blocked: AI=${live.home}:${live.away} stored=${prevHome}:${prevAway} — keeping stored score, keeping stored minuteLabel`);
+          }
+
           liveUpdates[m.id] = {
-            home: live.home,
-            away: live.away,
-            minuteLabel: live.minuteLabel || null,
-            goals: mergeGoals(prevGoals, newGoals),
+            home: safeHome,
+            away: safeAway,
+            minuteLabel: safeMinuteLabel,
+            goals: mergedGoals,
             homeCode,
             awayCode,
             updatedAt: now,
             sources: live.sources || [],
           };
-          liveFallback.push({ matchId: m.id, found: true, score: `${live.home}:${live.away}`, minuteLabel: live.minuteLabel, goals: liveUpdates[m.id].goals.length });
+          console.log(`[sync-live] ${m.id} ${homeName} vs ${awayName}: score=${safeHome}:${safeAway} label=${safeMinuteLabel} goals=${mergedGoals.length}`);
+          liveFallback.push({ matchId: m.id, found: true, score: `${safeHome}:${safeAway}`, minuteLabel: safeMinuteLabel, goals: mergedGoals.length });
         } else {
+          console.log(`[sync-live] ${m.id} ${homeName} vs ${awayName}: found=false reason=${live.reason ?? "unknown"}`);
           liveFallback.push({ matchId: m.id, found: false, reason: live.reason });
         }
       }

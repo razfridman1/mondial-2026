@@ -517,13 +517,13 @@ function MatchCardModern({ match, result, live, onOpen }: {
    * can render under that team's own flag. */
   const { homeGoals, awayGoals } = useMemo(() => {
     const goals = live?.goals;
-    if (!showLiveTicker || !goals || goals.length === 0) return { homeGoals: [], awayGoals: [] };
+    if (!goals || goals.length === 0) return { homeGoals: [], awayGoals: [] };
     const sorted = [...goals].sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0));
     return {
       homeGoals: sorted.filter(g => g.team !== "away"),
       awayGoals: sorted.filter(g => g.team === "away"),
     };
-  }, [showLiveTicker, live]);
+  }, [live]);
 
   return (
     <article className={`mt-card status-${status}`}
