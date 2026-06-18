@@ -300,7 +300,7 @@ export default function MatchesTab() {
       {/* List body */}
       <div className="mt-body" ref={bodyRef}>
         {section === "stages" ? (
-          <AllStagesSchedule matches={matches} onOpen={setOpenId} liveScores={liveScores} liveNow={buckets.liveOnly} />
+          <AllStagesSchedule matches={matches} onOpen={setOpenId} liveScores={liveScores} liveNow={buckets.liveOnly} matchResults={matchResults} />
         ) : visible.length === 0 ? (
           <EmptyState section={section} />
         ) : (
@@ -353,35 +353,40 @@ function PillBtn({ active, onClick, icon, label, badge, highlight }: {
 function LiveDot() { return <span className="mt-live-dot" aria-hidden /> ; }
 
 /* ----------- All-stages schedule (classic MatchCard view) ----------- */
-function AllStagesSchedule({ matches, onOpen, liveScores, liveNow }: {
+function AllStagesSchedule({ matches, onOpen, liveScores, liveNow, matchResults }: {
   matches: Match[];
   onOpen: (id: string) => void;
   liveScores: Record<string, any>;
-  /** Matches currently live (status === "live") — pinned at the very top
-   *  of the page so users see them immediately, without scrolling. */
   liveNow: Match[];
+  matchResults: Record<string, { home: number; away: number; finishedAt: number }>;
 }) {
-  /* Group matches by stage, then by day (within each stage). */
-  const stageBlocks = useMemo(() => {
-    return STAGE_ORDER.map(sid => {
-      const list = matches.filter(m => m.stage === sid)
-        .sort((a, b) => +new Date(a.utc) - +new Date(b.utc));
-      const byDay = new Map<string, Match[]>();
-      for (const m of list) {
-        const k = israelDateKey(m.utc);
-        if (!byDay.has(k)) byDay.set(k, []);
-        byDay.get(k)!.push(m);
-      }
-      /* Show only today and future days — past days are hidden. */
-      const today = todayKey();
-      const entries = [...byDay.entries()]
-        .filter(([day]) => day >= today)
-        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-      return { stage: sid, byDay: entries, count: list.length };
-    }).filter(b => b.count > 0);
-  }, [matches]);
+  const today = todayKey();
+  const liveIds = useMemo(() => new Set(liveNow.map(m => m.id)), [liveNow]);
 
-  if (stageBlocks.length === 0) {
+  /* Three ordered sections: finished today → live now → upcoming */
+  const { finishedToday, upcoming } = useMemo(() => {
+    const chrono = (a: Match, b: Match) => +new Date(a.utc) - +new Date(b.utc);
+    const finishedToday = matches
+      .filter(m => israelDateKey(m.utc) === today && !!matchResults[m.id] && !liveIds.has(m.id))
+      .sort(chrono);
+    const upcoming = matches
+      .filter(m => !matchResults[m.id] && !liveIds.has(m.id) && israelDateKey(m.utc) >= today)
+      .sort(chrono);
+    return { finishedToday, upcoming };
+  }, [matches, matchResults, liveIds, today]);
+
+  /* Group upcoming by date for section headers */
+  const upcomingByDay = useMemo(() => {
+    const map = new Map<string, Match[]>();
+    for (const m of upcoming) {
+      const k = israelDateKey(m.utc);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(m);
+    }
+    return [...map.entries()].sort(([a], [b]) => (a < b ? -1 : 1));
+  }, [upcoming]);
+
+  if (finishedToday.length === 0 && liveNow.length === 0 && upcoming.length === 0) {
     return (
       <div className="mt-empty">
         <div className="mt-empty-icon" aria-hidden>⚽</div>
@@ -392,10 +397,21 @@ function AllStagesSchedule({ matches, onOpen, liveScores, liveNow }: {
 
   return (
     <>
-      {/* Pinned "live now" block — shown at the very top of the page when a
-       * match is currently live, so users see it immediately with no
-       * scrolling. The same match still appears in its normal chronological
-       * spot below for browsing. */}
+      {/* Section 1 — finished today */}
+      {finishedToday.length > 0 && (
+        <section className="mt-stage-block" data-date={today}>
+          <h3 className="day-heading mt-section-heading">
+            <span>✅ הסתיימו היום</span>
+          </h3>
+          <div className="card-grid">
+            {finishedToday.map(m => (
+              <MatchCard key={m.id} match={m} onOpen={onOpen} live={liveScores[m.id]} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Section 2 — live now */}
       {liveNow.length > 0 && (
         <section className="mt-stage-block mt-live-pinned">
           <h3 className="day-heading mt-live-pinned-heading">
@@ -403,29 +419,28 @@ function AllStagesSchedule({ matches, onOpen, liveScores, liveNow }: {
             <span>חי כרגע</span>
           </h3>
           <div className="card-grid">
-            {liveNow.map(m => <MatchCard key={`live-${m.id}`} match={m} onOpen={onOpen} live={liveScores[m.id]} />)}
+            {liveNow.map(m => (
+              <MatchCard key={`live-${m.id}`} match={m} onOpen={onOpen} live={liveScores[m.id]} />
+            ))}
           </div>
         </section>
       )}
-      {stageBlocks.map(block => (
-        <section key={block.stage} className="mt-stage-block">
-          {/* Stage title removed — each MatchCard shows its own stage chip. */}
-          {block.byDay.map(([day, ms]) => (
-            <section key={day} className="day-section" data-date={day}>
-              <h3 className="day-heading hide-on-mobile">
-                <span>{formatIsraelDate(ms[0].utc)}</span>
-                {relativeLabel(ms[0].utc) && (
-                  <span className="chip chip-strong">{relativeLabel(ms[0].utc)}</span>
-                )}
-                <span className="muted">{ms.length} משחקים</span>
-              </h3>
-              <div className="card-grid">
-                {ms.filter(m => !liveNow.some(l => l.id === m.id)).map(m => (
-                  <MatchCard key={m.id} match={m} onOpen={onOpen} live={liveScores[m.id]} />
-                ))}
-              </div>
-            </section>
-          ))}
+
+      {/* Section 3 — upcoming (today's unstarted + future days) */}
+      {upcomingByDay.map(([day, ms]) => (
+        <section key={day} className="mt-stage-block" data-date={day}>
+          <h3 className="day-heading hide-on-mobile">
+            <span>{formatIsraelDate(ms[0].utc)}</span>
+            {relativeLabel(ms[0].utc) && (
+              <span className="chip chip-strong">{relativeLabel(ms[0].utc)}</span>
+            )}
+            <span className="muted">{ms.length} משחקים</span>
+          </h3>
+          <div className="card-grid">
+            {ms.map(m => (
+              <MatchCard key={m.id} match={m} onOpen={onOpen} live={liveScores[m.id]} />
+            ))}
+          </div>
         </section>
       ))}
     </>

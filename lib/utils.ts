@@ -134,7 +134,12 @@ export function formatCountdown(utcIso: string): string {
 export function matchLiveStatus(match: Match): MatchStatus {
   const now = Date.now();
   const start = new Date(match.utc).getTime();
-  const end = start + 115 * 60 * 1000;
+  /* Never auto-finish on the client based on time alone.
+   * A match stays "live" until match_results confirms the final score.
+   * 4.5h covers 90 min regulation + 30 min ET + penalties + any referee
+   * stoppage. The MatchCard/MatchesTab override to "finished" when a
+   * match_results entry is present, so this window is only a safety cap. */
+  const end = start + 270 * 60 * 1000;
   if (now < start - 30 * 60 * 1000) return "scheduled";
   if (now >= start - 30 * 60 * 1000 && now < start) return "pregame";
   if (now >= start && now <= end) return "live";
