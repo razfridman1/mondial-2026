@@ -31,20 +31,24 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
   const groups = useStore(s => s.groups);
   const [sharingPreds, setSharingPreds] = useState(false);
 
-  /* A result existing in the DB *is* the source of truth for "finished". */
-  const isFinished = !!matchResult;
+  /* "FT" in the live ticker minuteLabel is the fastest signal that the
+   * match is over — faster than waiting for the cron to write match_results.
+   * Accept any AI response that starts with FT / Full Time / הסתיים. */
+  const liveFT = /^(FT|Full.?Time|הסתיים|נגמר)/i.test(live?.minuteLabel ?? "");
+
+  /* A result in the DB is authoritative; live FT signal is the fast-path. */
+  const isFinished = !!matchResult || liveFT;
+  const effectiveStatus = isFinished ? "finished" : status;
 
   /* Show the live ticker (score / clock / goals) while the match is
    * actually live, OR once it's presumed over but match_results hasn't
    * landed yet — the live ticker then doubles as a provisional result. */
-  const showLiveTicker = status === "live" || (status === "finished" && !isFinished);
+  const showLiveTicker = effectiveStatus === "live" || (effectiveStatus === "finished" && !matchResult);
 
-  /* Live ticker clock label — shows exactly what the AI fetched.
-   * No local calculation: we don't know stoppage time, so we trust
-   * the live feed exclusively. If no minuteLabel yet, shows nothing. */
+  /* Live ticker clock label — shows exactly what the AI fetched. */
   const liveClockLabel =
-    status === "finished" ? "הסתיים"
-    : status === "live"   ? (live?.minuteLabel ?? null)
+    effectiveStatus === "finished" ? "הסתיים"
+    : effectiveStatus === "live"   ? (live?.minuteLabel ?? null)
     : null;
 
   /* Goals scored so far (live ticker), sorted by minute and split by team
@@ -222,9 +226,9 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
         <div className="mc-stage">
           <span className="chip chip-stage">{stage?.name}{match.group ? ` · בית ${match.group}` : ""}</span>
           {rel && <span className="chip chip-soft">{rel}</span>}
-          {status === "live"    && <span className="badge badge-live">🔴 שידור חי</span>}
+          {effectiveStatus === "live"    && <span className="badge badge-live">🔴 שידור חי</span>}
           {status === "pregame" && <span className="badge badge-pregame">קדם-משחק</span>}
-          {status === "finished"&& <span className="badge badge-finished">הסתיים</span>}
+          {effectiveStatus === "finished"&& <span className="badge badge-finished">הסתיים</span>}
         </div>
         <div className="mc-time">
           <div className="mc-time-time">{formatIsraelTime(match.utc)}</div>
@@ -262,7 +266,7 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
                 <span className="mc-live-score-num">{live ? live.away : "–"}</span>
               </div>
               <div className="vs-label mc-live-clock">
-                {status === "live" && <span className="mt-live-dot" aria-hidden />} {liveClockLabel}
+                {effectiveStatus === "live" && <span className="mt-live-dot" aria-hidden />} {liveClockLabel}
               </div>
             </>
           ) : (
@@ -476,7 +480,7 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
       </div>
 
       <div className="mc-actions mc-actions-row">
-        {(status === "live" || status === "pregame" || status === "finished") && (
+        {(effectiveStatus === "live" || effectiveStatus === "pregame" || effectiveStatus === "finished") && (
           <a className="btn btn-watch" href={channels[0]?.url || "#"} target="_blank" rel="noopener" onClick={stop}>
             {status === "live"    ? "▶ צפה"
             : status === "pregame" ? "▶ קדם"
@@ -490,7 +494,7 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
             <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/>
           </svg>
         </button>
-        {(status === "live" || isFinished) && currentGroupId && (
+        {(effectiveStatus === "live" || isFinished) && currentGroupId && (
           <button className="btn btn-small wa-btn" onClick={sharePredictions} disabled={sharingPreds} title="שתף את ניחושי הקבוצה למשחק הזה">
             {sharingPreds ? "…טוען" : "📤 שתף ניחושי הקבוצה"}
           </button>

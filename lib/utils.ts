@@ -134,12 +134,17 @@ export function formatCountdown(utcIso: string): string {
 export function matchLiveStatus(match: Match): MatchStatus {
   const now = Date.now();
   const start = new Date(match.utc).getTime();
-  /* Never auto-finish on the client based on time alone.
-   * A match stays "live" until match_results confirms the final score.
-   * 4.5h covers 90 min regulation + 30 min ET + penalties + any referee
-   * stoppage. The MatchCard/MatchesTab override to "finished" when a
-   * match_results entry is present, so this window is only a safety cap. */
-  const end = start + 270 * 60 * 1000;
+  /* Stage-aware live window — stays "live" until match_results confirms
+   * the final score (MatchCard overrides to "finished" when that entry
+   * exists).  The cap here is a fallback for when the cron hasn't
+   * confirmed yet:
+   *   GROUP : 150 min  (90 reg + 15 HT + ~15 stoppage)
+   *   KO    : 240 min  (90 reg + 15 HT + 30 ET + 15 HT + ~30 pens/stoppage)
+   * minuteLabel="FT" from the live ticker is a faster signal and is
+   * checked separately in the card components. */
+  const isKO = match.stage !== "GROUP";
+  const capMs = (isKO ? 240 : 150) * 60 * 1000;
+  const end = start + capMs;
   if (now < start - 30 * 60 * 1000) return "scheduled";
   if (now >= start - 30 * 60 * 1000 && now < start) return "pregame";
   if (now >= start && now <= end) return "live";

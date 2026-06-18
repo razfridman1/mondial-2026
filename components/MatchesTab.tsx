@@ -200,8 +200,12 @@ export default function MatchesTab() {
     for (const m of matches) {
       const st = matchLiveStatus(m);
       const key = israelDateKey(m.utc);
-      if (st === "live" || st === "pregame") live.push(m);
-      if (st === "live") liveOnly.push(m);
+      // A match with a confirmed result OR a live-FT signal is done — exclude from live buckets
+      const liveScore = liveScores[m.id];
+      const isFT = /^(FT|Full.?Time|הסתיים|נגמר)/i.test(liveScore?.minuteLabel ?? "");
+      const isDone = !!matchResults[m.id] || isFT;
+      if (!isDone && (st === "live" || st === "pregame")) live.push(m);
+      if (!isDone && st === "live") liveOnly.push(m);
       if (key === today) todays.push(m);
     }
     const byLiveFirst = (a: Match, b: Match) => {
@@ -514,19 +518,16 @@ function MatchCardModern({ match, result, live, onOpen }: {
   const status = result ? "finished" : baseStatus;
   const channels = (match.channels || []).map(c => CHANNELS[c]).filter(Boolean);
 
-  /* A result existing in DB is the source of truth for "finished". */
-  const isFinished = !!result;
+  /* FT in minuteLabel = fast-path finish signal before match_results lands. */
+  const liveFT = /^(FT|Full.?Time|הסתיים|נגמר)/i.test(live?.minuteLabel ?? "");
+  const isFinished = !!result || liveFT;
+  const effectiveStatus = isFinished ? "finished" : status;
 
-  /* Show the live ticker (score / clock / goals) while the match is
-   * actually live, OR once it's presumed over but the result hasn't
-   * landed yet — the live ticker then doubles as a provisional result. */
-  const showLiveTicker = status === "live" || (status === "finished" && !isFinished);
+  const showLiveTicker = effectiveStatus === "live" || (effectiveStatus === "finished" && !result);
 
-  /* Live ticker clock label — shows exactly what the AI fetched.
-   * No local calculation: we trust the live feed exclusively. */
   const clockLabel =
-    status === "finished" ? "הסתיים"
-    : status === "live"   ? (live?.minuteLabel ?? null)
+    effectiveStatus === "finished" ? "הסתיים"
+    : effectiveStatus === "live"   ? (live?.minuteLabel ?? null)
     : null;
 
   /* Goals scored so far, sorted by minute and split by team so each list
@@ -551,14 +552,14 @@ function MatchCardModern({ match, result, live, onOpen }: {
           <span className="chip chip-stage">{stage?.name}{match.group ? ` · בית ${match.group}` : ""}</span>
         </div>
         <div className="mt-card-status">
-          {status === "live" && (
+          {effectiveStatus === "live" && (
             <span className="mt-live-pill">
               <span className="mt-live-dot" aria-hidden /> חי · {clockLabel}
             </span>
           )}
-          {status === "pregame"  && <span className="mt-status-pill pregame">קדם-משחק</span>}
-          {status === "finished" && <span className="mt-status-pill finished">הסתיים</span>}
-          {status === "scheduled" && (
+          {effectiveStatus === "pregame"  && <span className="mt-status-pill pregame">קדם-משחק</span>}
+          {effectiveStatus === "finished" && <span className="mt-status-pill finished">הסתיים</span>}
+          {effectiveStatus === "scheduled" && (
             <span className="mt-status-pill scheduled">
               {formatIsraelTime(match.utc)}
             </span>
