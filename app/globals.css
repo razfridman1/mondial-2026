@@ -4231,12 +4231,21 @@ html[data-theme="light"] .chat-panel {
   font-variant-numeric: tabular-nums;
 }
 
+.team-flag-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.team-away .team-flag-col {
+  align-items: center;
+}
 .mc-team-goals {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 3px;
-  margin-top: 4px;
 }
 .team-away .mc-team-goals,
 .mt-team.away .mc-team-goals {

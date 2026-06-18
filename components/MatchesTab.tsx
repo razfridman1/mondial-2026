@@ -372,12 +372,11 @@ function AllStagesSchedule({ matches, onOpen, liveScores, liveNow }: {
         if (!byDay.has(k)) byDay.set(k, []);
         byDay.get(k)!.push(m);
       }
-      /* Plain chronological order (past → today → future) so users can
-       * scroll BACK to see finished matches' cards (and forward for
-       * upcoming ones). The "🎯 חזור להיום" floating button jumps straight
-       * to today's section, giving the "today first" effect on demand
-       * without hiding past days from normal scrolling. */
-      const entries = [...byDay.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+      /* Show only today and future days — past days are hidden. */
+      const today = todayKey();
+      const entries = [...byDay.entries()]
+        .filter(([day]) => day >= today)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
       return { stage: sid, byDay: entries, count: list.length };
     }).filter(b => b.count > 0);
   }, [matches]);
@@ -553,17 +552,19 @@ function MatchCardModern({ match, result, live, onOpen }: {
       <div className="mt-card-body">
         {/* Home team */}
         <div className="mt-team home">
-          <span className="mt-flag">{home.flag}</span>
+          <div className="team-flag-col">
+            <span className="mt-flag">{home.flag}</span>
+            {homeGoals.length > 0 && (
+              <div className="mc-team-goals">
+                {homeGoals.map((g, i) => (
+                  <span key={i} className="mt-live-goal">
+                    ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           <span className="mt-team-name">{home.name}</span>
-          {homeGoals.length > 0 && (
-            <div className="mc-team-goals">
-              {homeGoals.map((g, i) => (
-                <span key={i} className="mt-live-goal">
-                  ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Score / vs */}
@@ -591,16 +592,18 @@ function MatchCardModern({ match, result, live, onOpen }: {
         {/* Away team */}
         <div className="mt-team away">
           <span className="mt-team-name">{away.name}</span>
-          <span className="mt-flag">{away.flag}</span>
-          {awayGoals.length > 0 && (
-            <div className="mc-team-goals">
-              {awayGoals.map((g, i) => (
-                <span key={i} className="mt-live-goal">
-                  ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="team-flag-col">
+            <span className="mt-flag">{away.flag}</span>
+            {awayGoals.length > 0 && (
+              <div className="mc-team-goals">
+                {awayGoals.map((g, i) => (
+                  <span key={i} className="mt-live-goal">
+                    ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

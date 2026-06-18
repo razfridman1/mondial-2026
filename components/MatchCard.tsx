@@ -239,17 +239,19 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
 
       <div className="mc-body">
         <div className="team team-home">
-          <span className="flag">{home.flag}</span>
+          <div className="team-flag-col">
+            <span className="flag">{home.flag}</span>
+            {homeGoals.length > 0 && (
+              <div className="mc-team-goals">
+                {homeGoals.map((g, i) => (
+                  <span key={i} className="mc-live-goal">
+                    ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           <span className="team-name">{home.name}</span>
-          {homeGoals.length > 0 && (
-            <div className="mc-team-goals">
-              {homeGoals.map((g, i) => (
-                <span key={i} className="mc-live-goal">
-                  ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
         <div className="mc-vs">
           {showLiveTicker ? (
@@ -273,16 +275,18 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
         </div>
         <div className="team team-away">
           <span className="team-name">{away.name}</span>
-          <span className="flag">{away.flag}</span>
-          {awayGoals.length > 0 && (
-            <div className="mc-team-goals">
-              {awayGoals.map((g, i) => (
-                <span key={i} className="mc-live-goal">
-                  ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="team-flag-col">
+            <span className="flag">{away.flag}</span>
+            {awayGoals.length > 0 && (
+              <div className="mc-team-goals">
+                {awayGoals.map((g, i) => (
+                  <span key={i} className="mc-live-goal">
+                    ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
