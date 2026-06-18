@@ -420,7 +420,9 @@ function AllStagesSchedule({ matches, onOpen, liveScores, liveNow }: {
                 <span className="muted">{ms.length} משחקים</span>
               </h3>
               <div className="card-grid">
-                {ms.map(m => <MatchCard key={m.id} match={m} onOpen={onOpen} live={liveScores[m.id]} />)}
+                {ms.filter(m => !liveNow.some(l => l.id === m.id)).map(m => (
+                  <MatchCard key={m.id} match={m} onOpen={onOpen} live={liveScores[m.id]} />
+                ))}
               </div>
             </section>
           ))}
