@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MATCHES, TEAMS, VENUES, STAGES, CHANNELS } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import {
-  israelDateKey, todayKey, formatIsraelDate, formatIsraelTime,
+  israelDateKey, todayKey, yesterdayKey, formatIsraelDate, formatIsraelTime,
   matchLiveStatus, relativeLabel,
 } from "@/lib/utils";
 import { effMatch } from "@/lib/sim";
@@ -365,19 +365,23 @@ function AllStagesSchedule({ matches, onOpen, liveScores, liveNow, matchResults 
   matchResults: Record<string, { home: number; away: number; finishedAt: number }>;
 }) {
   const today = todayKey();
+  const yesterday = yesterdayKey();
   const liveIds = useMemo(() => new Set(liveNow.map(m => m.id)), [liveNow]);
 
-  /* Three ordered sections: finished today → live now → upcoming */
-  const { finishedToday, upcoming } = useMemo(() => {
+  /* Three ordered sections: finished (yesterday + today) → live now → upcoming */
+  const { finishedRecent, upcoming } = useMemo(() => {
     const chrono = (a: Match, b: Match) => +new Date(a.utc) - +new Date(b.utc);
-    const finishedToday = matches
-      .filter(m => israelDateKey(m.utc) === today && !!matchResults[m.id] && !liveIds.has(m.id))
+    const finishedRecent = matches
+      .filter(m => {
+        const day = israelDateKey(m.utc);
+        return (day === today || day === yesterday) && !!matchResults[m.id] && !liveIds.has(m.id);
+      })
       .sort(chrono);
     const upcoming = matches
       .filter(m => !matchResults[m.id] && !liveIds.has(m.id) && israelDateKey(m.utc) >= today)
       .sort(chrono);
-    return { finishedToday, upcoming };
-  }, [matches, matchResults, liveIds, today]);
+    return { finishedRecent, upcoming };
+  }, [matches, matchResults, liveIds, today, yesterday]);
 
   /* Group upcoming by date for section headers */
   const upcomingByDay = useMemo(() => {
@@ -390,7 +394,7 @@ function AllStagesSchedule({ matches, onOpen, liveScores, liveNow, matchResults 
     return [...map.entries()].sort(([a], [b]) => (a < b ? -1 : 1));
   }, [upcoming]);
 
-  if (finishedToday.length === 0 && liveNow.length === 0 && upcoming.length === 0) {
+  if (finishedRecent.length === 0 && liveNow.length === 0 && upcoming.length === 0) {
     return (
       <div className="mt-empty">
         <div className="mt-empty-icon" aria-hidden>⚽</div>
@@ -401,14 +405,14 @@ function AllStagesSchedule({ matches, onOpen, liveScores, liveNow, matchResults 
 
   return (
     <>
-      {/* Section 1 — finished today */}
-      {finishedToday.length > 0 && (
+      {/* Section 1 — finished yesterday + today */}
+      {finishedRecent.length > 0 && (
         <section className="mt-stage-block" data-date={today}>
           <h3 className="day-heading mt-section-heading">
-            <span>✅ הסתיימו היום</span>
+            <span>✅ הסתיימו לאחרונה</span>
           </h3>
           <div className="card-grid">
-            {finishedToday.map(m => (
+            {finishedRecent.map(m => (
               <MatchCard key={m.id} match={m} onOpen={onOpen} live={liveScores[m.id]} />
             ))}
           </div>

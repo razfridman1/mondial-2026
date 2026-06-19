@@ -50,6 +50,12 @@ export function todayKey(): string {
   return israelDateKey(new Date().toISOString());
 }
 
+export function yesterdayKey(): string {
+  const t = new Date();
+  t.setUTCDate(t.getUTCDate() - 1);
+  return israelDateKey(t.toISOString());
+}
+
 export function tomorrowKey(): string {
   const t = new Date();
   t.setUTCDate(t.getUTCDate() + 1);
