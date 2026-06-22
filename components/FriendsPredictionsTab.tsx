@@ -26,6 +26,7 @@ interface PredictionCell {
   auto: boolean;
   hidden: boolean;
   isSelf: boolean;
+  _docId?: string; // present for admin callers only
 }
 interface MatchRow {
   matchId: string;
@@ -48,8 +49,14 @@ const LIVE_WINDOW_MS = 115 * 60 * 1000;
 
 export default function FriendsPredictionsTab() {
   const user = useStore(s => s.user);
+  const isAdmin = useStore(s => s.user?.isAdmin ?? false);
   const groups = useStore(s => s.groups);
   const currentGroupId = useStore(s => s.currentGroupId);
+
+  // Admin edit state: key = `${matchId}:${uid}`, value = { home, away }
+  type EditKey = string;
+  const [editing, setEditing] = useState<Record<EditKey, { home: string; away: string }>>({});
+  const [saving, setSaving] = useState<Record<EditKey, boolean>>({});
 
   const [selectedGroupId, setSelectedGroupId] = useState<string>(() => currentGroupId || "");
   useEffect(() => {
@@ -131,6 +138,26 @@ export default function FriendsPredictionsTab() {
     }
     return map;
   }, [rows, members]);
+
+  async function saveEdit(matchId: string, uid: string, docId: string, home: string, away: string) {
+    const key = `${matchId}:${uid}`;
+    const h = parseInt(home, 10);
+    const a = parseInt(away, 10);
+    if (!Number.isFinite(h) || !Number.isFinite(a) || h < 0 || a < 0) return;
+    setSaving(s => ({ ...s, [key]: true }));
+    try {
+      const token = await getFirebase().auth!.currentUser!.getIdToken();
+      await fetch("/api/admin/predictions", {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: docId, homeScore: h, awayScore: a }),
+      });
+      setEditing(s => { const n = { ...s }; delete n[key]; return n; });
+      await load(); // refresh the table
+    } finally {
+      setSaving(s => { const n = { ...s }; delete n[key]; return n; });
+    }
+  }
 
   if (!user) {
     return (
@@ -239,23 +266,75 @@ export default function FriendsPredictionsTab() {
                           })
                         : null;
                       const winnerTeam = p.predictedWinner ? (TEAMS as any)[p.predictedWinner] : null;
+                      const editKey = `${row.matchId}:${m.uid}`;
+                      const editState = editing[editKey];
+                      const isSaving = saving[editKey];
                       return (
                         <td key={m.uid}>
                           <div className="fp-cell">
-                            <div className="fp-cell-pred">
-                              {p.homeScore} : {p.awayScore}
-                              {p.auto && <span title="ניחוש אוטומטי"> 🤖</span>}
-                            </div>
-                            {isKnockout && p.predictedWinner && (
-                              <div className="fp-cell-result">⚽ {winnerTeam?.flag || ""} {winnerTeam?.name || p.predictedWinner}</div>
-                            )}
-                            {row.result && (
-                              <div className="fp-cell-result">תוצאה: {row.result.home}:{row.result.away}</div>
-                            )}
-                            {sc && (
-                              <div className="fp-cell-points" style={{ color: sc.points > 0 ? "var(--green)" : "var(--text-muted)" }}>
-                                {sc.exact ? "🎯 " : ""}ניקוד: {sc.points}
+                            {isAdmin && p._docId && editState ? (
+                              /* Admin inline edit mode */
+                              <div className="fp-cell-edit">
+                                <div className="fp-edit-row">
+                                  <input
+                                    type="number" min={0} max={99}
+                                    value={editState.home}
+                                    onChange={e => setEditing(s => ({ ...s, [editKey]: { ...editState, home: e.target.value } }))}
+                                    className="fp-edit-input"
+                                    style={{ width: 36, textAlign: "center" }}
+                                    disabled={isSaving}
+                                  />
+                                  <span>:</span>
+                                  <input
+                                    type="number" min={0} max={99}
+                                    value={editState.away}
+                                    onChange={e => setEditing(s => ({ ...s, [editKey]: { ...editState, away: e.target.value } }))}
+                                    className="fp-edit-input"
+                                    style={{ width: 36, textAlign: "center" }}
+                                    disabled={isSaving}
+                                  />
+                                </div>
+                                <div className="fp-edit-actions">
+                                  <button
+                                    className="fp-edit-save"
+                                    disabled={isSaving}
+                                    onClick={() => saveEdit(row.matchId, m.uid, p._docId!, editState.home, editState.away)}
+                                  >{isSaving ? "…" : "✓"}</button>
+                                  <button
+                                    className="fp-edit-cancel"
+                                    disabled={isSaving}
+                                    onClick={() => setEditing(s => { const n = { ...s }; delete n[editKey]; return n; })}
+                                  >✕</button>
+                                </div>
                               </div>
+                            ) : (
+                              <>
+                                <div className="fp-cell-pred">
+                                  {p.homeScore} : {p.awayScore}
+                                  {p.auto && <span title="ניחוש אוטומטי"> 🤖</span>}
+                                  {isAdmin && p._docId && (
+                                    <button
+                                      className="fp-edit-btn"
+                                      title="ערוך ניחוש (אדמין)"
+                                      onClick={() => setEditing(s => ({
+                                        ...s,
+                                        [editKey]: { home: String(p.homeScore ?? ""), away: String(p.awayScore ?? "") },
+                                      }))}
+                                    >✏️</button>
+                                  )}
+                                </div>
+                                {isKnockout && p.predictedWinner && (
+                                  <div className="fp-cell-result">⚽ {winnerTeam?.flag || ""} {winnerTeam?.name || p.predictedWinner}</div>
+                                )}
+                                {row.result && (
+                                  <div className="fp-cell-result">תוצאה: {row.result.home}:{row.result.away}</div>
+                                )}
+                                {sc && (
+                                  <div className="fp-cell-points" style={{ color: sc.points > 0 ? "var(--green)" : "var(--text-muted)" }}>
+                                    {sc.exact ? "🎯 " : ""}ניקוד: {sc.points}
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>

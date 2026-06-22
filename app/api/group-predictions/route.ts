@@ -78,7 +78,7 @@ export async function GET(req: Request) {
   const allPreds: any[] = [];
   await Promise.all(uids.map(async uid => {
     const snap = await db.collection("predictions").where("uid", "==", uid).get();
-    snap.forEach(d => allPreds.push(d.data()));
+    snap.forEach(d => allPreds.push({ ...d.data(), _docId: d.id }));
   }));
 
   /* 4. Effective match times (overrides + sim) */
@@ -135,6 +135,7 @@ export async function GET(req: Request) {
             auto: reveal ? !!p.auto : false,
             hidden: !reveal,
             isSelf,
+            ...(callerIsAdmin ? { _docId: p._docId } : {}),
           };
         })
         // Caller's own prediction first, then by name
