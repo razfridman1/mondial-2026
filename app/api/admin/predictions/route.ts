@@ -39,6 +39,9 @@ export async function PATCH(req: Request) {
   if (Number.isFinite(Number(body.homeScore))) patch.homeScore = Number(body.homeScore);
   if (Number.isFinite(Number(body.awayScore))) patch.awayScore = Number(body.awayScore);
   if (typeof body.joker === "boolean")          patch.joker = body.joker;
+  /* When the admin explicitly sets scores, clear the auto-filled flag so
+   * the prediction appears as if the user filled it themselves. */
+  if (patch.homeScore != null || patch.awayScore != null) patch.auto = false;
   await db.collection("predictions").doc(body.id).set(patch, { merge: true });
   return NextResponse.json({ ok: true });
 }
