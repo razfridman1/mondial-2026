@@ -56,15 +56,55 @@ const CURATED_HE_BY_EN: Record<string, string> = (() => {
 })();
 
 export async function getScorerLeaderboards(db: FirebaseFirestore.Firestore): Promise<ScorerLeaderboards> {
-  const snap = await db.collection("live_data").doc("match_goals").get();
+  /* Primary source: live_data/match_goals — written by the goals-lookup
+   * cron step (lookupGoalsViaAI or football-data.org details).
+   * Fallback source: live_data/live_scores — written by the live-ticker
+   * step during the match; uses {player} instead of {scorer}.
+   * If match_goals has goals for a match we use those; otherwise we fall
+   * back to live_scores so that matches whose dedicated goal lookup failed
+   * (found: false) are still counted. */
+  const [snap, liveSnap] = await Promise.all([
+    db.collection("live_data").doc("match_goals").get(),
+    db.collection("live_data").doc("live_scores").get(),
+  ]);
   const data: Record<string, { goals?: ExternalGoal[]; homeCode?: string; awayCode?: string }> =
     snap.exists ? (snap.data() || {}) : {};
+  const liveData: Record<string, any> =
+    liveSnap.exists ? (liveSnap.data() || {}) : {};
+
+  /* Union of all match IDs across both sources */
+  const allMatchIds = new Set([...Object.keys(data), ...Object.keys(liveData)]);
 
   const scorers = new Map<string, ScorerEntry>();
   const assists = new Map<string, ScorerEntry>();
 
-  for (const match of Object.values(data)) {
-    for (const g of match.goals || []) {
+  for (const matchId of allMatchIds) {
+    const matchGoalsEntry = data[matchId];
+    const liveEntry = liveData[matchId];
+
+    let goals: ExternalGoal[];
+
+    if (matchGoalsEntry && (matchGoalsEntry.goals || []).length > 0) {
+      /* Primary: explicit goal-lookup result — trust this over live ticker */
+      goals = matchGoalsEntry.goals!;
+    } else if (liveEntry && (liveEntry.goals || []).length > 0) {
+      /* Fallback: live ticker goals — field is "player", team is "home"|"away" */
+      goals = (liveEntry.goals as any[])
+        .map(g => ({
+          minute: g.minute ?? null,
+          teamCode: g.team === "home"
+            ? (liveEntry.homeCode || null)
+            : (liveEntry.awayCode || null),
+          scorer: (g.player || "").trim(),
+          ...(g.assist ? { assist: g.assist } : {}),
+          ...(g.type ? { type: g.type } : {}),
+        } as ExternalGoal))
+        .filter(g => g.scorer);
+    } else {
+      continue;
+    }
+
+    for (const g of goals) {
       if (!g || g.type === "OWN") continue; // own goals don't count toward either leaderboard
 
       if (g.scorer) {
@@ -146,17 +186,25 @@ export async function getScorerLeaderboards(db: FirebaseFirestore.Firestore): Pr
 
   const debug = {
     matchGoals: Object.fromEntries(
-      Object.entries(data).map(([matchId, m]) => [
-        matchId,
-        {
-          homeCode: m.homeCode,
-          awayCode: m.awayCode,
-          goalCount: (m.goals || []).length,
-          goals: (m.goals || []).map(g => ({
-            side: g.teamCode ?? undefined, scorer: g.scorer, assist: g.assist, type: g.type, minute: g.minute ?? undefined,
+      [...allMatchIds].map(matchId => {
+        const mg = data[matchId];
+        const lv = liveData[matchId];
+        const usedLive = !mg || (mg.goals || []).length === 0;
+        const goals = usedLive ? (lv?.goals || []) : (mg?.goals || []);
+        return [matchId, {
+          homeCode: mg?.homeCode ?? lv?.homeCode,
+          awayCode: mg?.awayCode ?? lv?.awayCode,
+          goalCount: goals.length,
+          source: usedLive ? "live_scores_fallback" : "match_goals",
+          goals: goals.map((g: any) => ({
+            side: g.teamCode ?? g.team ?? undefined,
+            scorer: g.scorer ?? g.player,
+            assist: g.assist,
+            type: g.type,
+            minute: g.minute ?? undefined,
           })),
-        },
-      ])
+        }];
+      })
     ),
     nameResolution: allEntries.map((e, i) => {
       const original = originalNames[i];
