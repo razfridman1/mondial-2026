@@ -151,7 +151,7 @@ const GOALS_SYSTEM_PROMPT = `אתה עוזר שמאתר את רשימת מבקי
  * short diagnostic string — surfaced (for goals lookups) via
  * AiGoalsLookup.reason so a manual ?force=1 call can show WHY a lookup
  * failed (missing key, HTTP error, etc.) without needing server logs. */
-async function callClaude(system: string, userMsg: string, maxTokens: number, useWebSearch: boolean = true): Promise<{ content: any[] } | { error: string }> {
+async function callClaude(system: string, userMsg: string, maxTokens: number, useWebSearch: boolean = true, forceModel?: string): Promise<{ content: any[] } | { error: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: "no_api_key" };
   try {
@@ -163,7 +163,7 @@ async function callClaude(system: string, userMsg: string, maxTokens: number, us
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.ANTHROPIC_GOALS_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+        model: forceModel || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
         max_tokens: maxTokens,
         system,
         ...(useWebSearch ? { tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }] } : {}),
@@ -362,7 +362,9 @@ export async function lookupGoalsViaAI(opts: {
     `מצא את רשימת מבקיעי השערים (ואת המבשלים, אם ידועים) במשחק מונדיאל 2026: ${opts.homeName} ${opts.homeScore}:${opts.awayScore} ${opts.awayName}, שנערך בתאריך ${opts.dateISO}. ` +
     `סך הכל יש ${opts.homeScore + opts.awayScore} שערים במשחק זה. אם אינך מוצא פירוט מלא ומאומת לכל השערים — החזר found:false.`;
 
-  const data = await callClaude(GOALS_SYSTEM_PROMPT, userMsg, 1200);
+  /* Always use Sonnet for goals — it has far better web-search quality for
+   * 2026 WC data than Haiku; ignore ANTHROPIC_MODEL env override here. */
+  const data = await callClaude(GOALS_SYSTEM_PROMPT, userMsg, 1200, true, "claude-sonnet-4-6");
   if ("error" in data) return { found: false, reason: data.error };
 
   const { sources, parsed, rawText } = extractSourcesAndJson(data);

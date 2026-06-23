@@ -143,3 +143,35 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, goalCount: goals.length, goals });
 }
+
+/**
+ * DELETE /api/admin/goals
+ * Body: { matchId } — wipes goals entry for one match so the cron retries it.
+ * Body: { all: true } — wipes ALL goals entries so cron re-fetches everything.
+ * After calling this, the next cron run (within ~1 min) will re-run the AI
+ * goals lookup (now using Sonnet) for every match whose goals were cleared.
+ */
+export async function DELETE(req: Request) {
+  try { await authedAdmin(req); } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: e.status || 401 });
+  }
+  const { db } = getAdmin();
+  const body = await req.json().catch(() => null);
+
+  if (body?.all) {
+    // Wipe the entire match_goals document → cron will refetch all matches
+    await db.collection("live_data").doc("match_goals").set({});
+    return NextResponse.json({ ok: true, wiped: "all" });
+  }
+
+  if (!body?.matchId) {
+    return NextResponse.json({ error: "matchId or all:true required" }, { status: 400 });
+  }
+
+  // Remove just this match's entry using FieldValue.delete()
+  const { FieldValue } = await import("firebase-admin/firestore");
+  await db.collection("live_data").doc("match_goals").update({
+    [body.matchId]: FieldValue.delete(),
+  });
+  return NextResponse.json({ ok: true, wiped: body.matchId });
+}
