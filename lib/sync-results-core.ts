@@ -954,7 +954,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
           continue; // no AI call needed for a 0-0 — doesn't consume the per-run budget
         }
 
-        if (aiCallsUsed >= 3) continue; // budget reached — retry the rest on a later run
+        if (aiCallsUsed >= 5) continue; // budget reached — retry the rest on a later run
 
         const homeName = TEAMS[gc.homeCode]?.nameEn || TEAMS[gc.homeCode]?.name || gc.homeCode;
         const awayName = TEAMS[gc.awayCode]?.nameEn || TEAMS[gc.awayCode]?.name || gc.awayCode;
