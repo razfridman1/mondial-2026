@@ -1,6 +1,6 @@
 import type { ExternalGoal } from "./football-data-api";
 import { SQUADS, normalizeName } from "./players";
-import { translateNamesToHebrew } from "./ai-result-fallback";
+import { translateNamesToHebrew, lookupAssistsLeaderboardViaAI } from "./ai-result-fallback";
 import { teamCodeFromApiName } from "./team-name-mapper";
 import { TEAMS } from "./data";
 
@@ -137,19 +137,53 @@ export async function getScorerLeaderboards(db: FirebaseFirestore.Firestore): Pr
   let rawAssists: ScorerEntry[];
   let debugSource: string;
 
+  // -- Assists: try Firestore cache first, then AI (every 30 min), fallback to FD/Firestore --
+  const ASSISTS_TTL_MS = 30 * 60 * 1000; // 30 minutes
+  let aiAssistsRaw: ScorerEntry[] | null = null;
+  try {
+    const aiCacheSnap = await db.collection("live_data").doc("assists_leaderboard").get();
+    const aiCache = aiCacheSnap.exists ? aiCacheSnap.data() : null;
+    const cacheAge = aiCache?.updatedAt ? Date.now() - aiCache.updatedAt : Infinity;
+    if (aiCache?.assists && Array.isArray(aiCache.assists) && aiCache.assists.length > 0 && cacheAge < ASSISTS_TTL_MS) {
+      // Cache is fresh — use it
+      aiAssistsRaw = (aiCache.assists as { name: string; team: string; count: number }[])
+        .map(a => ({ name: a.name, teamCode: a.team || null, count: a.count }));
+    } else {
+      // Cache stale / missing — call AI
+      const aiResult = await lookupAssistsLeaderboardViaAI();
+      if (aiResult.found && aiResult.assists && aiResult.assists.length > 0) {
+        aiAssistsRaw = aiResult.assists.map(a => ({ name: a.name, teamCode: a.team || null, count: a.count }));
+        // Persist to cache
+        await db.collection("live_data").doc("assists_leaderboard").set({
+          assists: aiResult.assists,
+          updatedAt: Date.now(),
+        });
+      }
+    }
+  } catch { /* non-fatal */ }
+
   if (fd && fd.scorers.length > 0) {
     rawScorers = fd.scorers;
     debugSource = "football-data.org";
-    if (fd.assists.length >= 3) {
+    if (aiAssistsRaw && aiAssistsRaw.length > 0) {
+      rawAssists = aiAssistsRaw.sort(byRank);
+      debugSource += "+ai-assists-cache";
+    } else if (fd.assists.length >= 3) {
       rawAssists = fd.assists;
+      debugSource += "+fd-assists";
     } else {
       rawAssists = Array.from(fbAssists.values()).sort(byRank);
       debugSource += "+firestore-assists";
     }
   } else {
     rawScorers = Array.from(fbScorers.values()).sort(byRank);
-    rawAssists = Array.from(fbAssists.values()).sort(byRank);
-    debugSource = "firestore-fallback";
+    if (aiAssistsRaw && aiAssistsRaw.length > 0) {
+      rawAssists = aiAssistsRaw.sort(byRank);
+      debugSource = "firestore-scorers+ai-assists-cache";
+    } else {
+      rawAssists = Array.from(fbAssists.values()).sort(byRank);
+      debugSource = "firestore-fallback";
+    }
   }
 
   const top8Scorers = rawScorers.slice(0, 8);

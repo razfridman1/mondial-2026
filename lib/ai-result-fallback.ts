@@ -561,3 +561,47 @@ export async function translateNamesToHebrew(names: string[]): Promise<{ map: Re
   }
   return { map: out };
 }
+
+const ASSISTS_LEADERBOARD_PROMPT = `אתה עוזר שמאתר את טבלת מלך הבישולים העדכנית של מונדיאל הכדורגל 2026, באמצעות חיפוש אינטרנט באתרים אמינים (fifa.com, espn.com, bbc.com/sport, sofascore.com, flashscore.com).
+החזר תשובה אך ורק כ-JSON תקין:
+{"found": true, "assists": [{"name": "<שם שחקן באנגלית>", "team": "<קוד נבחרת 3 אותיות>", "count": <מספר בישולים>}, ...]}
+או אם לא מצאת מידע מאומת:
+{"found": false}
+
+חוקים קריטיים:
+- אסור להמציא נתונים. רק שחקנים עם בישולים מאומתים ממקור אמיתי.
+- "team" חייב להיות קוד 3 אותיות באנגלית של הנבחרת (ARG, FRA, GER, BRA, NED, ENG, וכד').
+- מיין מגבוה לנמוך לפי מספר הבישולים.
+- כלול לפחות 8 שחקנים אם קיימים.`;
+
+export interface AiAssistsLeaderboard {
+  found: boolean;
+  assists?: { name: string; team: string; count: number }[];
+  reason?: string;
+}
+
+/** Look up the current WC 2026 top assists leaderboard via Sonnet web search.
+ *  Results should be cached in Firestore (live_data/assists_leaderboard)
+ *  by the caller; this function is the expensive fetch step. */
+export async function lookupAssistsLeaderboardViaAI(): Promise<AiAssistsLeaderboard> {
+  const userMsg = `מצא את טבלת מלך הבישולים העדכנית ביותר של מונדיאל 2026 (FIFA World Cup 2026). ` +
+    `כלול את כל השחקנים עם לפחות בישול אחד, ממויינים מגבוה לנמוך. ` +
+    `חשוב: השתמש בקוד 3 אותיות של הנבחרת (ARG, FRA, GER, BRA, NED, NOR, SWE, EGY, NZL וכד').`;
+
+  const data = await callClaude(ASSISTS_LEADERBOARD_PROMPT, userMsg, 1500, true, "claude-sonnet-4-6");
+  if ("error" in data) return { found: false, reason: data.error };
+
+  const { parsed, rawText } = extractSourcesAndJson(data);
+  if (!parsed) return { found: false, reason: `no_json: ${rawText.slice(0, 200)}` };
+  if (parsed.found !== true) return { found: false, reason: "ai_returned_found_false" };
+  if (!Array.isArray(parsed.assists) || parsed.assists.length === 0) {
+    return { found: false, reason: "empty_assists_array" };
+  }
+
+  const assists = parsed.assists
+    .filter((a: any) => a && typeof a.name === "string" && a.name.trim() && typeof a.count === "number" && a.count > 0)
+    .map((a: any) => ({ name: a.name.trim(), team: (a.team || "").trim().toUpperCase(), count: a.count as number }));
+
+  if (assists.length === 0) return { found: false, reason: "no_valid_entries" };
+  return { found: true, assists };
+}
