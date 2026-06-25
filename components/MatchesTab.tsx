@@ -368,7 +368,14 @@ function AllStagesSchedule({ matches, onOpen, liveScores, liveNow, matchResults 
   const yesterday = yesterdayKey();
   const liveIds = useMemo(() => new Set(liveNow.map(m => m.id)), [liveNow]);
 
-  /* Three ordered sections: finished (yesterday + today) → live now → upcoming */
+  /* Hide matches that finished 2+ days ago (keep today + yesterday only).
+   * Also hide past matches with no result that are older than 2 days. */
+  const twoDaysAgo = useMemo(() => {
+    const d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  /* Three ordered sections: finished (today + yesterday only) → live now → upcoming */
   const { finishedRecent, upcoming } = useMemo(() => {
     const chrono = (a: Match, b: Match) => +new Date(a.utc) - +new Date(b.utc);
     const finishedRecent = matches
@@ -378,10 +385,14 @@ function AllStagesSchedule({ matches, onOpen, liveScores, liveNow, matchResults 
       })
       .sort(chrono);
     const upcoming = matches
-      .filter(m => !matchResults[m.id] && !liveIds.has(m.id) && israelDateKey(m.utc) >= today)
+      .filter(m => {
+        const day = israelDateKey(m.utc);
+        if (day < twoDaysAgo) return false; // hide anything older than 2 days
+        return !matchResults[m.id] && !liveIds.has(m.id) && day >= today;
+      })
       .sort(chrono);
     return { finishedRecent, upcoming };
-  }, [matches, matchResults, liveIds, today, yesterday]);
+  }, [matches, matchResults, liveIds, today, yesterday, twoDaysAgo]);
 
   /* Group upcoming by date for section headers */
   const upcomingByDay = useMemo(() => {

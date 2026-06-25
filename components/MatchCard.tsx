@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { TEAMS, VENUES, CHANNELS, STAGES } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
@@ -184,6 +184,20 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
 
   const isKnockout = match.stage !== "GROUP";
 
+  /* Lineups: fetch once within 60 min of kickoff (or during/after the match).
+   * TheSportsDB publishes them ~1h before kickoff. */
+  const [lineups, setLineups] = useState<{ home: any; away: any } | null>(null);
+  const shouldFetchLineups = minutesToKick <= 60 || effectiveStatus === "live" || effectiveStatus === "finished";
+  useEffect(() => {
+    if (!shouldFetchLineups || lineups) return;
+    let cancelled = false;
+    fetch(`/api/lineups?matchId=${match.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (!cancelled && d?.lineups) setLineups(d.lineups); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [shouldFetchLineups, match.id]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   /* Compute score if both prediction and result available */
   const myScore = useMemo(() => {
     if (!myPrediction || !matchResult) return null;
@@ -298,6 +312,41 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
         <span>🏟️ {venue.name}</span>
         <span>📍 {venue.city}{venue.country ? ", " + venue.country : ""} {venue.flag || ""}</span>
       </div>
+
+      {/* Lineups ~1h before kickoff */}
+      {lineups && (
+        <div className="mc-lineups">
+          <div className="mc-lineups-title">&#x1F9D1; &#x05D4;&#x05E8;&#x05DB;&#x05D1;&#x05D9;&#x05DD; &#x05E8;&#x05D0;&#x05E9;&#x05D5;&#x05E0;&#x05D9;&#x05D9;&#x05DD;</div>
+          <div className="mc-lineups-cols">
+            <div className="mc-lineup-team">
+              <div className="mc-lineup-team-name">{home.flag} {home.name}</div>
+              {(lineups.home?.slots || [])
+                .filter((s: any) => s.player)
+                .sort((a: any, b: any) => (a.player.jersey ?? 99) - (b.player.jersey ?? 99))
+                .map((s: any, i: number) => (
+                  <div key={i} className="mc-lineup-player">
+                    <span className="mc-lineup-num">{s.player.jersey ?? ""}</span>
+                    <span className="mc-lineup-name">{s.player.name}</span>
+                    <span className="mc-lineup-pos muted">{s.pos}</span>
+                  </div>
+                ))}
+            </div>
+            <div className="mc-lineup-team">
+              <div className="mc-lineup-team-name">{away.flag} {away.name}</div>
+              {(lineups.away?.slots || [])
+                .filter((s: any) => s.player)
+                .sort((a: any, b: any) => (a.player.jersey ?? 99) - (b.player.jersey ?? 99))
+                .map((s: any, i: number) => (
+                  <div key={i} className="mc-lineup-player">
+                    <span className="mc-lineup-num">{s.player.jersey ?? ""}</span>
+                    <span className="mc-lineup-name">{s.player.name}</span>
+                    <span className="mc-lineup-pos muted">{s.pos}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="status-chips">
         {isFinished && myPrediction ? (
