@@ -262,13 +262,13 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
   console.log(`[sync] runResultsSync start force=${!!opts.force} debug=${!!opts.debug}`);
   const apiKey = process.env.FOOTBALL_API_KEY;
   const hasFD = !!apiKey;
-  const hasAI = !!process.env.ANTHROPIC_API_KEY;
+  const hasTsdb = !!process.env.THESPORTSDB_API_KEY;
 
-  if (!hasAI && !hasFD) {
+  if (!hasFD) {
     return {
       ok: true,
       skipped: "no result source configured",
-      docs: "Set ANTHROPIC_API_KEY in Vercel env vars — it is the sole source for match_results. FOOTBALL_API_KEY (football-data.org) is optional and only used for goal breakdowns + summaries.",
+      docs: "Set FOOTBALL_API_KEY in Vercel env vars — it is the source for match_results via football-data.org.",
     };
   }
 
@@ -425,26 +425,21 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
     const GROUP_BUFFER_MS = 120 * 60 * 1000; // ~2h: regulation + halftime + stoppage time
     const KO_BUFFER_MS = 185 * 60 * 1000;    // ~3h05m: regulation + ET + penalties, worst case
 
-    if (process.env.ANTHROPIC_API_KEY) {
-      /* IMPORTANT: this `buffer` is a pre-filter to avoid asking the AI
-       * about a match before it has REALISTICALLY ended — i.e. including
-       * halftime break + stoppage time for regulation matches, and (for
-       * knockout matches) extra time + penalties on top of that. We don't
-       * have a live-status feed, so these are conservative real-world
-       * estimates of "kickoff to final whistle":
+    if (hasFD) {
+      /* IMPORTANT: this `buffer` is a pre-filter to avoid querying for a
+       * result before the match has REALISTICALLY ended — including halftime
+       * break + stoppage time for regulation matches, and (for knockout
+       * matches) extra time + penalties on top of that. Conservative
+       * real-world estimates of "kickoff to final whistle":
        *   - Group/regulation: 90 min play + ~15 min halftime + ~15 min
        *     stoppage/added time  -> ~120 min.
        *   - Knockout: regulation (~120 min incl. halftime+stoppage) + ~15
        *     min break before extra time + 30 min extra time + up to ~20
        *     min for a penalty shootout -> ~185 min.
        *
-       * Even after the buffer, lookupResultViaAI() itself does the REAL
-       * "has this match finished" check via live web search: it returns
-       * found:false if its sources show the match still in progress (e.g.
-       * a knockout match that didn't need extra time would already be
-       * findable before the full 185 min buffer, but if it's still
-       * found:false we simply retry every cron minute until it's true).
-       * No result is ever written before the match has truly finished. */
+       * After the buffer, lookupResultViaAI() (which now calls
+       * football-data.org directly) returns found:false until the API
+       * reports FINISHED status. We retry every cron minute until true. */
       const RECHECK_MS = 3 * 60 * 1000;
       /* Final correction pass: ~1h after a result was first written, do ONE
        * more lookup and, if it disagrees with what's stored — for ANY
@@ -492,13 +487,13 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
         let candidate: "new" | "recheck" | "finalCheck" | null = null;
         if (!existing) candidate = "new";
         else if (
-          existing.source === "ai-websearch" &&
+          existing.source === "football-data.org" &&
           !existing.aiMismatch &&
           (existing.verificationCount || 0) < 3 &&
           now - (existing.lastVerifiedAt || 0) >= RECHECK_MS
         ) candidate = "recheck";
         else if (
-          existing.source === "ai-websearch" &&
+          existing.source === "football-data.org" &&
           !existing.finalCheckedAt &&
           now - (existing.finishedAt || 0) >= FINAL_CHECK_MS
         ) candidate = "finalCheck";
@@ -525,14 +520,11 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
           const r = resolved[m.id];
           if (r?.home && r?.away) {
             homeCode = r.home; awayCode = r.away;
-            const homeName = TEAMS[homeCode]?.nameEn || TEAMS[homeCode]?.name || homeCode;
-            const awayName = TEAMS[awayCode]?.nameEn || TEAMS[awayCode]?.name || awayCode;
-            lookup = await lookupResultViaAI({ homeName, awayName, dateISO: m.utc, isKnockout: true });
+            lookup = await lookupResultViaAI({ homeCode, awayCode, dateISO: m.utc, isKnockout: true });
           } else {
-            /* Unresolved bracket slot — ask the AI to identify BOTH teams
-             * (by stage + date) as well as the score. */
-            const stageLabel = STAGE_LABEL_HE[m.stage] || m.stage;
-            const idLookup = await lookupResultViaAI({ stageLabel, dateISO: m.utc, isKnockout: true });
+            /* Unresolved bracket slot — look up by stage + date; football-data.org
+             * already knows the two teams once the prior round is done. */
+            const idLookup = await lookupResultViaAI({ stageLabel: m.stage, dateISO: m.utc, isKnockout: true });
             if (idLookup.found && idLookup.homeTeamName && idLookup.awayTeamName) {
               const hc = teamCodeFromApiName(idLookup.homeTeamName);
               const ac = teamCodeFromApiName(idLookup.awayTeamName);
@@ -547,9 +539,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             }
           }
         } else {
-          const homeName = TEAMS[homeCode]?.nameEn || TEAMS[homeCode]?.name || homeCode;
-          const awayName = TEAMS[awayCode]?.nameEn || TEAMS[awayCode]?.name || awayCode;
-          lookup = await lookupResultViaAI({ homeName, awayName, dateISO: m.utc, isKnockout: false });
+          lookup = await lookupResultViaAI({ homeCode, awayCode, dateISO: m.utc, isKnockout: false });
         }
         resultCallsUsed++;
 
@@ -570,8 +560,8 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             away: lookup.away,
             finishedAt: now,
             sim: false,
-            source: "ai-websearch",
-            aiSources: lookup.sources || [],
+            source: "football-data.org",
+            apiSources: lookup.sources || [],
             verificationCount: 1,
             lastVerifiedAt: now,
             ...(isKO ? { isKnockout: true } : {}),
@@ -766,7 +756,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
     let liveCallsUsed = 0;
     const liveUpdates: Record<string, any> = {};
     const liveFallback: any[] = [];
-    if (process.env.ANTHROPIC_API_KEY) {
+    if (hasFD) {
       /* existingLiveScores was pre-fetched above (before the result loop)
        * so both loops share the same snapshot without an extra read. */
 
@@ -806,9 +796,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
 
         if (liveCallsUsed >= LIVE_FALLBACK_BUDGET) continue; // retry on a later run
 
-        const homeName = TEAMS[homeCode]?.nameEn || TEAMS[homeCode]?.name || homeCode;
-        const awayName = TEAMS[awayCode]?.nameEn || TEAMS[awayCode]?.name || awayCode;
-        const live = await lookupLiveScoreViaAI({ homeName, awayName, dateISO: m.utc, isKnockout: isKO });
+        const live = await lookupLiveScoreViaAI({ homeName: homeCode, awayName: awayCode, homeCode, awayCode, dateISO: m.utc, isKnockout: isKO });
         liveCallsUsed++;
 
         if (live.found && live.home != null && live.away != null) {
@@ -833,7 +821,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             : (existingLiveScores[m.id]?.minuteLabel ?? null);
 
           if (!scoreAdvanced) {
-            console.log(`[sync-live] ${m.id} score regression blocked: AI=${live.home}:${live.away} stored=${prevHome}:${prevAway} — keeping stored score, keeping stored minuteLabel`);
+            console.log(`[sync-live] ${m.id} score regression blocked: api=${live.home}:${live.away} stored=${prevHome}:${prevAway} — keeping stored score, keeping stored minuteLabel`);
           }
 
           liveUpdates[m.id] = {
@@ -846,10 +834,10 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             updatedAt: now,
             sources: live.sources || [],
           };
-          console.log(`[sync-live] ${m.id} ${homeName} vs ${awayName}: score=${safeHome}:${safeAway} label=${safeMinuteLabel} goals=${mergedGoals.length}`);
+          console.log(`[sync-live] ${m.id} ${homeCode} vs ${awayCode}: score=${safeHome}:${safeAway} label=${safeMinuteLabel} goals=${mergedGoals.length}`);
           liveFallback.push({ matchId: m.id, found: true, score: `${safeHome}:${safeAway}`, minuteLabel: safeMinuteLabel, goals: mergedGoals.length });
         } else {
-          console.log(`[sync-live] ${m.id} ${homeName} vs ${awayName}: found=false reason=${live.reason ?? "unknown"}`);
+          console.log(`[sync-live] ${m.id} ${homeCode} vs ${awayCode}: found=false reason=${live.reason ?? "unknown"}`);
           liveFallback.push({ matchId: m.id, found: false, reason: live.reason });
         }
       }
@@ -956,9 +944,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
 
         if (aiCallsUsed >= 5) continue; // budget reached — retry the rest on a later run
 
-        const homeName = TEAMS[gc.homeCode]?.nameEn || TEAMS[gc.homeCode]?.name || gc.homeCode;
-        const awayName = TEAMS[gc.awayCode]?.nameEn || TEAMS[gc.awayCode]?.name || gc.awayCode;
-        const glookup = await lookupGoalsViaAI({ homeName, awayName, dateISO: gc.dateISO, homeScore: gc.homeScore, awayScore: gc.awayScore });
+        const glookup = await lookupGoalsViaAI({ homeName: gc.homeCode, awayName: gc.awayCode, homeCode: gc.homeCode, awayCode: gc.awayCode, dateISO: gc.dateISO, homeScore: gc.homeScore, awayScore: gc.awayScore });
         aiCallsUsed++;
 
         if (glookup.found && glookup.goals) {
@@ -967,8 +953,8 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
             homeCode: gc.homeCode,
             awayCode: gc.awayCode,
             updatedAt: Date.now(),
-            source: "ai-websearch",
-            aiSources: glookup.sources || [],
+            source: "football-data.org",
+            apiSources: glookup.sources || [],
           };
           aiGoalsResults.push({ matchId: gc.matchId, found: true });
         } else {
@@ -995,7 +981,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
       total: externalMatches.length,
       summariesGenerated,
       sources: {
-        "anthropic (results)": hasAI ? "ok" : "not configured",
+        "thesportsdb (results/live)": hasTsdb ? "ok" : "not configured",
         "football-data.org (goals/summaries only)": hasFD ? (fdOrgError ? `error: ${fdOrgError}` : "ok") : "not configured",
       },
       aiFallback,
