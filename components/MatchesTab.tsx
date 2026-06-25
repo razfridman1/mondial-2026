@@ -49,6 +49,9 @@ export default function MatchesTab() {
   const [section, setSection] = useState<Section>("stages");
   const [openId, setOpenId]   = useState<string | null>(null);
   const [now, setNow]         = useState(() => Date.now());
+  /* Real-time overrides — polled directly from /api/live-now every 30 s.
+   * These take priority over Firestore liveScores (which lag by ~1 min). */
+  const [liveNowMap, setLiveNowMap] = useState<Record<string, import("@/lib/store").LiveScore>>({});
 
   /* Scroll-to-today plumbing. We render an invisible anchor at the current
    * Israel-date inside the stage view; on first mount (and whenever the user
@@ -136,6 +139,45 @@ export default function MatchesTab() {
     return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
   }, [simConfig?.enabled, refreshLiveScores]);
 
+  /* Direct real-time polling from /api/live-now (both API-Football + TSDB).
+   * Runs every 30 s unconditionally so we pick up matches the moment they
+   * go live, without waiting for the cron→Firestore round-trip. */
+  useEffect(() => {
+    let cancelled = false;
+    async function pollLiveNow() {
+      try {
+        const res = await fetch("/api/live-now", { cache: "no-store" });
+        if (!res.ok || cancelled) return;
+        const data = await res.json() as import("@/app/api/live-now/route").LiveNowResponse;
+        if (!data?.matches?.length) return;
+        const map: Record<string, import("@/lib/store").LiveScore> = {};
+        for (const m of data.matches) {
+          if (!m.matchId) continue;
+          map[m.matchId] = {
+            home: m.homeScore,
+            away: m.awayScore,
+            minuteLabel: m.minuteLabel,
+            homeCode: m.homeCode,
+            awayCode: m.awayCode,
+            updatedAt: data.fetchedAt,
+            sources: [m.source],
+            goals: (m.goals ?? []).map(g => ({
+              minute: g.minute ?? undefined,
+              team: g.team,
+              player: g.player,
+              assist: g.assist,
+              type: g.type,
+            })),
+          };
+        }
+        if (!cancelled) setLiveNowMap(map);
+      } catch { /* ignore */ }
+    }
+    pollLiveNow();
+    const id = setInterval(pollLiveNow, 30_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
   /* While simulation is active, drive the server-side tick worker from the
    * client every 3s. The tick endpoint is idempotent and scans for matches
    * whose simulated 115-minute window has elapsed and writes a random result.
@@ -201,7 +243,7 @@ export default function MatchesTab() {
       const st = matchLiveStatus(m);
       const key = israelDateKey(m.utc);
       // A match with a confirmed result OR a live-FT signal is done — exclude from live buckets
-      const liveScore = liveScores[m.id];
+      const liveScore = liveNowMap[m.id] ?? liveScores[m.id];
       const isFT = /^(FT|Full.?Time|הסתיים|נגמר)/i.test(liveScore?.minuteLabel ?? "");
       const isDone = !!matchResults[m.id] || isFT;
       if (!isDone && (st === "live" || st === "pregame")) live.push(m);
@@ -289,6 +331,13 @@ export default function MatchesTab() {
   );
   const showJumpToFinished = section === "stages" && hasFinished;
 
+  /* Merge Firestore liveScores with direct real-time data from /api/live-now.
+   * liveNowMap takes priority because it's polled directly from the APIs. */
+  const mergedLiveScores = useMemo(
+    () => ({ ...liveScores, ...liveNowMap }),
+    [liveScores, liveNowMap],
+  );
+
   return (
     <section className="matches-tab">
       {/* Section pills */}
@@ -304,12 +353,12 @@ export default function MatchesTab() {
       {/* List body */}
       <div className="mt-body" ref={bodyRef}>
         {section === "stages" ? (
-          <AllStagesSchedule matches={matches} onOpen={setOpenId} liveScores={liveScores} liveNow={buckets.liveOnly} matchResults={matchResults} />
+          <AllStagesSchedule matches={matches} onOpen={setOpenId} liveScores={mergedLiveScores} liveNow={buckets.liveOnly} matchResults={matchResults} />
         ) : visible.length === 0 ? (
           <EmptyState section={section} />
         ) : (
           <GroupedList list={visible} section={section} results={matchResults}
-                       liveScores={liveScores} onOpen={setOpenId} />
+                       liveScores={mergedLiveScores} onOpen={setOpenId} />
         )}
       </div>
 
