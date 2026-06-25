@@ -1,144 +1,261 @@
 "use client";
-import { useMemo } from "react";
-import { MATCHES, TEAMS, VENUES, STAGES } from "@/lib/data";
-import { useStore } from "@/lib/store";
-import { formatIsraelDate, formatIsraelTime, matchLiveStatus } from "@/lib/utils";
-import { resolveAllStages } from "@/lib/bracket";
+/* ================================================================
+ * Bracket.tsx — LIVE knockout bracket driven by TheSportsDB API.
+ *
+ * Data layer : /api/bracket (server-side, 2-min cache)
+ * UI layer   : this component
+ *
+ * STRICT: only renders what the API returns.
+ * No hardcoded bracket structure. No resolveAllStages. No MATCHES.
+ * Missing slots → "לא זמין עדיין" (Not available yet).
+ * ================================================================ */
 
-const STAGE_ORDER = ["R32","R16","QF","SF","THIRD","FINAL"] as const;
-type KoStage = typeof STAGE_ORDER[number];
+import { useEffect, useState, useCallback } from "react";
+import { TEAMS } from "@/lib/data";
+import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
+import type { BracketData, BracketMatch, BracketRound } from "@/app/api/bracket/route";
 
-const STAGE_TITLES: Record<KoStage, string> = {
-  R32: "שלב 32 האחרונות", R16: "שמינית גמר",
-  QF: "רבע גמר", SF: "חצי גמר",
-  THIRD: "מקום 3", FINAL: "הגמר",
-};
+// ---- Status helpers ----------------------------------------------
 
-function TeamSlot({ code, placeholder }: { code: string; placeholder?: string }) {
-  const team = TEAMS[code];
-  if (team) {
-    return (
-      <div className="br-team">
-        <span className="br-team-flag">{team.flag}</span>
-        <span className="br-team-name">{team.name}</span>
-      </div>
-    );
+function isFinished(status: string) {
+  return ["FT", "AET", "AP"].includes(status.toUpperCase());
+}
+function isLive(status: string) {
+  return ["1H", "HT", "2H", "ET", "P", "BT"].includes(status.toUpperCase());
+}
+function statusLabel(status: string): string {
+  switch (status.toUpperCase()) {
+    case "1H": return "מחצית 1";
+    case "HT": return "הפסקה";
+    case "2H": return "מחצית 2";
+    case "ET": return "הארכה";
+    case "P":  return "פנדלים";
+    case "FT":
+    case "AET":
+    case "AP": return "הסתיים";
+    default:   return "";
   }
+}
+
+// ---- Sub-components ---------------------------------------------
+
+function TeamRow({
+  teamName,
+  teamCode,
+  score,
+  isWinner,
+}: {
+  teamName: string | null;
+  teamCode: string | null;
+  score: number | null;
+  isWinner: boolean;
+}) {
+  const team = teamCode ? TEAMS[teamCode] : null;
+  const flag  = team?.flag ?? (teamCode ? "🏳" : "❓");
+  const name  = team?.name ?? teamName ?? "לא זמין עדיין";
+  const tbd   = !teamName;
+
   return (
-    <div className="br-team br-team-tbd">
-      <span className="br-team-flag">❓</span>
-      <span className="br-team-name muted">{placeholder || code}</span>
+    <div className={`brv-team-row${isWinner ? " brv-winner-row" : ""}${tbd ? " brv-tbd" : ""}`}>
+      <span className="brv-flag">{flag}</span>
+      <span className="brv-name">{name}</span>
+      {score !== null && (
+        <span className={`brv-score${isWinner ? " brv-score-win" : ""}`}>{score}</span>
+      )}
     </div>
   );
 }
 
-export default function Bracket() {
-  const matchResults = useStore(s => s.matchResults);
-  const liveScores   = useStore(s => s.liveScores);
+function MatchCard({ match }: { match: BracketMatch }) {
+  const done  = isFinished(match.status);
+  const live  = isLive(match.status);
+  const label = statusLabel(match.status);
 
-  const resolved = useMemo(() => resolveAllStages(matchResults), [matchResults]);
+  // Determine winner
+  let homeWins = false;
+  let awayWins = false;
+  if (done && match.homeScore !== null && match.awayScore !== null) {
+    homeWins = match.homeScore > match.awayScore;
+    awayWins = match.awayScore > match.homeScore;
+  }
 
-  const koMatches = useMemo(() =>
-    MATCHES
-      .filter(m => m.stage !== "GROUP")
-      .sort((a, b) => +new Date(a.utc) - +new Date(b.utc)),
-    []
-  );
-
-  const byStage = useMemo(() => {
-    const map = new Map<KoStage, typeof koMatches>();
-    for (const s of STAGE_ORDER) map.set(s, []);
-    for (const m of koMatches) {
-      const list = map.get(m.stage as KoStage);
-      if (list) list.push(m);
+  // Date/time display (treat TSDB timestamp as UTC)
+  let dateStr = "";
+  let timeStr = "";
+  if (match.timestamp) {
+    const utc = match.timestamp.endsWith("Z")
+      ? match.timestamp
+      : match.timestamp + "Z";
+    try {
+      dateStr = formatIsraelDate(utc, { short: true });
+      timeStr = formatIsraelTime(utc);
+    } catch {
+      dateStr = match.timestamp.slice(0, 10);
     }
-    return map;
-  }, [koMatches]);
+  }
+
+  const noData = !match.homeTeam && !match.awayTeam;
 
   return (
-    <div className="bracket">
-      {STAGE_ORDER.map(stage => {
-        const ms = byStage.get(stage) || [];
-        return (
-          <div key={stage} className="br-col">
-            <h4 className="br-title">{STAGE_TITLES[stage]}</h4>
-            {ms.map(m => {
-              const res = resolved[m.id];
-              const homeCode = res?.home || m.home;
-              const awayCode = res?.away || m.away;
-              const result   = matchResults[m.id];
-              const live     = liveScores[m.id];
-              const status   = matchLiveStatus(m);
-              const venue    = VENUES[m.venue];
-              const isLive   = status === "live" || status === "pregame";
-              const isDone   = !!result;
-              const liveFT   = /^(FT|הסתיים)/i.test(live?.minuteLabel ?? "");
+    <div className={`brv-match${done ? " brv-match-done" : live ? " brv-match-live" : ""}`}>
+      {/* Status badge */}
+      {live && (
+        <div className="brv-badge brv-badge-live">
+          <span className="mt-live-dot" aria-hidden /> {label}
+        </div>
+      )}
+      {done && <div className="brv-badge brv-badge-done">{label}</div>}
+      {!live && !done && match.status === "NS" && label === "" && null}
 
-              const homeIsReal = !!TEAMS[homeCode];
-              const awayIsReal = !!TEAMS[awayCode];
+      {noData ? (
+        <div className="brv-not-available">לא זמין עדיין</div>
+      ) : (
+        <div className="brv-teams">
+          <TeamRow
+            teamName={match.homeTeam}
+            teamCode={match.homeCode}
+            score={match.homeScore}
+            isWinner={homeWins}
+          />
+          <TeamRow
+            teamName={match.awayTeam}
+            teamCode={match.awayCode}
+            score={match.awayScore}
+            isWinner={awayWins}
+          />
+        </div>
+      )}
 
-              // Score display: real result > live score > nothing
-              const showScore = isDone || (live && (isLive || liveFT));
-              const scoreHome = isDone ? result.home : (live?.home ?? "–");
-              const scoreAway = isDone ? result.away : (live?.away ?? "–");
+      {/* Date / venue meta */}
+      <div className="brv-meta">
+        {dateStr && (
+          <span className="brv-meta-date">
+            {dateStr}{timeStr ? ` · ${timeStr}` : ""}
+          </span>
+        )}
+        {(match.venue || match.city) && (
+          <span className="brv-meta-venue">
+            🏟 {[match.venue, match.city].filter(Boolean).join(" · ")}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
-              return (
-                <div key={m.id} className={`br-match${isDone ? " br-done" : isLive ? " br-live" : ""}`}>
-                  {/* Status badge */}
-                  {status === "live" && (
-                    <div className="br-badge br-badge-live">
-                      <span className="mt-live-dot" aria-hidden /> חי · {live?.minuteLabel || ""}
-                    </div>
-                  )}
-                  {status === "pregame" && <div className="br-badge br-badge-pre">קדם-משחק</div>}
-                  {isDone && <div className="br-badge br-badge-done">הסתיים</div>}
+// Group matches into pairs for bracket arms
+function groupIntoPairs<T>(arr: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += 2) out.push(arr.slice(i, i + 2));
+  return out;
+}
 
-                  {/* Teams + score */}
-                  <div className="br-teams-score">
-                    <div className="br-teams">
-                      <TeamSlot code={homeCode} placeholder={m.home} />
-                      <TeamSlot code={awayCode} placeholder={m.away} />
-                    </div>
-                    {showScore && (
-                      <div className={`br-score${isDone ? "" : " br-score-live"}`}>
-                        <span>{scoreHome}</span>
-                        <span className="br-score-sep">:</span>
-                        <span>{scoreAway}</span>
-                      </div>
-                    )}
-                  </div>
+function RoundColumn({ round, isLast }: { round: BracketRound; isLast: boolean }) {
+  const pairs = groupIntoPairs(round.matches);
 
-                  {/* Winner indicator */}
-                  {isDone && res?.winner && TEAMS[res.winner] && (
-                    <div className="br-winner">
-                      {TEAMS[res.winner].flag} {TEAMS[res.winner].name} עברה הלאה
-                    </div>
-                  )}
-
-                  {/* Date / time / venue */}
-                  <div className="br-meta">
-                    <span className="br-meta-date">
-                      {formatIsraelDate(m.utc, { short: true })} · {formatIsraelTime(m.utc)}
-                    </span>
-                    {venue && (
-                      <span className="br-meta-venue">
-                        🏟 {venue.name}{venue.city ? ` · ${venue.city}` : ""}
-                      </span>
-                    )}
-                    {(!homeIsReal || !awayIsReal) && (
-                      <span className="br-meta-pending muted">
-                        {!homeIsReal && !awayIsReal ? "שתי הנבחרות טרם נקבעו"
-                         : !homeIsReal ? `${m.home} טרם נקבעה`
-                         : `${m.away} טרם נקבעה`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+  return (
+    <div className={`brv-col${isLast ? " brv-col-last" : ""}`}>
+      <h4 className="brv-col-title">{round.title}</h4>
+      <div className="brv-pairs">
+        {pairs.map((pair, pi) => (
+          <div key={pi} className={`brv-pair${!isLast && pair.length === 2 ? " brv-pair-connectable" : ""}`}>
+            {pair.map((m, mi) => (
+              <MatchCard key={m.idEvent ?? `${pi}-${mi}`} match={m} />
+            ))}
+            {/* If odd match in last pair, show empty slot */}
+            {pair.length === 1 && round.matches.length % 2 === 1 && (
+              <div className="brv-match brv-match-empty">
+                <div className="brv-not-available">לא זמין עדיין</div>
+              </div>
+            )}
           </div>
-        );
-      })}
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---- Main component ---------------------------------------------
+
+const REFRESH_INTERVAL = 60 * 1000; // re-fetch every 60s
+
+export default function Bracket() {
+  const [data, setData]     = useState<BracketData | null>(null);
+  const [error, setError]   = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/bracket", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json: BracketData = await res.json();
+      setData(json);
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message || "שגיאה בטעינה");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  // --- Loading ---
+  if (loading) {
+    return (
+      <div className="brv-state">
+        <div className="brv-spinner" aria-label="טוען..." />
+        <p>טוען שלב נוקאאוט...</p>
+      </div>
+    );
+  }
+
+  // --- Error ---
+  if (error) {
+    return (
+      <div className="brv-state brv-state-error">
+        <p>⚠️ {error}</p>
+        <button className="brv-retry-btn" onClick={load}>נסה שוב</button>
+      </div>
+    );
+  }
+
+  // --- No data yet ---
+  if (!data || data.rounds.length === 0) {
+    return (
+      <div className="brv-state">
+        <p className="brv-empty-title">🏆 שלב הנוקאאוט</p>
+        <p className="muted">
+          {!data
+            ? "לא ניתן לטעון נתונים מ-TheSportsDB"
+            : "מידע על שלב הנוקאאוט אינו זמין עדיין"}
+        </p>
+        <p className="muted" style={{ fontSize: 12 }}>
+          {data ? "הנתונים יעודכנו ברגע שיוזנו ל-TheSportsDB" : "ודא ש-THESPORTSDB_API_KEY מוגדר"}
+        </p>
+      </div>
+    );
+  }
+
+  // --- Bracket ---
+  return (
+    <div className="brv-root" dir="rtl">
+      <div className="brv-scroll">
+        {data.rounds.map((round, idx) => (
+          <RoundColumn
+            key={round.name}
+            round={round}
+            isLast={idx === data.rounds.length - 1}
+          />
+        ))}
+      </div>
+      <p className="brv-footer muted">
+        מקור נתונים: TheSportsDB · עודכן {new Date(data.fetchedAt).toLocaleTimeString("he-IL")}
+      </p>
     </div>
   );
 }

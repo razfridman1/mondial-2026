@@ -5348,3 +5348,181 @@ html[data-theme="light"] .chat-panel {
 .dossier-player-name { font-weight: 700; grid-column: 2; }
 .dossier-player-club { font-size: 11px; grid-column: 2; }
 .dossier-cap { color: var(--accent); font-weight: 800; }
+
+/* ================================================================
+ * LIVE KNOCKOUT BRACKET (brv-* namespace)
+ * Data driven from TheSportsDB API via /api/bracket
+ * ================================================================ */
+
+.brv-root { width: 100%; padding: 8px 0 20px; }
+
+/* Horizontal scroll container */
+.brv-scroll {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  padding: 4px 4px 12px;
+  align-items: flex-start;
+}
+
+/* Round column */
+.brv-col {
+  min-width: 220px;
+  max-width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding-right: 20px; /* space for bracket arm */
+  position: relative;
+}
+.brv-col-last { padding-right: 0; }
+
+.brv-col-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--accent);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin: 0 0 10px;
+}
+
+/* Pairs container */
+.brv-pairs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Pair = two matches that feed into the same next-round slot */
+.brv-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+/* Bracket connector arm on the right side of a pair */
+.brv-pair-connectable::after {
+  content: "";
+  position: absolute;
+  right: -20px;
+  /* top: center of first match, bottom: center of second match — approximated */
+  top: 25%;
+  height: 50%;
+  width: 0;
+  border-right: 2px solid var(--border-soft);
+}
+/* Horizontal stub to the right at pair midpoint */
+.brv-pair-connectable::before {
+  content: "";
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  width: 20px;
+  height: 0;
+  border-top: 2px solid var(--border-soft);
+}
+
+/* Match card */
+.brv-match {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  transition: border-color .15s;
+  min-height: 76px;
+}
+.brv-match-live  { border-color: #ef4444; }
+.brv-match-done  { opacity: .92; }
+.brv-match-empty { border-style: dashed; opacity: .5; justify-content: center; }
+
+/* Status badge */
+.brv-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 99px;
+  align-self: flex-start;
+}
+.brv-badge-live {
+  background: #ef444422;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.brv-badge-done { background: var(--border-soft); color: var(--text-muted); }
+
+/* Team rows */
+.brv-teams { display: flex; flex-direction: column; gap: 4px; }
+.brv-team-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+.brv-tbd .brv-name { color: var(--text-muted); font-style: italic; font-size: 12px; }
+.brv-flag  { font-size: 17px; line-height: 1; flex-shrink: 0; }
+.brv-name  { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.brv-score { font-size: 15px; font-weight: 800; min-width: 20px; text-align: center; flex-shrink: 0; }
+.brv-winner-row .brv-name  { font-weight: 700; }
+.brv-score-win { color: #22c55e; }
+
+/* Not available yet */
+.brv-not-available {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 8px 0;
+}
+
+/* Meta (date/time/venue) */
+.brv-meta { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+.brv-meta-date  { font-size: 10px; color: var(--text-muted); }
+.brv-meta-venue { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Footer */
+.brv-footer { font-size: 11px; text-align: center; margin-top: 8px; }
+
+/* Loading / error / empty states */
+.brv-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.brv-state-error { color: #ef4444; }
+.brv-empty-title { font-size: 22px; font-weight: 800; color: var(--text); }
+
+.brv-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: brv-spin .8s linear infinite;
+}
+@keyframes brv-spin { to { transform: rotate(360deg); } }
+
+.brv-retry-btn {
+  padding: 8px 20px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.brv-retry-btn:hover { opacity: .85; }
