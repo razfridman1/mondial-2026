@@ -264,4 +264,9 @@ export function afRoundTitle(round: string): string {
   const r = round.toLowerCase();
   if (/round of 32/i.test(r)) return "שלב 32 האחרונות";
   if (/round of 16/i.test(r)) return "שמינית גמר";
-  if (/quarter/i.test(r)) return "רבע גמר"
+  if (/quarter/i.test(r)) return "רבע גמר";
+  if (/semi/i.test(r)) return "חצי גמר";
+  if (/3rd|third/i.test(r)) return "מקום שלישי";
+  if (/final/i.test(r)) return "הגמר";
+  return round;
+}
