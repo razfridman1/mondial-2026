@@ -4,7 +4,7 @@
  * PRIMARY:  API-Football  (https://v3.football.api-sports.io)
  * FALLBACK: TheSportsDB   (https://www.thesportsdb.com/api)
  *
- * Set API_FOOTBALL_KEY (primary) and THESPORTSDB_API_KEY (fallback)
+ * Set FOOTBALL_API_KEY + FOOTBALL_API_URL (primary) and THESPORTSDB_API_KEY (fallback)
  * in your Vercel environment variables.
  *
  * All exported function names / interfaces are unchanged.

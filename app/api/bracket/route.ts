@@ -1,30 +1,15 @@
 import { NextResponse } from "next/server";
-import {
-  hasAfKey,
-  fetchAfWcFixtures,
-  afIsKnockoutRound,
-  afRoundOrder,
-  afRoundTitle,
-  afIsFinished,
-  afIsLive,
-  afFinalScore,
-  type AfFixture,
-} from "@/lib/api-football-wc";
+import { fetchTsdbWcEvents, parseTsdbScore } from "@/lib/thesportsdb";
 import { teamCodeFromApiName } from "@/lib/team-name-mapper";
-import {
-  hasTsdbKey,
-  fetchTsdbWcEvents,
-  parseTsdbScore,
-} from "@/lib/thesportsdb";
 
 /* ================================================================
  * /api/bracket — server-side data layer for the knockout bracket.
  *
- * PRIMARY:  API-Football (v3.football.api-sports.io)
- * FALLBACK: TheSportsDB
+ * Fetches ALL WC 2026 events from TheSportsDB, filters to knockout
+ * rounds only, groups by round, and returns structured JSON.
  *
- * STRICT: only what the API returns.
- * No hardcoded bracket structure. No simulated progression.
+ * STRICT: only what the API returns. No hardcoded bracket structure.
+ * No simulated progression. No assumptions about winners.
  * ================================================================ */
 
 // ---- Types -------------------------------------------------------
@@ -41,7 +26,6 @@ export interface BracketMatch {
   timestamp: string | null;
   venue: string | null;
   city: string | null;
-  source: string;
 }
 
 export interface BracketRound {
@@ -55,7 +39,6 @@ export interface BracketData {
   rounds: BracketRound[];
   fetchedAt: number;
   total: number;
-  source: string;
 }
 
 // ---- Module-level cache (2 min) ----------------------------------
@@ -63,19 +46,33 @@ export interface BracketData {
 const CACHE_TTL = 2 * 60 * 1000;
 let _cache: { data: BracketData; at: number } | null = null;
 
-// ---- TheSportsDB knockout helpers --------------------------------
+// ---- Knockout detection ------------------------------------------
 
-function tsdbIsKnockoutRound(round: string | number | undefined | null): boolean {
+/**
+ * Returns true if this strRound value is a knockout stage.
+ * Excludes: pure numbers (group matchdays), "Group X" strings,
+ *           "Group Stage", null/undefined.
+ * Includes: "Round of 32", "Round of 16", "Quarter-Final",
+ *           "Semi-Final", "Final", "Third Place", "Play-off".
+ */
+function isKnockoutRound(round: string | number | undefined | null): boolean {
   if (round == null) return false;
   const r = String(round).trim().toLowerCase();
-  if (!r || /^\d+$/.test(r) || /^group\b/i.test(r) || /group stage/i.test(r)) return false;
+  if (!r) return false;
+  // Pure number → group matchday
+  if (/^\d+$/.test(r)) return false;
+  // "Group A" .. "Group L" or "Group Stage"
+  if (/^group\b/i.test(r)) return false;
+  // Known knockout keywords
   return /round of|quarter|semi|final|third|3rd place|play.?off/i.test(r);
 }
 
-function tsdbRoundOrder(round: string): number {
+// ---- Round metadata ----------------------------------------------
+
+function roundOrder(round: string): number {
   const r = round.toLowerCase();
-  if (/round of 32/i.test(r)) return 1;
-  if (/round of 16/i.test(r)) return 2;
+  if (/round of 32|last 32/i.test(r)) return 1;
+  if (/round of 16|last 16/i.test(r)) return 2;
   if (/quarter/i.test(r)) return 3;
   if (/semi/i.test(r)) return 4;
   if (/third|3rd/i.test(r)) return 5;
@@ -83,7 +80,7 @@ function tsdbRoundOrder(round: string): number {
   return 99;
 }
 
-function tsdbRoundTitle(round: string): string {
+function roundTitle(round: string): string {
   const r = round.toLowerCase();
   if (/round of 32/i.test(r)) return "שלב 32 האחרונות";
   if (/round of 16/i.test(r)) return "שמינית גמר";
@@ -106,125 +103,64 @@ export async function GET() {
   }
 
   try {
-    // ---- PRIMARY: API-Football -----------------------------------
-    if (hasAfKey()) {
-      const fixtures = await fetchAfWcFixtures();
-      const koFixtures = fixtures.filter(f => afIsKnockoutRound(f.league.round));
+    const events = await fetchTsdbWcEvents();
 
-      if (koFixtures.length > 0) {
-        const roundMap = new Map<string, BracketMatch[]>();
+    // Filter to knockout rounds only
+    const koEvents = events.filter(e => isKnockoutRound(e.strRound));
 
-        for (const f of koFixtures) {
-          const round = f.league.round;
-          if (!roundMap.has(round)) roundMap.set(round, []);
-
-          const status = f.fixture.status.short;
-          const score = afFinalScore(f);
-          const rawHome = f.goals.home;
-          const rawAway = f.goals.away;
-
-          roundMap.get(round)!.push({
-            idEvent: String(f.fixture.id),
-            homeTeam: f.teams.home.name || null,
-            awayTeam: f.teams.away.name || null,
-            homeCode: teamCodeFromApiName(f.teams.home.name) || null,
-            awayCode: teamCodeFromApiName(f.teams.away.name) || null,
-            homeScore: rawHome ?? null,
-            awayScore: rawAway ?? null,
-            status: status || "NS",
-            timestamp: f.fixture.date || null,
-            venue: f.fixture.venue?.name || null,
-            city: f.fixture.venue?.city || null,
-            source: "api-football.com",
-          });
-        }
-
-        const rounds: BracketRound[] = [...roundMap.entries()]
-          .map(([name, matches]) => ({
-            name,
-            title: afRoundTitle(name),
-            order: afRoundOrder(name),
-            matches: matches.sort((a, b) =>
-              (a.timestamp || "").localeCompare(b.timestamp || "")
-            ),
-          }))
-          .filter(r => r.matches.length > 0)
-          .sort((a, b) => a.order - b.order);
-
-        const data: BracketData = {
-          rounds,
-          fetchedAt: now,
-          total: koFixtures.length,
-          source: "api-football.com",
-        };
-        _cache = { data, at: now };
-        return NextResponse.json(data, {
-          headers: { "Cache-Control": "public, max-age=120, stale-while-revalidate=60" },
-        });
-      }
+    // Group by round name
+    const roundMap = new Map<string, typeof koEvents>();
+    for (const e of koEvents) {
+      const rName = String(e.strRound ?? "").trim();
+      if (!roundMap.has(rName)) roundMap.set(rName, []);
+      roundMap.get(rName)!.push(e);
     }
 
-    // ---- FALLBACK: TheSportsDB -----------------------------------
-    if (hasTsdbKey()) {
-      const events = await fetchTsdbWcEvents();
-      const koEvents = events.filter(e => tsdbIsKnockoutRound(e.strRound));
+    // Build rounds array
+    const rounds: BracketRound[] = [...roundMap.entries()]
+      .map(([name, matches]) => ({
+        name,
+        title: roundTitle(name),
+        order: roundOrder(name),
+        matches: matches
+          .sort((a, b) => {
+            const ta = a.strTimestamp || (a.dateEvent && a.strTime ? `${a.dateEvent}T${a.strTime}` : a.dateEvent) || "";
+            const tb = b.strTimestamp || (b.dateEvent && b.strTime ? `${b.dateEvent}T${b.strTime}` : b.dateEvent) || "";
+            return ta.localeCompare(tb);
+          })
+          .map(e => {
+            const raw = e as any;
+            return {
+              idEvent: e.idEvent,
+              homeTeam: e.strHomeTeam || null,
+              awayTeam: e.strAwayTeam || null,
+              homeCode: teamCodeFromApiName(e.strHomeTeam) || null,
+              awayCode: teamCodeFromApiName(e.strAwayTeam) || null,
+              homeScore: parseTsdbScore(e.intHomeScore),
+              awayScore: parseTsdbScore(e.intAwayScore),
+              status: e.strStatus || "NS",
+              timestamp: e.strTimestamp
+                || (e.dateEvent && e.strTime ? `${e.dateEvent}T${e.strTime}` : null)
+                || e.dateEvent
+                || null,
+              venue: raw.strVenue || raw.strStadium || null,
+              city: raw.strCity || raw.strCountry || null,
+            } as BracketMatch;
+          }),
+      }))
+      .filter(r => r.matches.length > 0)
+      .sort((a, b) => a.order - b.order);
 
-      const roundMap = new Map<string, BracketMatch[]>();
-      for (const e of koEvents) {
-        const rName = String(e.strRound ?? "").trim();
-        if (!roundMap.has(rName)) roundMap.set(rName, []);
-        const raw = e as any;
-        roundMap.get(rName)!.push({
-          idEvent: e.idEvent,
-          homeTeam: e.strHomeTeam || null,
-          awayTeam: e.strAwayTeam || null,
-          homeCode: teamCodeFromApiName(e.strHomeTeam) || null,
-          awayCode: teamCodeFromApiName(e.strAwayTeam) || null,
-          homeScore: parseTsdbScore(e.intHomeScore),
-          awayScore: parseTsdbScore(e.intAwayScore),
-          status: e.strStatus || "NS",
-          timestamp: e.strTimestamp
-            || (e.dateEvent && e.strTime ? `${e.dateEvent}T${e.strTime}` : null)
-            || e.dateEvent
-            || null,
-          venue: raw.strVenue || raw.strStadium || null,
-          city: raw.strCity || raw.strCountry || null,
-          source: "thesportsdb.com",
-        });
-      }
+    const data: BracketData = { rounds, fetchedAt: now, total: koEvents.length };
+    _cache = { data, at: now };
 
-      const rounds: BracketRound[] = [...roundMap.entries()]
-        .map(([name, matches]) => ({
-          name,
-          title: tsdbRoundTitle(name),
-          order: tsdbRoundOrder(name),
-          matches: matches.sort((a, b) =>
-            (a.timestamp || "").localeCompare(b.timestamp || "")
-          ),
-        }))
-        .filter(r => r.matches.length > 0)
-        .sort((a, b) => a.order - b.order);
-
-      const data: BracketData = {
-        rounds,
-        fetchedAt: now,
-        total: koEvents.length,
-        source: "thesportsdb.com",
-      };
-      _cache = { data, at: now };
-      return NextResponse.json(data, {
-        headers: { "Cache-Control": "public, max-age=120, stale-while-revalidate=60" },
-      });
-    }
-
-    // No keys configured
-    const empty: BracketData = { rounds: [], fetchedAt: now, total: 0, source: "none" };
-    return NextResponse.json(empty);
-
+    return NextResponse.json(data, {
+      headers: { "Cache-Control": "public, max-age=120, stale-while-revalidate=60" },
+    });
   } catch (err) {
     console.error("[bracket] fetch error:", err);
     return NextResponse.json(
-      { error: "Failed to load bracket data", rounds: [], fetchedAt: now, total: 0, source: "error" },
+      { error: "Failed to load bracket data", rounds: [], fetchedAt: now, total: 0 },
       { status: 500 }
     );
   }

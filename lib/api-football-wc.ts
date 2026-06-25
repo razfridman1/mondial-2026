@@ -4,9 +4,8 @@
  * PRIMARY data source for WC 2026 match results, live scores,
  * goal events, and lineups.
  *
- * Set API_FOOTBALL_KEY in Vercel env vars.
- * Optional: API_FOOTBALL_HOST (default: v3.football.api-sports.io)
- *           AF_WC_LEAGUE_ID   (default: 1  — FIFA World Cup)
+ * Set FOOTBALL_API_KEY and FOOTBALL_API_URL in Vercel env vars.
+ * Optional: AF_WC_LEAGUE_ID (default: 1 — FIFA World Cup)
  *
  * Exported helpers follow the same conventions as thesportsdb.ts so
  * ai-result-fallback.ts can call one then fall back to the other.
@@ -16,8 +15,10 @@ import { teamCodeFromApiName } from "./team-name-mapper";
 
 // ---- Config ---------------------------------------------------------
 
-function afKey(): string | undefined { return process.env.API_FOOTBALL_KEY; }
-function afHost(): string { return process.env.API_FOOTBALL_HOST ?? "v3.football.api-sports.io"; }
+function afKey(): string | undefined { return process.env.FOOTBALL_API_KEY; }
+function afBaseUrl(): string {
+  return (process.env.FOOTBALL_API_URL ?? "https://v3.football.api-sports.io").replace(/\/$/, "");
+}
 
 export const AF_WC_LEAGUE  = Number(process.env.AF_WC_LEAGUE_ID ?? 1);
 export const AF_WC_SEASON  = 2026;
@@ -30,7 +31,7 @@ async function afGet(path: string): Promise<any | null> {
   const key = afKey();
   if (!key) return null;
   try {
-    const res = await fetch(`https://${afHost()}${path}`, {
+    const res = await fetch(`${afBaseUrl()}${path}`, {
       headers: {
         "x-apisports-key": key,
         "Accept": "application/json",
