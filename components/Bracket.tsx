@@ -231,11 +231,13 @@ export default function Bracket() {
         <p className="brv-empty-title">🏆 שלב הנוקאאוט</p>
         <p className="muted">
           {!data
-            ? "לא ניתן לטעון נתונים מ-TheSportsDB"
-            : "מידע על שלב הנוקאאוט אינו זמין עדיין"}
+            ? "לא ניתן לטעון נתונים מה-API"
+            : "משחקי שלב הנוקאאוט טרם פורסמו ב-API"}
         </p>
         <p className="muted" style={{ fontSize: 12 }}>
-          {data ? "הנתונים יעודכנו ברגע שיוזנו ל-TheSportsDB" : "ודא ש-THESPORTSDB_API_KEY מוגדר"}
+          {data
+            ? "הנתונים יעודכנו אוטומטית ברגע שיפורסמו"
+            : "ודא ש-FOOTBALL_API_KEY ו-FOOTBALL_API_URL מוגדרים ב-Vercel"}
         </p>
       </div>
     );
@@ -254,7 +256,7 @@ export default function Bracket() {
         ))}
       </div>
       <p className="brv-footer muted">
-        מקור נתונים: TheSportsDB · עודכן {new Date(data.fetchedAt).toLocaleTimeString("he-IL")}
+        מקור: {(data as any).source ?? "API"} · עודכן {new Date(data.fetchedAt).toLocaleTimeString("he-IL")}
       </p>
     </div>
   );
