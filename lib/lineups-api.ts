@@ -31,7 +31,7 @@ function parseFormation(s: string | undefined): Formation {
 }
 
 export async function fetchLiveLineups(matchId: string, dateIso: string, homeCode: string, awayCode: string): Promise<{ home: TeamLineup; away: TeamLineup } | null> {
-  const apiKey = process.env.FOOTBALL_API_KEY;
+  const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey) return null;
 
   const { db } = getAdmin();
@@ -46,13 +46,13 @@ export async function fetchLiveLineups(matchId: string, dateIso: string, homeCod
   }
 
   try {
-    const baseUrl = (process.env.FOOTBALL_API_URL || "https://v3.football.api-sports.io").replace(/\/$/, "");
+    const host = process.env.API_FOOTBALL_HOST || "v3.football.api-sports.io";
     const homeId = AF_TEAM_IDS[homeCode];
     const awayId = AF_TEAM_IDS[awayCode];
     if (!homeId || !awayId) return null;
 
     const dateOnly = dateIso.slice(0, 10);
-    const fxRes = await fetch(`${baseUrl}/fixtures?date=${dateOnly}&team=${homeId}`, {
+    const fxRes = await fetch(`https://${host}/fixtures?date=${dateOnly}&team=${homeId}`, {
       headers: { "x-apisports-key": apiKey },
     });
     if (!fxRes.ok) return null;
@@ -62,7 +62,7 @@ export async function fetchLiveLineups(matchId: string, dateIso: string, homeCod
     if (!fx) return null;
     const fixtureId = fx.fixture?.id;
 
-    const lnRes = await fetch(`${baseUrl}/fixtures/lineups?fixture=${fixtureId}`, {
+    const lnRes = await fetch(`https://${host}/fixtures/lineups?fixture=${fixtureId}`, {
       headers: { "x-apisports-key": apiKey },
     });
     if (!lnRes.ok) return null;
