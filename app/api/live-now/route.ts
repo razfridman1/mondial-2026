@@ -35,6 +35,11 @@ import {
  * Returns current score, minute, goals for every live match.
  * ================================================================ */
 
+// Force dynamic rendering — never cache at the Next.js/CDN layer.
+// This endpoint fetches live scores and must always return fresh data.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export interface LiveNowMatch {
   matchId: string;           // internal MATCHES id
   homeCode: string;
@@ -60,10 +65,6 @@ export interface LiveNowResponse {
   sources: string[];
 }
 
-// ---- Short-lived cache (25 s) ------------------------------------
-const CACHE_TTL = 25_000;
-let _cache: { data: LiveNowResponse; at: number } | null = null;
-
 // ---- Internal match finder ---------------------------------------
 /** Find internal match ID for a given home/away code + date. */
 function findInternalMatchId(
@@ -86,12 +87,6 @@ function findInternalMatchId(
 // ---- Route -------------------------------------------------------
 export async function GET() {
   const now = Date.now();
-  if (_cache && now - _cache.at < CACHE_TTL) {
-    return NextResponse.json(_cache.data, {
-      headers: { "Cache-Control": "public, max-age=25, stale-while-revalidate=10" },
-    });
-  }
-
   const sources: string[] = [];
   const matchMap = new Map<string, LiveNowMatch>(); // matchId → data
 
@@ -235,9 +230,10 @@ export async function GET() {
     fetchedAt: now,
     sources,
   };
-  _cache = { data, at: now };
-
   return NextResponse.json(data, {
-    headers: { "Cache-Control": "public, max-age=25, stale-while-revalidate=10" },
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "Pragma": "no-cache",
+    },
   });
 }

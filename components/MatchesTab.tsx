@@ -174,7 +174,7 @@ export default function MatchesTab() {
       } catch { /* ignore */ }
     }
     pollLiveNow();
-    const id = setInterval(pollLiveNow, 30_000);
+    const id = setInterval(pollLiveNow, 15_000);
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
