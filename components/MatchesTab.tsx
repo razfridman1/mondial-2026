@@ -148,7 +148,7 @@ export default function MatchesTab() {
       try {
         const res = await fetch("/api/live-now", { cache: "no-store" });
         if (!res.ok || cancelled) return;
-        const data = await res.json() as import("@/app/api/live-now/route").LiveNowResponse;
+        const data = await res.json() as import("@/lib/live-now-types").LiveNowResponse;
         if (!data?.matches?.length) return;
         const map: Record<string, import("@/lib/store").LiveScore> = {};
         for (const m of data.matches) {

@@ -40,30 +40,8 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export interface LiveNowMatch {
-  matchId: string;           // internal MATCHES id
-  homeCode: string;
-  awayCode: string;
-  homeScore: number;
-  awayScore: number;
-  status: string;            // "1H" | "HT" | "2H" | "ET" | "P" | "FT" | "AET" | "AP"
-  minuteLabel: string;       // "23′" | "הפסקה" | "הסתיים" | …
-  elapsed: number | null;    // numeric minute from API
-  goals: Array<{
-    minute: number | null;
-    team: "home" | "away";
-    player: string;
-    assist?: string;
-    type?: string;
-  }>;
-  source: string;
-}
-
-export interface LiveNowResponse {
-  matches: LiveNowMatch[];
-  fetchedAt: number;
-  sources: string[];
-}
+export type { LiveNowMatch, LiveNowResponse } from "@/lib/live-now-types";
+import type { LiveNowMatch, LiveNowResponse } from "@/lib/live-now-types";
 
 // ---- Internal match finder ---------------------------------------
 /** Find internal match ID for a given home/away code + date. */
