@@ -36,6 +36,9 @@ async function afGet(path: string): Promise<any | null> {
         "x-apisports-key": key,
         "Accept": "application/json",
       },
+      // Must opt out of Next.js data cache — without this, App Router
+      // silently caches the response forever (even in Route Handlers).
+      cache: "no-store",
     });
     if (!res.ok) return null;
     return await res.json();
@@ -261,9 +264,4 @@ export function afRoundTitle(round: string): string {
   const r = round.toLowerCase();
   if (/round of 32/i.test(r)) return "שלב 32 האחרונות";
   if (/round of 16/i.test(r)) return "שמינית גמר";
-  if (/quarter/i.test(r)) return "רבע גמר";
-  if (/semi/i.test(r)) return "חצי גמר";
-  if (/3rd|third/i.test(r)) return "מקום שלישי";
-  if (/final/i.test(r)) return "הגמר";
-  return round;
-}
+  if (/quarter/i.test(r)) return "רבע גמר"
