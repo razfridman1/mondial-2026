@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
-import { MATCHES, TEAMS } from "@/lib/data";
+import { MATCHES } from "@/lib/data";
 import { listSeasonMatches, parse1X2Odds, hasFootballDataIoKey, WC_SEASON_ID } from "@/lib/footballdata-io";
 import { teamCodeFromApiName } from "@/lib/team-name-mapper";
-import { lookupOddsViaAI } from "@/lib/ai-result-fallback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,7 +44,6 @@ export const maxDuration = 60;
 
 const SECRET = process.env.CRON_SECRET || "";
 const SEASON_ID = WC_SEASON_ID; // World Cup 2026 on footballdata.io (league_id=50)
-const AI_ODDS_BUDGET = 1;
 
 export async function GET(req: Request) {
   if (SECRET) {
@@ -95,43 +93,11 @@ export async function GET(req: Request) {
     }
   }
 
-  /* AI fallback for upcoming GROUP matches still without odds. */
-  const now = Date.now();
-  const stillMissing = MATCHES.filter(m => {
-    if (m.stage !== "GROUP") return false;
-    if (existing[m.id] || updates[m.id]) return false; // already have real odds
-    const kickoff = new Date(m.utc).getTime();
-    return kickoff > now - 3 * 60 * 60 * 1000; // not long-finished
-  }).sort((a, b) => new Date(a.utc).getTime() - new Date(b.utc).getTime());
-
-  let aiUsed = 0, aiFound = 0;
-  const aiDebug: any[] = [];
-  for (const m of stillMissing) {
-    if (aiUsed >= AI_ODDS_BUDGET) break;
-    const home = TEAMS[m.home], away = TEAMS[m.away];
-    if (!home || !away) continue;
-    aiUsed++;
-    const lookup = await lookupOddsViaAI({
-      homeName: home.nameEn, awayName: away.nameEn,
-      dateISO: m.utc,
-    });
-    if (lookup.found && lookup.odds) {
-      aiFound++;
-      const entry = { ...lookup.odds, updatedAt: Date.now(), source: "ai" };
-      updates[m.id] = entry;
-      // Write immediately — don't risk losing this on a later timeout.
-      await db.collection("live_data").doc("match_odds").set({ [m.id]: entry }, { merge: true });
-    } else {
-      aiDebug.push({ matchId: m.id, reason: lookup.reason });
-    }
-  }
-
   if (Object.keys(updates).length) {
     await db.collection("live_data").doc("match_odds").set(updates, { merge: true });
   }
 
   return NextResponse.json({
     ok: true, fdMatches: fdCount, priced, matched, updated: Object.keys(updates).length,
-    aiUsed, aiFound, aiDebug,
   });
 }

@@ -306,3 +306,23 @@ export function teamsByGroup(): Record<string, Team[]> {
   });
   return map;
 }
+
+/* ---------- Hebrew name lookup (client-safe) ----------
+ * Translates an English player name to Hebrew using the curated SQUADS data.
+ * Returns the original name if not found. Safe to call from client components.
+ */
+const _heByEn: Record<string, string> = (() => {
+  const out: Record<string, string> = {};
+  for (const list of Object.values(SQUADS)) {
+    for (const p of list) {
+      if (p.nameEn && p.name) out[normalizeName(p.nameEn)] = p.name;
+    }
+  }
+  return out;
+})();
+
+export function playerNameHe(enName: string): string {
+  if (!enName) return enName;
+  const key = normalizeName(enName);
+  return _heByEn[key] || enName;
+}

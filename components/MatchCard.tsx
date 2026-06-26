@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { TEAMS, VENUES, CHANNELS, STAGES } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
@@ -10,6 +10,7 @@ import { shareToWhatsApp, matchShareText } from "@/lib/share";
 import { scorePrediction } from "@/lib/scoring";
 import { computeGroupStandings } from "@/lib/standings";
 import type { Match } from "@/lib/types";
+import { playerNameHe } from "@/lib/players";
 import Countdown from "./Countdown";
 
 export default function MatchCard({ match, onOpen, live }: { match: Match; onOpen: (id: string) => void; live?: import("@/lib/store").LiveScore }) {
@@ -184,19 +185,7 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
 
   const isKnockout = match.stage !== "GROUP";
 
-  /* Lineups: fetch once within 60 min of kickoff (or during/after the match).
-   * TheSportsDB publishes them ~1h before kickoff. */
-  const [lineups, setLineups] = useState<{ home: any; away: any } | null>(null);
-  const shouldFetchLineups = minutesToKick <= 60 || effectiveStatus === "live" || effectiveStatus === "finished";
-  useEffect(() => {
-    if (!shouldFetchLineups || lineups) return;
-    let cancelled = false;
-    fetch(`/api/lineups?matchId=${match.id}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (!cancelled && d?.lineups) setLineups(d.lineups); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [shouldFetchLineups, match.id]);  // eslint-disable-line react-hooks/exhaustive-deps
+
 
   /* Compute score if both prediction and result available */
   const myScore = useMemo(() => {
@@ -292,16 +281,16 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
           <div className="mt-goals-side mt-goals-home">
             {homeGoals.map((g, i) => (
               <span key={i} className="mt-goal-chip">
-                ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
-                {g.assist ? <span className="mt-goal-assist"> ({g.assist})</span> : null}
+                ⚽ {g.minute != null ? `${g.minute}′` : ""} {playerNameHe(g.player || "")}
+                {g.assist ? <span className="mt-goal-assist"> ({playerNameHe(g.assist)})</span> : null}
               </span>
             ))}
           </div>
           <div className="mt-goals-side mt-goals-away">
             {awayGoals.map((g, i) => (
               <span key={i} className="mt-goal-chip">
-                ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
-                {g.assist ? <span className="mt-goal-assist"> ({g.assist})</span> : null}
+                ⚽ {g.minute != null ? `${g.minute}′` : ""} {playerNameHe(g.player || "")}
+                {g.assist ? <span className="mt-goal-assist"> ({playerNameHe(g.assist)})</span> : null}
               </span>
             ))}
           </div>
@@ -313,40 +302,7 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
         <span>📍 {venue.city}{venue.country ? ", " + venue.country : ""} {venue.flag || ""}</span>
       </div>
 
-      {/* Lineups ~1h before kickoff */}
-      {lineups && (
-        <div className="mc-lineups">
-          <div className="mc-lineups-title">&#x1F9D1; &#x05D4;&#x05E8;&#x05DB;&#x05D1;&#x05D9;&#x05DD; &#x05E8;&#x05D0;&#x05E9;&#x05D5;&#x05E0;&#x05D9;&#x05D9;&#x05DD;</div>
-          <div className="mc-lineups-cols">
-            <div className="mc-lineup-team">
-              <div className="mc-lineup-team-name">{home.flag} {home.name}</div>
-              {(lineups.home?.slots || [])
-                .filter((s: any) => s.player)
-                .sort((a: any, b: any) => (a.player.jersey ?? 99) - (b.player.jersey ?? 99))
-                .map((s: any, i: number) => (
-                  <div key={i} className="mc-lineup-player">
-                    <span className="mc-lineup-num">{s.player.jersey ?? ""}</span>
-                    <span className="mc-lineup-name">{s.player.name}</span>
-                    <span className="mc-lineup-pos muted">{s.pos}</span>
-                  </div>
-                ))}
-            </div>
-            <div className="mc-lineup-team">
-              <div className="mc-lineup-team-name">{away.flag} {away.name}</div>
-              {(lineups.away?.slots || [])
-                .filter((s: any) => s.player)
-                .sort((a: any, b: any) => (a.player.jersey ?? 99) - (b.player.jersey ?? 99))
-                .map((s: any, i: number) => (
-                  <div key={i} className="mc-lineup-player">
-                    <span className="mc-lineup-num">{s.player.jersey ?? ""}</span>
-                    <span className="mc-lineup-name">{s.player.name}</span>
-                    <span className="mc-lineup-pos muted">{s.pos}</span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
-      )}
+
 
       <div className="status-chips">
         {isFinished && myPrediction ? (

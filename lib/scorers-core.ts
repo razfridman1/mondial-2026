@@ -164,53 +164,41 @@ export async function getScorerLeaderboards(db: FirebaseFirestore.Firestore): Pr
   let rawAssists: ScorerEntry[];
   let debugSource: string;
 
-  // -- Assists: try Firestore cache first, then AI (every 30 min), fallback to FD/Firestore --
-  const ASSISTS_TTL_MS = 30 * 60 * 1000; // 30 minutes
-  let aiAssistsRaw: ScorerEntry[] | null = null;
-  try {
-    const aiCacheSnap = await db.collection("live_data").doc("assists_leaderboard").get();
-    const aiCache = aiCacheSnap.exists ? aiCacheSnap.data() : null;
-    const cacheAge = aiCache?.updatedAt ? Date.now() - aiCache.updatedAt : Infinity;
-    if (aiCache?.assists && Array.isArray(aiCache.assists) && aiCache.assists.length > 0 && cacheAge < ASSISTS_TTL_MS) {
-      // Cache is fresh — use it
-      aiAssistsRaw = (aiCache.assists as { name: string; team: string; count: number }[])
-        .map(a => ({ name: a.name, teamCode: a.team || null, count: a.count }));
-    } else {
-      // Cache stale / missing — call AI
-      const aiResult = await lookupAssistsLeaderboardViaAI();
-      if (aiResult.found && aiResult.assists && aiResult.assists.length > 0) {
-        aiAssistsRaw = aiResult.assists.map(a => ({ name: a.name, teamCode: a.team || null, count: a.count }));
-        // Persist to cache
-        await db.collection("live_data").doc("assists_leaderboard").set({
-          assists: aiResult.assists,
-          updatedAt: Date.now(),
-        });
-      }
-    }
-  } catch { /* non-fatal */ }
-
+  // -- Assists priority: API-Football /players/topassists → Firestore fallback --
+  // API-Football is always primary. We never let a stale cache override live data.
   if (fd && fd.scorers.length > 0) {
     rawScorers = fd.scorers;
-    debugSource = "football-data.org";
-    if (aiAssistsRaw && aiAssistsRaw.length > 0) {
-      rawAssists = aiAssistsRaw.sort(byRank);
-      debugSource += "+ai-assists-cache";
-    } else if (fd.assists.length >= 3) {
+    if (fd.assists.length > 0) {
       rawAssists = fd.assists;
-      debugSource += "+fd-assists";
+      debugSource = "api-football";
     } else {
-      rawAssists = Array.from(fbAssists.values()).sort(byRank);
-      debugSource += "+firestore-assists";
+      // API-Football topassists returned empty — fall back to scanning events
+      let eventAssists: ScorerEntry[] | null = null;
+      try {
+        const aiResult = await lookupAssistsLeaderboardViaAI();
+        if (aiResult.found && aiResult.assists && aiResult.assists.length > 0) {
+          eventAssists = aiResult.assists.map(a => ({ name: a.name, teamCode: a.team || null, count: a.count }));
+        }
+      } catch { /* non-fatal */ }
+      rawAssists = eventAssists?.length
+        ? eventAssists.sort(byRank)
+        : Array.from(fbAssists.values()).sort(byRank);
+      debugSource = "api-football-scorers+event-assists-fallback";
     }
   } else {
     rawScorers = Array.from(fbScorers.values()).sort(byRank);
-    if (aiAssistsRaw && aiAssistsRaw.length > 0) {
-      rawAssists = aiAssistsRaw.sort(byRank);
-      debugSource = "firestore-scorers+ai-assists-cache";
-    } else {
-      rawAssists = Array.from(fbAssists.values()).sort(byRank);
-      debugSource = "firestore-fallback";
-    }
+    // No API-Football scorers — scan events for assists too
+    let eventAssists: ScorerEntry[] | null = null;
+    try {
+      const aiResult = await lookupAssistsLeaderboardViaAI();
+      if (aiResult.found && aiResult.assists && aiResult.assists.length > 0) {
+        eventAssists = aiResult.assists.map(a => ({ name: a.name, teamCode: a.team || null, count: a.count }));
+      }
+    } catch { /* non-fatal */ }
+    rawAssists = eventAssists?.length
+      ? eventAssists.sort(byRank)
+      : Array.from(fbAssists.values()).sort(byRank);
+    debugSource = "firestore-fallback";
   }
 
   const top8Scorers = rawScorers.slice(0, 8);

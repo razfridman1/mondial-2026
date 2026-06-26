@@ -5529,33 +5529,38 @@ html[data-theme="light"] .chat-panel {
 
 
 /* ====================================================================
- * PURPLE THEME — fc26 redesign
- * Primary:  #4B2D8F  (deep purple — group headers, active states)
- * Navy:     #0D0A3C  (dark navy  — date chips, today badge)
- * Bg:       #F5F6FA  (very light cool gray)
- * Card:     #FFFFFF  (pure white)
+ * FC26 PURPLE THEME
+ *
+ * Background palette (warm lavender — comfortable, not snow-white):
+ *   Page bg:   #F0EFFE  (soft lavender tint)
+ *   Card bg:   #F8F7FF  (near-white with warmth)
+ *   Card alt:  #EAE8FC  (slightly deeper lavender)
+ *
+ * Purple:  #4B2D8F  (headers, active states)
+ * Navy:    #0D0A3C  (date chips, "finished" badges)
+ * Text:    #1A1433  (deep purple-black — better than pure #000)
+ * Muted:   #4A476A  (medium purple-gray)
  * ==================================================================== */
 
-/* ── Core light-theme tokens ──────────────────────────────────────── */
+/* ── Core tokens ──────────────────────────────────────────────────── */
 html[data-theme="light"] {
-  --bg:          #F5F6FA;
-  --bg-elev:     #FFFFFF;
-  --bg-card:     #FFFFFF;
-  --bg-card-2:   #F0F1F8;
-  --border:      #DDE0EE;
-  --border-soft: #EAECF4;
-  --text:        #12103A;
-  --text-muted:  #5A5880;
-  --text-dim:    #8F8DB8;
+  --bg:          #F0EFFE;
+  --bg-elev:     #F8F7FF;
+  --bg-card:     #F8F7FF;
+  --bg-card-2:   #EAE8FC;
+  --border:      #C8C4E8;
+  --border-soft: #DDD9F4;
+  --text:        #1A1433;
+  --text-muted:  #4A476A;
+  --text-dim:    #7B789A;
   --accent:      #4B2D8F;
   --accent-2:    #7C3AED;
   --primary:     #4B2D8F;
   --primary-2:   #3B1F7A;
-  --green:       #15803d;
-  --red:         #b91c1c;
-  --orange:      #d97706;
+  --green:       #166534;
+  --red:         #9B1C1C;
+  --orange:      #B45309;
   --purple:      #4B2D8F;
-  --navy:        #0D0A3C;
 }
 
 html[data-theme="light"] body {
@@ -5563,268 +5568,242 @@ html[data-theme="light"] body {
   color: var(--text);
 }
 
-/* ── Header & tabs ────────────────────────────────────────────────── */
+/* ── Header ───────────────────────────────────────────────────────── */
 html[data-theme="light"] .header {
   background: #4B2D8F;
   border-bottom: none;
-  box-shadow: 0 2px 12px rgba(75, 45, 143, 0.25);
+  box-shadow: 0 2px 16px rgba(75,45,143,0.3);
 }
-html[data-theme="light"] .brand-title,
-html[data-theme="light"] .brand-sub,
-html[data-theme="light"] #header-clock { color: rgba(255,255,255,0.9); }
-html[data-theme="light"] .brand-logo {
-  background: linear-gradient(135deg, #FFD700, #FFA500);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-html[data-theme="light"] .tabs { border-top: 1px solid rgba(255,255,255,0.15); }
+/* Specific white-text elements inside the purple header */
+html[data-theme="light"] .brand-title  { color: #FFFFFF !important; }
+html[data-theme="light"] .brand-sub    { color: rgba(255,255,255,0.75) !important; }
+html[data-theme="light"] .header-domain { color: #FFD700 !important; }
+html[data-theme="light"] #header-clock { color: rgba(255,255,255,0.85) !important; }
+html[data-theme="light"] #header-clock .muted { color: rgba(255,255,255,0.65) !important; }
+html[data-theme="light"] .header-name-btn { color: #FFFFFF !important; }
+html[data-theme="light"] .header-login-stats { color: #FFFFFF !important; }
+
+/* ── Main nav tabs (inside purple header) ─────────────────────────── */
 html[data-theme="light"] .tab-btn {
-  color: rgba(255,255,255,0.65);
-  border-bottom-color: transparent;
+  color: rgba(255,255,255,0.65) !important;
+  border-bottom-color: transparent !important;
 }
-html[data-theme="light"] .tab-btn:hover { color: #fff; }
+html[data-theme="light"] .tab-btn:hover {
+  color: rgba(255,255,255,0.9) !important;
+}
 html[data-theme="light"] .tab-btn.on {
-  color: #fff;
-  border-bottom-color: #FFD700;
+  color: #FFFFFF !important;
+  border-bottom-color: #FFD700 !important;
 }
 
-/* ── Section pills (משחקים/חי/היום) ──────────────────────────────── */
+/* ── Section pills row (משחקים/חי/היום) ──────────────────────────── */
 html[data-theme="light"] .mt-sections {
   background: linear-gradient(180deg,
-    rgba(245,246,250,0.97) 0%,
-    rgba(245,246,250,0.7) 80%,
-    rgba(245,246,250,0) 100%);
+    rgba(240,239,254,0.98) 0%,
+    rgba(240,239,254,0.8) 80%,
+    rgba(240,239,254,0) 100%);
 }
 html[data-theme="light"] .mt-pill {
-  background: #FFFFFF;
-  border: 1px solid #DDE0EE;
-  color: #5A5880;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  background: #F8F7FF;
+  border: 1.5px solid #C8C4E8;
+  color: #4A476A !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
 }
 html[data-theme="light"] .mt-pill:hover {
-  background: #F0F1F8;
-  color: #12103A;
+  background: #EAE8FC;
+  color: #1A1433 !important;
 }
 html[data-theme="light"] .mt-pill.on {
-  background: linear-gradient(135deg, #4B2D8F 0%, #7C3AED 100%);
-  color: #fff;
+  background: #4B2D8F;
+  color: #FFFFFF !important;
   border-color: transparent;
-  box-shadow: 0 4px 14px rgba(75, 45, 143, 0.35);
+  box-shadow: 0 4px 14px rgba(75,45,143,0.35);
 }
 html[data-theme="light"] .mt-pill.is-live.on {
-  background: linear-gradient(135deg, #E11D48 0%, #F97316 100%);
-  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.4);
+  background: linear-gradient(135deg, #BE123C 0%, #EA580C 100%);
+  box-shadow: 0 4px 14px rgba(190,18,60,0.4);
 }
+html[data-theme="light"] .mt-pill-label { color: inherit !important; }
 
-/* ── Day / date headings ──────────────────────────────────────────── */
+/* ── Day / section headings ───────────────────────────────────────── */
 html[data-theme="light"] .day-heading {
-  background: #0D0A3C;
-  color: #FFFFFF;
+  background: #0D0A3C !important;
+  color: #FFFFFF !important;
+  border-right: none !important;
   border-radius: 8px;
-  border-right: none;
   padding: 10px 16px;
-  font-size: 14px;
 }
-html[data-theme="light"] .day-heading .muted { color: rgba(255,255,255,0.65); }
-html[data-theme="light"] .chip.chip-strong {
-  background: rgba(255,255,255,0.18);
-  color: #fff;
-  border-color: rgba(255,255,255,0.25);
+html[data-theme="light"] .day-heading * { color: rgba(255,255,255,0.8) !important; }
+html[data-theme="light"] .day-heading .chip-strong {
+  background: rgba(255,255,255,0.15) !important;
+  color: #FFFFFF !important;
+  border-color: rgba(255,255,255,0.25) !important;
 }
-
-/* ── Section / stage title ────────────────────────────────────────── */
-html[data-theme="light"] .mt-section-heading,
+html[data-theme="light"] .mt-section-heading { color: #FFFFFF !important; }
 html[data-theme="light"] .mt-stage-title {
-  background: #4B2D8F;
-  color: #FFFFFF;
-  border: none;
-  box-shadow: 0 2px 10px rgba(75, 45, 143, 0.2);
+  background: #4B2D8F !important;
+  color: #FFFFFF !important;
+  border: none !important;
 }
-html[data-theme="light"] .mt-section-heading .muted { color: rgba(255,255,255,0.6); }
+html[data-theme="light"] .mt-stage-title * { color: #FFFFFF !important; }
 
-/* ── Match cards (modern view in MatchesTab) ──────────────────────── */
-html[data-theme="light"] .mt-card {
-  background: #FFFFFF;
-  border: 1px solid #E4E6F0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-html[data-theme="light"] .mt-card:hover {
-  border-color: #4B2D8F;
-  box-shadow: 0 6px 20px rgba(75, 45, 143, 0.15);
-}
-html[data-theme="light"] .mt-card.status-live {
-  border-color: rgba(225, 29, 72, 0.35);
-  background: #FFFBFB;
-}
-html[data-theme="light"] .mt-card-head { border-bottom: 1px solid #F0F1F8; }
-html[data-theme="light"] .mt-card-foot { border-top: 1px solid #F0F1F8; }
-html[data-theme="light"] .mt-team-name { color: #12103A; }
-html[data-theme="light"] .mt-score-num { color: #12103A; }
-html[data-theme="light"] .mt-score.live .mt-score-num { color: #4B2D8F; }
-html[data-theme="light"] .mt-vs-time { color: #4B2D8F; font-weight: 700; }
-html[data-theme="light"] .mt-live-pill {
-  background: linear-gradient(90deg, #E11D48, #F97316);
-  color: #fff;
-  border-radius: 999px;
-  padding: 2px 10px;
-  font-size: 12px;
-  font-weight: 700;
-}
-html[data-theme="light"] .mt-status-pill.finished {
-  background: #0D0A3C;
-  color: #fff;
-  border-radius: 999px;
-  padding: 2px 10px;
-  font-size: 12px;
-}
-html[data-theme="light"] .mt-status-pill.pregame {
-  background: rgba(75,45,143,0.1);
-  color: #4B2D8F;
-  border-radius: 999px;
-  padding: 2px 10px;
-  font-size: 12px;
-}
-html[data-theme="light"] .mt-status-pill.scheduled {
-  color: #4B2D8F;
-  font-weight: 700;
-}
-html[data-theme="light"] .mt-venue,
-html[data-theme="light"] .mt-broadcast { color: #5A5880; }
-
-/* ── Old-style MatchCard (chip-stage, badges) ─────────────────────── */
+/* ── Stage/group chip ─────────────────────────────────────────────── */
 html[data-theme="light"] .chip.chip-stage {
-  background: #4B2D8F;
-  border: none;
-  color: #FFFFFF;
+  background: #4B2D8F !important;
+  color: #FFFFFF !important;
+  border: none !important;
 }
+
+/* ── Badges ───────────────────────────────────────────────────────── */
 html[data-theme="light"] .badge-live {
-  background: linear-gradient(90deg, #E11D48, #F97316);
-  color: #fff;
+  background: linear-gradient(90deg, #BE123C, #EA580C) !important;
+  color: #FFFFFF !important;
 }
 html[data-theme="light"] .badge-finished {
-  background: #0D0A3C;
-  color: #fff;
+  background: #0D0A3C !important;
+  color: #FFFFFF !important;
 }
 html[data-theme="light"] .badge-pregame {
-  background: rgba(75,45,143,0.12);
-  color: #4B2D8F;
+  background: rgba(75,45,143,0.12) !important;
+  color: #4B2D8F !important;
+}
+html[data-theme="light"] .mt-live-pill {
+  background: linear-gradient(90deg, #BE123C, #EA580C) !important;
+  color: #FFFFFF !important;
+}
+html[data-theme="light"] .mt-status-pill.finished {
+  background: #0D0A3C !important;
+  color: #FFFFFF !important;
+}
+html[data-theme="light"] .mt-status-pill.pregame {
+  background: rgba(75,45,143,0.1) !important;
+  color: #4B2D8F !important;
+}
+html[data-theme="light"] .mt-status-pill.scheduled {
+  color: #4B2D8F !important;
+  font-weight: 700;
 }
 
-/* ── Old-style MatchCard body ─────────────────────────────────────── */
+/* ── Match cards (modern - MatchesTab) ───────────────────────────── */
+html[data-theme="light"] .mt-card {
+  background: #F8F7FF !important;
+  border: 1.5px solid #C8C4E8 !important;
+  box-shadow: 0 2px 8px rgba(75,45,143,0.07) !important;
+  backdrop-filter: none !important;
+}
+html[data-theme="light"] .mt-card:hover {
+  border-color: #4B2D8F !important;
+  box-shadow: 0 6px 20px rgba(75,45,143,0.15) !important;
+}
+html[data-theme="light"] .mt-card.status-live {
+  border-color: rgba(190,18,60,0.35) !important;
+  background: #FFF8FA !important;
+}
+html[data-theme="light"] .mt-card-head { border-bottom: 1px solid #DDD9F4; }
+html[data-theme="light"] .mt-card-foot { border-top: 1px solid #DDD9F4; color: #4A476A; }
+html[data-theme="light"] .mt-team-name { color: #1A1433 !important; font-weight: 700; }
+html[data-theme="light"] .mt-score-num { color: #1A1433 !important; font-weight: 800; }
+html[data-theme="light"] .mt-score {
+  background: rgba(75,45,143,0.06) !important;
+  border-color: rgba(75,45,143,0.15) !important;
+}
+html[data-theme="light"] .mt-score.live {
+  background: rgba(190,18,60,0.07) !important;
+  border-color: rgba(190,18,60,0.2) !important;
+}
+html[data-theme="light"] .mt-vs {
+  background: rgba(75,45,143,0.05) !important;
+  border-color: rgba(75,45,143,0.12) !important;
+}
+html[data-theme="light"] .mt-vs-time { color: #4B2D8F !important; font-weight: 800; }
+html[data-theme="light"] .mt-vs-date { color: #4A476A !important; }
+html[data-theme="light"] .mt-venue,
+html[data-theme="light"] .mt-broadcast { color: #4A476A !important; }
+
+/* ── Old-style MatchCard ─────────────────────────────────────────── */
 html[data-theme="light"] .match-card {
-  background: #FFFFFF;
-  border: 1px solid #E4E6F0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  background: #F8F7FF !important;
+  border: 1.5px solid #C8C4E8 !important;
+  box-shadow: 0 2px 8px rgba(75,45,143,0.06) !important;
 }
 html[data-theme="light"] .match-card:hover {
-  border-color: #4B2D8F;
-  box-shadow: 0 6px 20px rgba(75,45,143,0.12);
+  border-color: #4B2D8F !important;
 }
-html[data-theme="light"] .match-card.status-live {
-  border-color: rgba(225, 29, 72, 0.3);
-}
-html[data-theme="light"] .mc-live-score-num { color: #4B2D8F; font-weight: 800; }
-html[data-theme="light"] .mc-live-clock { color: #E11D48; }
-html[data-theme="light"] .mc-venue { color: #5A5880; }
-html[data-theme="light"] .mc-header { border-bottom: 1px solid #F0F1F8; }
-html[data-theme="light"] .mc-broadcast { border-top: 1px solid #F0F1F8; }
-html[data-theme="light"] .team-name { color: #12103A; font-weight: 700; }
-html[data-theme="light"] .vs-label { color: #5A5880; }
+html[data-theme="light"] .team-name { color: #1A1433 !important; font-weight: 700; }
+html[data-theme="light"] .flag { filter: drop-shadow(0 1px 3px rgba(0,0,0,0.15)); }
+html[data-theme="light"] .mc-live-score-num { color: #4B2D8F !important; font-weight: 800; }
+html[data-theme="light"] .mc-live-clock { color: #BE123C !important; }
+html[data-theme="light"] .mc-venue { color: #4A476A !important; }
+html[data-theme="light"] .mc-header { border-bottom: 1px solid #DDD9F4; }
+html[data-theme="light"] .mc-broadcast { border-top: 1px solid #DDD9F4; }
+html[data-theme="light"] .vs-label { color: #4A476A !important; }
+html[data-theme="light"] .vs-line { background: #C8C4E8 !important; }
 
-/* ── Standings / groups ───────────────────────────────────────────── */
-html[data-theme="light"] .group-card {
-  background: #FFFFFF;
-  border: 1px solid #E4E6F0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+/* ── Goals strip ─────────────────────────────────────────────────── */
+html[data-theme="light"] .mt-goals-strip { border-top-color: #DDD9F4; }
+html[data-theme="light"] .mt-goal-chip {
+  background: rgba(75,45,143,0.07) !important;
+  border-color: rgba(75,45,143,0.18) !important;
+  color: #1A1433 !important;
 }
-html[data-theme="light"] .group-name {
-  background: #4B2D8F;
-  color: #FFFFFF;
+html[data-theme="light"] .mt-goal-assist { color: #4A476A !important; }
+
+/* ── Standings / group tables ────────────────────────────────────── */
+html[data-theme="light"] .group-card,
+html[data-theme="light"] .stnd-group-card {
+  background: #F8F7FF !important;
+  border: 1.5px solid #C8C4E8 !important;
 }
+html[data-theme="light"] .group-name,
 html[data-theme="light"] .stnd-group-title {
-  background: #4B2D8F;
-  color: #FFFFFF;
-  border: none;
-  border-radius: 8px 8px 0 0;
+  background: #4B2D8F !important;
+  color: #FFFFFF !important;
+  border: none !important;
 }
-html[data-theme="light"] .stnd-table th { background: #F0F1F8; color: #5A5880; }
-html[data-theme="light"] .stnd-table .highlight { background: #EDE9FA; }
-
-/* ── Buttons and form elements ────────────────────────────────────── */
-html[data-theme="light"] .btn-primary,
-html[data-theme="light"] .seg.on { background: #4B2D8F; color: #fff; border-color: #4B2D8F; }
-html[data-theme="light"] .btn-primary:hover { background: #3B1F7A; }
-html[data-theme="light"] .btn-watch { background: #4B2D8F; color: #fff; border-color: transparent; }
-
-/* ── Cards + filters ──────────────────────────────────────────────── */
-html[data-theme="light"] .filters,
-html[data-theme="light"] .empty-state { background: #FFFFFF; border-color: #E4E6F0; }
-html[data-theme="light"] .seg {
-  background: #F0F1F8;
-  color: #12103A;
-  border-color: #DDE0EE;
+html[data-theme="light"] .stnd-table th {
+  background: #EAE8FC !important;
+  color: #4A476A !important;
 }
+html[data-theme="light"] .stnd-table .highlight,
+html[data-theme="light"] .stnd-row.highlight { background: #E0DCF8 !important; }
 
-/* ── Bracket ──────────────────────────────────────────────────────── */
+/* ── Bracket ─────────────────────────────────────────────────────── */
 html[data-theme="light"] .brv-col-title {
-  background: #4B2D8F;
-  color: #FFFFFF;
-  border: none;
+  background: #4B2D8F !important;
+  color: #FFFFFF !important;
+  border: none !important;
 }
 html[data-theme="light"] .brv-match {
-  background: #FFFFFF;
-  border-color: #E4E6F0;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  background: #F8F7FF !important;
+  border-color: #C8C4E8 !important;
 }
-html[data-theme="light"] .brv-score-win { color: #4B2D8F; }
-html[data-theme="light"] .brv-badge-live { background: #E11D48; }
-html[data-theme="light"] .brv-badge-done { background: #0D0A3C; }
+html[data-theme="light"] .brv-score-win { color: #4B2D8F !important; }
+html[data-theme="light"] .brv-badge-live { background: #BE123C !important; color: #fff !important; }
+html[data-theme="light"] .brv-badge-done { background: #0D0A3C !important; color: #fff !important; }
+html[data-theme="light"] .brv-team-row { color: #1A1433 !important; }
 
-/* ── Goals strip — appears below team row, never inside flag column ── */
-.mt-goals-strip {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px 8px;
-  padding: 6px 4px 2px;
-  border-top: 1px solid rgba(255,255,255,0.06);
-  font-size: 12px;
+/* ── Buttons / segments ──────────────────────────────────────────── */
+html[data-theme="light"] .btn-primary,
+html[data-theme="light"] .seg.on,
+html[data-theme="light"] .btn-on {
+  background: #4B2D8F !important;
+  color: #FFFFFF !important;
+  border-color: #4B2D8F !important;
 }
-html[data-theme="light"] .mt-goals-strip {
-  border-top-color: #E4E6F0;
+html[data-theme="light"] .btn-watch { background: #4B2D8F !important; color: #FFFFFF !important; }
+html[data-theme="light"] .seg {
+  background: #EAE8FC !important;
+  color: #1A1433 !important;
+  border-color: #C8C4E8 !important;
 }
-.mt-goals-side {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+
+/* ── Generic containers ──────────────────────────────────────────── */
+html[data-theme="light"] .filters,
+html[data-theme="light"] .empty-state,
+html[data-theme="light"] .tab-pane { background: transparent; }
+html[data-theme="light"] .muted { color: #4A476A !important; }
+html[data-theme="light"] .chip.chip-soft {
+  background: #EAE8FC !important;
+  color: #4B2D8F !important;
+  border-color: #C8C4E8 !important;
 }
-.mt-goals-home { align-items: flex-start; }
-.mt-goals-away { align-items: flex-end; }
-.mt-goal-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  background: rgba(255, 59, 94, 0.08);
-  border: 1px solid rgba(255, 59, 94, 0.18);
-  border-radius: 999px;
-  padding: 2px 8px;
-  color: var(--text);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-html[data-theme="light"] .mt-goal-chip {
-  background: rgba(75, 45, 143, 0.07);
-  border-color: rgba(75, 45, 143, 0.18);
-  color: #12103A;
-}
-.mt-goal-assist {
-  color: var(--text-muted);
-  font-size: 10px;
-}
-/* Remove old layout that put goals inside flag column */
-.team-flag-col { flex-direction: row; gap: 0; }
-.mc-team-goals { display: none; }

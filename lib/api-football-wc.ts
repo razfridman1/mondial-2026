@@ -270,3 +270,4 @@ export function afRoundTitle(round: string): string {
   if (/final/i.test(r)) return "הגמר";
   return round;
 }
+}

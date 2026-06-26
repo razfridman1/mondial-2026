@@ -10,8 +10,14 @@ export const maxDuration = 60;
  * triggers a sync itself. Keeps the extra Firestore read + (rare) sync
  * call cheap for the vast majority of requests, while giving a backup
  * path independent of Vercel Cron (per requirement: "אם ה-cron נכשל —
- * אין מנגנון גיבוי אוטומטי מלא"). */
-const STALE_MS = 3 * 60 * 1000;
+ * אין מנגנון גיבוי אוטומטי מלא").
+ *
+ * Kept short (30s) so that final results land close to real-time —
+ * comparable to /api/scorers' 60s "near real-time" client polling.
+ * MatchesTab calls this endpoint every 10s while a match is live, so a
+ * 30s staleness window still caps real sync calls at ~2/min — well
+ * under football-data.org's free-tier rate limit. */
+const STALE_MS = 30 * 1000;
 
 /* GET /api/match-results — public list of all finished match results.
  * Returns { [matchId]: { home, away, finishedAt } } */
