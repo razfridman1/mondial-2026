@@ -634,18 +634,7 @@ function MatchCardModern({ match, result, live, onOpen }: {
       <div className="mt-card-body">
         {/* Home team */}
         <div className="mt-team home">
-          <div className="team-flag-col">
-            <span className="mt-flag">{home.flag}</span>
-            {homeGoals.length > 0 && (
-              <div className="mc-team-goals">
-                {homeGoals.map((g, i) => (
-                  <span key={i} className="mt-live-goal">
-                    ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          <span className="mt-flag">{home.flag}</span>
           <span className="mt-team-name">{home.name}</span>
         </div>
 
@@ -674,20 +663,31 @@ function MatchCardModern({ match, result, live, onOpen }: {
         {/* Away team */}
         <div className="mt-team away">
           <span className="mt-team-name">{away.name}</span>
-          <div className="team-flag-col">
-            <span className="mt-flag">{away.flag}</span>
-            {awayGoals.length > 0 && (
-              <div className="mc-team-goals">
-                {awayGoals.map((g, i) => (
-                  <span key={i} className="mt-live-goal">
-                    ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          <span className="mt-flag">{away.flag}</span>
         </div>
       </div>
+
+      {/* Goals strip — separate row below teams, never overlaps score or names */}
+      {(homeGoals.length > 0 || awayGoals.length > 0) && (
+        <div className="mt-goals-strip">
+          <div className="mt-goals-side mt-goals-home">
+            {homeGoals.map((g, i) => (
+              <span key={i} className="mt-goal-chip">
+                ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
+                {g.assist ? <span className="mt-goal-assist"> ({g.assist})</span> : null}
+              </span>
+            ))}
+          </div>
+          <div className="mt-goals-side mt-goals-away">
+            {awayGoals.map((g, i) => (
+              <span key={i} className="mt-goal-chip">
+                ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
+                {g.assist ? <span className="mt-goal-assist"> ({g.assist})</span> : null}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <footer className="mt-card-foot">
         <span className="mt-venue">🏟 {venue.name}{venue.city ? ` · ${venue.city}` : ""}</span>

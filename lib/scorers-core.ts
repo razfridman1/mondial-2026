@@ -43,35 +43,62 @@ const CURATED_HE_BY_EN: Record<string, string> = (() => {
   return out;
 })();
 
-async function fetchFDScorers(limit = 20): Promise<{ scorers: ScorerEntry[]; assists: ScorerEntry[] } | null> {
+/** Fetch top scorers and assists from API-Football.
+ *  Endpoint: /players/topscorers?league={id}&season=2026
+ *            /players/topassists?league={id}&season=2026
+ */
+async function fetchFDScorers(_limit = 20): Promise<{ scorers: ScorerEntry[]; assists: ScorerEntry[] } | null> {
   const apiKey = process.env.FOOTBALL_API_KEY;
-  const baseUrl = process.env.FOOTBALL_API_URL || "https://api.football-data.org/v4";
+  const baseUrl = (process.env.FOOTBALL_API_URL || "https://v3.football.api-sports.io").replace(/\/$/, "");
+  const leagueId = process.env.AF_WC_LEAGUE_ID || "1";
   if (!apiKey) return null;
+
+  const headers = { "x-apisports-key": apiKey, "Accept": "application/json" };
+
+  async function afGet(path: string): Promise<any | null> {
+    try {
+      const r = await fetch(`${baseUrl}${path}`, { headers, cache: "no-store" });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch { return null; }
+  }
+
+  const byRank = (a: ScorerEntry, b: ScorerEntry) =>
+    b.count - a.count || a.name.localeCompare(b.name);
+
   try {
-    const r = await fetch(
-      `${baseUrl}/competitions/WC/scorers?limit=${limit}&season=2026`,
-      { headers: { "X-Auth-Token": apiKey } },
-    );
-    if (!r.ok) return null;
-    const data = await r.json();
-    const raw: any[] = data.scorers || [];
+    // Fetch both in parallel
+    const [scoreData, assistData] = await Promise.all([
+      afGet(`/players/topscorers?league=${leagueId}&season=2026`),
+      afGet(`/players/topassists?league=${leagueId}&season=2026`),
+    ]);
+
     const scorers: ScorerEntry[] = [];
     const assists: ScorerEntry[] = [];
-    for (const entry of raw) {
+
+    for (const entry of (scoreData?.response ?? [])) {
       const playerName: string = entry.player?.name || "";
       if (!playerName) continue;
-      const tla: string = entry.team?.tla || "";
-      const teamCode: string | null =
-        teamCodeFromApiName(entry.team?.name) || (tla in TEAMS ? tla : null);
-      const goals = typeof entry.goals === "number" ? entry.goals : 0;
-      const assistCount = typeof entry.assists === "number" ? entry.assists : 0;
-      if (goals > 0) scorers.push({ name: playerName, teamCode, count: goals });
-      if (assistCount > 0) assists.push({ name: playerName, teamCode, count: assistCount });
+      const teamName: string = entry.statistics?.[0]?.team?.name || "";
+      const teamCode = teamCodeFromApiName(teamName);
+      const goals = entry.statistics?.[0]?.goals?.total ?? 0;
+      if (goals > 0) scorers.push({ name: playerName, teamCode: teamCode || null, count: goals });
     }
-    const byRank = (a: ScorerEntry, b: ScorerEntry) =>
-      b.count - a.count || a.name.localeCompare(b.name);
+
+    for (const entry of (assistData?.response ?? [])) {
+      const playerName: string = entry.player?.name || "";
+      if (!playerName) continue;
+      const teamName: string = entry.statistics?.[0]?.team?.name || "";
+      const teamCode = teamCodeFromApiName(teamName);
+      const assistCount = entry.statistics?.[0]?.goals?.assists ?? 0;
+      if (assistCount > 0) assists.push({ name: playerName, teamCode: teamCode || null, count: assistCount });
+    }
+
     scorers.sort(byRank);
     assists.sort(byRank);
+
+    // Return null only if both came back completely empty (API down)
+    if (scorers.length === 0 && assists.length === 0) return null;
     return { scorers, assists };
   } catch {
     return null;
