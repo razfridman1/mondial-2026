@@ -1,4 +1,5 @@
 "use client";
+import { playerNameHe } from "@/lib/players";
 /* =====================================================================
  * MatchesTab — modern live-results center.
  * Inspired by Sofascore / Flashscore / OneFootball.
@@ -667,23 +668,25 @@ function MatchCardModern({ match, result, live, onOpen }: {
         </div>
       </div>
 
-      {/* Goals strip — separate row below teams, never overlaps score or names */}
+      {/* Goals — two columns, each team on its own side */}
       {(homeGoals.length > 0 || awayGoals.length > 0) && (
         <div className="mt-goals-strip">
-          <div className="mt-goals-side mt-goals-home">
+          <div className="mt-goals-col mt-goals-home">
             {homeGoals.map((g, i) => (
-              <span key={i} className="mt-goal-chip">
-                ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
-                {g.assist ? <span className="mt-goal-assist"> ({g.assist})</span> : null}
-              </span>
+              <div key={i} className="mt-goal-entry">
+                <span className="mt-goal-scorer">⚽ {playerNameHe(g.player || "")}</span>
+                {g.assist && <span className="mt-goal-assist">🅰️ {playerNameHe(g.assist)}</span>}
+                <span className="mt-goal-min">{g.minute != null ? g.minute + "′" : ""}</span>
+              </div>
             ))}
           </div>
-          <div className="mt-goals-side mt-goals-away">
+          <div className="mt-goals-col mt-goals-away">
             {awayGoals.map((g, i) => (
-              <span key={i} className="mt-goal-chip">
-                ⚽ {g.minute != null ? `${g.minute}'` : ""} {g.player || ""}
-                {g.assist ? <span className="mt-goal-assist"> ({g.assist})</span> : null}
-              </span>
+              <div key={i} className="mt-goal-entry">
+                <span className="mt-goal-min">{g.minute != null ? g.minute + "′" : ""}</span>
+                <span className="mt-goal-scorer">⚽ {playerNameHe(g.player || "")}</span>
+                {g.assist && <span className="mt-goal-assist">🅰️ {playerNameHe(g.assist)}</span>}
+              </div>
             ))}
           </div>
         </div>
