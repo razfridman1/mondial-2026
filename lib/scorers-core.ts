@@ -1,6 +1,6 @@
 import type { ExternalGoal } from "./football-data-api";
 import { SQUADS, normalizeName } from "./players";
-import { translateNamesToHebrew, lookupAssistsLeaderboardViaAI } from "./ai-result-fallback";
+import { translateNamesToHebrew } from "./ai-result-fallback";
 import { teamCodeFromApiName } from "./team-name-mapper";
 import { TEAMS } from "./data";
 
@@ -70,12 +70,16 @@ async function fetchFDScorers(_limit = 20): Promise<{ scorers: ScorerEntry[]; as
     const assists: ScorerEntry[] = [];
 
     for (const entry of (data?.scorers ?? [])) {
-      const playerName: string = entry.player?.name || entry.player?.firstName
-        ? `${entry.player?.firstName || ""} ${entry.player?.lastName || ""}`.trim()
-        : "";
+      // football-data.org always has player.name; firstName/lastName as fallback
+      const playerName: string = entry.player?.name ||
+        (entry.player?.firstName
+          ? `${entry.player.firstName} ${entry.player?.lastName || ""}`.trim()
+          : "");
       if (!playerName) continue;
-      const teamName: string = entry.team?.name || entry.team?.shortName || entry.team?.tla || "";
-      const teamCode = teamCodeFromApiName(teamName) || (entry.team?.tla || null);
+      // Use TLA directly (ARG, FRA, …) — matches our internal team codes exactly
+      const tla: string | null = entry.team?.tla || null;
+      const teamName: string = entry.team?.name || entry.team?.shortName || "";
+      const teamCode = teamCodeFromApiName(teamName) || tla;
       const goals: number = entry.goals ?? 0;
       const assts: number = entry.assists ?? 0;
       if (goals > 0) scorers.push({ name: playerName, teamCode, count: goals });
@@ -177,36 +181,21 @@ export async function getScorerLeaderboards(db: FirebaseFirestore.Firestore): Pr
   // API-Football is always primary. We never let a stale cache override live data.
   if (fd && fd.scorers.length > 0) {
     rawScorers = fd.scorers;
+    // For assists: football-data.org scorers list includes assists per player.
+    // Supplement with match_goals for pure assisters (0 goals, >0 assists).
     if (fd.assists.length > 0) {
-      rawAssists = fd.assists;
-      debugSource = "api-football";
+      // Merge: fd.assists is primary; add match_goals entries not already covered
+      const fdNames = new Set(fd.assists.map(a => normalizeName(a.name)));
+      const extra = Array.from(fbAssists.values()).filter(e => !fdNames.has(normalizeName(e.name)));
+      rawAssists = [...fd.assists, ...extra].sort(byRank);
+      debugSource = "football-data.org";
     } else {
-      // API-Football topassists returned empty — fall back to scanning events
-      let eventAssists: ScorerEntry[] | null = null;
-      try {
-        const aiResult = await lookupAssistsLeaderboardViaAI();
-        if (aiResult.found && aiResult.assists && aiResult.assists.length > 0) {
-          eventAssists = aiResult.assists.map(a => ({ name: a.name, teamCode: a.team || null, count: a.count }));
-        }
-      } catch { /* non-fatal */ }
-      rawAssists = eventAssists?.length
-        ? eventAssists.sort(byRank)
-        : Array.from(fbAssists.values()).sort(byRank);
-      debugSource = "api-football-scorers+event-assists-fallback";
+      // fd.org returned no assist data for this comp — use match_goals only
+      rawAssists = Array.from(fbAssists.values()).sort(byRank);
+      debugSource = "football-data.org-scorers+match_goals-assists";
     }
   } else {
     rawScorers = Array.from(fbScorers.values()).sort(byRank);
-    // No API-Football scorers — scan events for assists too
-    let eventAssists: ScorerEntry[] | null = null;
-    try {
-      const aiResult = await lookupAssistsLeaderboardViaAI();
-      if (aiResult.found && aiResult.assists && aiResult.assists.length > 0) {
-        eventAssists = aiResult.assists.map(a => ({ name: a.name, teamCode: a.team || null, count: a.count }));
-      }
-    } catch { /* non-fatal */ }
-    rawAssists = eventAssists?.length
-      ? eventAssists.sort(byRank)
-      : Array.from(fbAssists.values()).sort(byRank);
     debugSource = "firestore-fallback";
   }
 
