@@ -173,9 +173,9 @@ export async function getScorerLeaderboards(db: FirebaseFirestore.Firestore): Pr
   const byRank = (a: ScorerEntry, b: ScorerEntry) =>
     b.count - a.count || a.name.localeCompare(b.name);
 
-  let rawScorers: ScorerEntry[];
-  let rawAssists: ScorerEntry[];
-  let debugSource: string;
+  let rawScorers: ScorerEntry[] = [];
+  let rawAssists: ScorerEntry[] = [];
+  let debugSource: string = "firestore-fallback";
 
   // -- Assists priority: API-Football /players/topassists → Firestore fallback --
   // API-Football is always primary. We never let a stale cache override live data.
