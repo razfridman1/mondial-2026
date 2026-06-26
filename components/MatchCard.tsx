@@ -293,6 +293,8 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
               </div>
             ))}
           </div>
+          {/* Center spacer — matches mc-vs width */}
+          <div />
           {/* Left column = away team (RTL) */}
           <div className="mt-goals-col mt-goals-away">
             {awayGoals.map((g, i) => (

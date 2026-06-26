@@ -333,11 +333,20 @@ export default function MatchesTab() {
   const showJumpToFinished = section === "stages" && hasFinished;
 
   /* Merge Firestore liveScores with direct real-time data from /api/live-now.
-   * liveNowMap takes priority because it's polled directly from the APIs. */
-  const mergedLiveScores = useMemo(
-    () => ({ ...liveScores, ...liveNowMap }),
-    [liveScores, liveNowMap],
-  );
+   * liveNowMap takes priority for score/status, but we keep goals from liveScores
+   * if liveNowMap returns an empty goals array (avoids wiping scored goals). */
+  const mergedLiveScores = useMemo(() => {
+    const result: Record<string, import("@/lib/store").LiveScore> = { ...liveScores };
+    for (const [id, nowEntry] of Object.entries(liveNowMap)) {
+      result[id] = {
+        ...nowEntry,
+        goals: nowEntry.goals && nowEntry.goals.length > 0
+          ? nowEntry.goals
+          : (liveScores[id]?.goals || []),
+      };
+    }
+    return result;
+  }, [liveScores, liveNowMap]);
 
   return (
     <section className="matches-tab">
