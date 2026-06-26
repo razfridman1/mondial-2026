@@ -84,7 +84,7 @@ export default function OpenPredictionsTab() {
       const savedAt = recentlySaved[m.id];
       return !!savedAt && (now - savedAt < GRACE_MS);
     });
-  }, [resolvedMatches, predictions, recentlySaved, now, simConfig]);
+  }, [overrides, predictions, recentlySaved, now, simConfig]);
 
   function handleSaved(matchId: string) {
     // Only grant grace to matches that were unpredicted when tab opened
