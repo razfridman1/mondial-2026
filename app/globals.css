@@ -5554,3 +5554,5 @@ html[data-theme="light"] .chat-panel {
 .mmt-flag-img { width: 20px; height: 15px; object-fit: cover; border-radius: 2px; vertical-align: middle; flex-shrink: 0; }
 
 .stnd-flag-img { width: 22px; height: 16px; object-fit: cover; border-radius: 2px; vertical-align: middle; flex-shrink: 0; margin-left: 4px; }
+
+.team-flag-img { width: 40px; height: 30px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto 4px; }

@@ -247,7 +247,9 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
 
       <div className="mc-body">
         <div className="team team-home">
-          <span className="flag">{home.flag}</span>
+          {flagUrl(match.home)
+            ? <img src={flagUrl(match.home)} alt={home.name} className="team-flag-img" />
+            : <span className="flag">{home.flag}</span>}
           <span className="team-name">{home.name}</span>
         </div>
         <div className="mc-vs">
@@ -272,7 +274,9 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
         </div>
         <div className="team team-away">
           <span className="team-name">{away.name}</span>
-          <span className="flag">{away.flag}</span>
+          {flagUrl(match.away)
+            ? <img src={flagUrl(match.away)} alt={away.name} className="team-flag-img" />
+            : <span className="flag">{away.flag}</span>}
         </div>
       </div>
 
