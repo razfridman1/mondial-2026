@@ -327,12 +327,8 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
                 <span className="muted" style={{ fontSize: 12, marginRight: 8 }}>(הרכב רשמי שאותר באמצעות AI)</span>
               )}
             </h3>
-            {(lineupSource === "live" || lineupSource === "ai") && lineups ? (
+            {lineups && (
               <Pitch home={lineups.home} away={lineups.away} />
-            ) : (
-              <p className="muted" style={{ margin: 0 }}>
-                ⏳ ההרכבים הרשמיים טרם פורסמו. הם יוצגו כאן ברגע שיתפרסמו רשמית, בדרך כלל כשעה לפני תחילת המשחק.
-              </p>
             )}
           </section>
         )}
