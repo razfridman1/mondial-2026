@@ -43,61 +43,48 @@ const CURATED_HE_BY_EN: Record<string, string> = (() => {
   return out;
 })();
 
-/** Fetch top scorers and assists from API-Football.
- *  Endpoint: /players/topscorers?league={id}&season=2026
- *            /players/topassists?league={id}&season=2026
+/** Fetch top scorers and assists from football-data.org
+ *  Endpoint: GET /v4/competitions/WC/scorers?season=2026&limit=20
+ *  Uses the same FOOTBALL_API_KEY + X-Auth-Token already configured for
+ *  match results and goal details — no extra credentials needed.
  */
 async function fetchFDScorers(_limit = 20): Promise<{ scorers: ScorerEntry[]; assists: ScorerEntry[] } | null> {
   const apiKey = process.env.FOOTBALL_API_KEY;
-  const baseUrl = (process.env.FOOTBALL_API_URL || "https://v3.football.api-sports.io").replace(/\/$/, "");
-  const leagueId = process.env.AF_WC_LEAGUE_ID || "1";
+  const baseUrl = (process.env.FOOTBALL_API_URL || "https://api.football-data.org/v4").replace(/\/$/, "");
   if (!apiKey) return null;
 
-  const headers = { "x-apisports-key": apiKey, "Accept": "application/json" };
-
-  async function afGet(path: string): Promise<any | null> {
-    try {
-      const r = await fetch(`${baseUrl}${path}`, { headers, cache: "no-store" });
-      if (!r.ok) return null;
-      return await r.json();
-    } catch { return null; }
-  }
+  const headers: Record<string, string> = { "X-Auth-Token": apiKey, "Accept": "application/json" };
 
   const byRank = (a: ScorerEntry, b: ScorerEntry) =>
     b.count - a.count || a.name.localeCompare(b.name);
 
   try {
-    // Fetch both in parallel
-    const [scoreData, assistData] = await Promise.all([
-      afGet(`/players/topscorers?league=${leagueId}&season=2026`),
-      afGet(`/players/topassists?league=${leagueId}&season=2026`),
-    ]);
+    const r = await fetch(`${baseUrl}/competitions/WC/scorers?season=2026&limit=20`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
 
     const scorers: ScorerEntry[] = [];
     const assists: ScorerEntry[] = [];
 
-    for (const entry of (scoreData?.response ?? [])) {
-      const playerName: string = entry.player?.name || "";
+    for (const entry of (data?.scorers ?? [])) {
+      const playerName: string = entry.player?.name || entry.player?.firstName
+        ? `${entry.player?.firstName || ""} ${entry.player?.lastName || ""}`.trim()
+        : "";
       if (!playerName) continue;
-      const teamName: string = entry.statistics?.[0]?.team?.name || "";
-      const teamCode = teamCodeFromApiName(teamName);
-      const goals = entry.statistics?.[0]?.goals?.total ?? 0;
-      if (goals > 0) scorers.push({ name: playerName, teamCode: teamCode || null, count: goals });
-    }
-
-    for (const entry of (assistData?.response ?? [])) {
-      const playerName: string = entry.player?.name || "";
-      if (!playerName) continue;
-      const teamName: string = entry.statistics?.[0]?.team?.name || "";
-      const teamCode = teamCodeFromApiName(teamName);
-      const assistCount = entry.statistics?.[0]?.goals?.assists ?? 0;
-      if (assistCount > 0) assists.push({ name: playerName, teamCode: teamCode || null, count: assistCount });
+      const teamName: string = entry.team?.name || entry.team?.shortName || entry.team?.tla || "";
+      const teamCode = teamCodeFromApiName(teamName) || (entry.team?.tla || null);
+      const goals: number = entry.goals ?? 0;
+      const assts: number = entry.assists ?? 0;
+      if (goals > 0) scorers.push({ name: playerName, teamCode, count: goals });
+      if (assts > 0) assists.push({ name: playerName, teamCode, count: assts });
     }
 
     scorers.sort(byRank);
     assists.sort(byRank);
 
-    // Return null only if both came back completely empty (API down)
     if (scorers.length === 0 && assists.length === 0) return null;
     return { scorers, assists };
   } catch {
@@ -105,13 +92,35 @@ async function fetchFDScorers(_limit = 20): Promise<{ scorers: ScorerEntry[]; as
   }
 }
 
-export async function getScorerLeaderboards(db: FirebaseFirestore.Firestore): Promise<ScorerLeaderboards> {
+/** Force-refresh the cached_scorers doc from football-data.org. Called by admin sync endpoint. */
+export async function cacheScorerLeaderboards(db: FirebaseFirestore.Firestore): Promise<{ scorers: ScorerEntry[]; assists: ScorerEntry[] } | null> {
   const fd = await fetchFDScorers(20);
+  if (!fd || (fd.scorers.length === 0 && fd.assists.length === 0)) return null;
+  await db.collection("live_data").doc("cached_scorers").set({ scorers: fd.scorers, assists: fd.assists, updatedAt: Date.now() });
+  return fd;
+}
 
-  const [goalsSnap, liveSnap] = await Promise.all([
+export async function getScorerLeaderboards(db: FirebaseFirestore.Firestore): Promise<ScorerLeaderboards> {
+  const [fdResult, cacheSnap, goalsSnap, liveSnap] = await Promise.all([
+    fetchFDScorers(20),
+    db.collection("live_data").doc("cached_scorers").get(),
     db.collection("live_data").doc("match_goals").get(),
     db.collection("live_data").doc("live_scores").get(),
   ]);
+
+  // Persist fresh API result to Firestore cache for future cold-starts / API outages
+  let fd = fdResult;
+  if (fd && (fd.scorers.length > 0 || fd.assists.length > 0)) {
+    db.collection("live_data").doc("cached_scorers")
+      .set({ scorers: fd.scorers, assists: fd.assists, updatedAt: Date.now() })
+      .catch(() => {});
+  } else {
+    // API unavailable — use the Firestore cache (even if stale)
+    const cached = cacheSnap.exists ? (cacheSnap.data() as any) : null;
+    if (cached?.scorers?.length > 0 || cached?.assists?.length > 0) {
+      fd = { scorers: cached.scorers || [], assists: cached.assists || [] };
+    }
+  }
   const goalsData: Record<string, { goals?: ExternalGoal[]; homeCode?: string; awayCode?: string }> =
     goalsSnap.exists ? (goalsSnap.data() || {}) : {};
   const liveData: Record<string, any> =
