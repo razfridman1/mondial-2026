@@ -1,6 +1,6 @@
 import type { ExternalGoal } from "./football-data-api";
 import { SQUADS, normalizeName } from "./players";
-import { translateNamesToHebrew, lookupAssistsLeaderboardViaAI } from "./ai-result-fallback";
+import { translateNamesToHebrew } from "./ai-result-fallback";
 import { teamCodeFromApiName } from "./team-name-mapper";
 import { TEAMS } from "./data";
 
@@ -137,23 +137,37 @@ export async function getScorerLeaderboards(db: FirebaseFirestore.Firestore): Pr
   for (const matchId of allMatchIds) {
     const mgEntry = goalsData[matchId];
     const lvEntry = liveData[matchId];
-    let goals: ExternalGoal[];
-    if (mgEntry && (mgEntry.goals || []).length > 0) {
-      goals = mgEntry.goals!;
-    } else if (lvEntry && (lvEntry.goals || []).length > 0) {
-      goals = (lvEntry.goals as any[])
+
+    // Scorers: prefer match_goals (more reliable names), fall back to live_scores
+    const scorerGoals: ExternalGoal[] = (() => {
+      if (mgEntry && (mgEntry.goals || []).length > 0) return mgEntry.goals!;
+      if (!lvEntry || !(lvEntry.goals || []).length) return [];
+      return (lvEntry.goals as any[])
         .map((g: any) => ({
           minute: g.minute ?? null,
           teamCode: g.team === "home" ? (lvEntry.homeCode || null) : (lvEntry.awayCode || null),
           scorer: (g.player || "").trim(),
-          ...(g.assist ? { assist: g.assist } : {}),
           ...(g.type ? { type: g.type } : {}),
         } as ExternalGoal))
         .filter((g: ExternalGoal) => g.scorer);
-    } else {
-      continue;
-    }
-    for (const g of goals) {
+    })();
+
+    // Assists: prefer live_scores (has assist from live tracking), fall back to match_goals
+    const assistGoals: Array<{ assist?: string; teamCode?: string | null; type?: string }> = (() => {
+      if (lvEntry && (lvEntry.goals || []).length > 0) {
+        return (lvEntry.goals as any[]).map((g: any) => ({
+          assist: g.assist || undefined,
+          teamCode: g.team === "home" ? (lvEntry.homeCode || null) : (lvEntry.awayCode || null),
+          type: g.type || undefined,
+        }));
+      }
+      if (mgEntry && (mgEntry.goals || []).length > 0) {
+        return mgEntry.goals!.map(g => ({ assist: g.assist, teamCode: g.teamCode, type: g.type }));
+      }
+      return [];
+    })();
+
+    for (const g of scorerGoals) {
       if (!g || g.type === "OWN") continue;
       if (g.scorer) {
         const key = `${g.teamCode || ""}|${g.scorer}`;
@@ -161,6 +175,9 @@ export async function getScorerLeaderboards(db: FirebaseFirestore.Firestore): Pr
         cur.count++;
         fbScorers.set(key, cur);
       }
+    }
+    for (const g of assistGoals) {
+      if (!g || g.type === "OWN") continue;
       if (g.assist) {
         const key = `${g.teamCode || ""}|${g.assist}`;
         const cur = fbAssists.get(key) || { name: g.assist, teamCode: g.teamCode || null, count: 0 };
