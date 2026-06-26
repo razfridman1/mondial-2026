@@ -6,6 +6,7 @@ import MatchesTab from "@/components/MatchesTab";
 import MyPredictionsTab from "@/components/MyPredictionsTab";
 import TopScorersTab from "@/components/TopScorersTab";
 import WeeklyPredictionsTab from "@/components/WeeklyPredictionsTab";
+import OpenPredictionsTab from "@/components/OpenPredictionsTab";
 import StandingsTab from "@/components/StandingsTab";
 import Bracket from "@/components/Bracket";
 import AdminPanel from "@/components/AdminPanel";
@@ -29,6 +30,7 @@ function HomeInner() {
       <main className="container">
         {tab === "schedule"      && <MatchesTab />}
         {tab === "weekpredictions" && <WeeklyPredictionsTab />}
+        {tab === "openpredictions" && <OpenPredictionsTab />}
         {tab === "mypredictions" && <MyPredictionsTab />}
         {tab === "topscorers"    && <TopScorersTab />}
         {tab === "standings"     && <StandingsTab />}
