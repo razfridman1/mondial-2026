@@ -16,7 +16,7 @@ const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const POS_MAP: Record<string, Position> = { G: "GK", D: "DEF", M: "MID", F: "FWD" };
 
 function parseFormation(s: string | undefined): Formation {
-  const allow: Formation[] = ["4-3-3","4-4-2","3-5-2","4-2-3-1","5-3-2","3-4-3","4-1-4-1","4-3-2-1"];
+  const allow: Formation[] = ["4-3-3","4-4-2","3-5-2","4-2-3-1","5-3-2"];
   return (allow.includes(s as Formation) ? s : "4-3-3") as Formation;
 }
 
