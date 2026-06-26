@@ -11,6 +11,7 @@ import { scorePrediction } from "@/lib/scoring";
 import { computeGroupStandings } from "@/lib/standings";
 import type { Match } from "@/lib/types";
 import { playerNameHe } from "@/lib/players";
+import { flagUrl } from "@/lib/flag-url";
 import Countdown from "./Countdown";
 
 export default function MatchCard({ match, onOpen, live }: { match: Match; onOpen: (id: string) => void; live?: import("@/lib/store").LiveScore }) {
@@ -275,23 +276,31 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
         </div>
       </div>
 
-      {/* Goals strip — clean row below team names, never overlaps score */}
+      {/* Goals — vertical list per team, sorted by minute */}
       {(homeGoals.length > 0 || awayGoals.length > 0) && (
         <div className="mt-goals-strip">
-          <div className="mt-goals-side mt-goals-home">
+          {/* Home goals — under home team (right side, RTL) */}
+          <div className="mt-goals-col mt-goals-home">
             {homeGoals.map((g, i) => (
-              <span key={i} className="mt-goal-chip">
-                ⚽ {g.minute != null ? `${g.minute}′` : ""} {playerNameHe(g.player || "")}
-                {g.assist ? <span className="mt-goal-assist"> ({playerNameHe(g.assist)})</span> : null}
-              </span>
+              <div key={i} className="mt-goal-row">
+                <span className="mt-goal-min">{g.minute != null ? `${g.minute}′` : ""}</span>
+                <span className="mt-goal-info">
+                  <span className="mt-goal-scorer">⚽ {playerNameHe(g.player || "")}</span>
+                  {g.assist && <span className="mt-goal-assist">🅰️ {playerNameHe(g.assist)}</span>}
+                </span>
+              </div>
             ))}
           </div>
-          <div className="mt-goals-side mt-goals-away">
+          {/* Away goals — under away team (left side, RTL) */}
+          <div className="mt-goals-col mt-goals-away">
             {awayGoals.map((g, i) => (
-              <span key={i} className="mt-goal-chip">
-                ⚽ {g.minute != null ? `${g.minute}′` : ""} {playerNameHe(g.player || "")}
-                {g.assist ? <span className="mt-goal-assist"> ({playerNameHe(g.assist)})</span> : null}
-              </span>
+              <div key={i} className="mt-goal-row">
+                <span className="mt-goal-info">
+                  <span className="mt-goal-scorer">⚽ {playerNameHe(g.player || "")}</span>
+                  {g.assist && <span className="mt-goal-assist">🅰️ {playerNameHe(g.assist)}</span>}
+                </span>
+                <span className="mt-goal-min">{g.minute != null ? `${g.minute}′` : ""}</span>
+              </div>
             ))}
           </div>
         </div>
@@ -458,7 +467,9 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
                 <tr key={s.teamCode} className={`mmt-row ${s.teamCode === match.home ? "is-home" : ""}`}>
                   <td className="mmt-pos">{s.position}</td>
                   <td className="mmt-team">
-                    <span className="mmt-flag">{s.teamFlag}</span>
+                    {flagUrl(s.teamCode)
+                      ? <img src={flagUrl(s.teamCode)} alt={s.teamName} className="mmt-flag-img" />
+                      : <span className="mmt-flag">{s.teamFlag}</span>}
                     <span className="mmt-name">{s.teamName}</span>
                   </td>
                   <td>{s.played}</td>

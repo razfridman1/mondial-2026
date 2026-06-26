@@ -1,5 +1,6 @@
 "use client";
 import { TEAMS } from "@/lib/data";
+import { playerNameHe } from "@/lib/players";
 import type { TeamLineup } from "@/lib/lineups";
 
 /* =====================================================================
@@ -103,14 +104,14 @@ export default function Pitch({
         {home.slots.map(slot => dot(
           slot.x, 50 + slot.y * 0.5, "#2e6bff",
           slot.player.jersey != null ? String(slot.player.jersey) : (slot.role || slot.pos),
-          slot.player.name.split(" ").slice(-1)[0],
+          playerNameHe(slot.player.name).split(" ").slice(-1)[0],
         ))}
 
         {/* Away players occupy top half (mirror: y: 0-50) */}
         {away.slots.map(slot => dot(
           100 - slot.x, 50 - slot.y * 0.5, "#dc2626",
           slot.player.jersey != null ? String(slot.player.jersey) : (slot.role || slot.pos),
-          slot.player.name.split(" ").slice(-1)[0],
+          playerNameHe(slot.player.name).split(" ").slice(-1)[0],
           { isAway: true }
         ))}
       </svg>

@@ -256,7 +256,9 @@ function StandingRow({
           onClick={() => onOpenTeam(s.teamCode)}
           title="לחץ לפרטי הקבוצה: סגל, מערך, ושחקנים"
         >
-          <span className="stnd-flag">{s.teamFlag}</span>
+          {flagUrl(s.teamCode)
+            ? <img src={flagUrl(s.teamCode)} alt={s.teamName} className="stnd-flag-img" />
+            : <span className="stnd-flag">{s.teamFlag}</span>}
           <span className="stnd-name">{s.teamName}</span>
         </button>
       </td>

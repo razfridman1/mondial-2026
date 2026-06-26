@@ -5526,3 +5526,31 @@ html[data-theme="light"] .chat-panel {
   font-family: inherit;
 }
 .brv-retry-btn:hover { opacity: .85; }
+
+.mt-goals-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: 6px 12px 8px;
+  border-top: 1px solid var(--border-soft);
+}
+.mt-goals-col { display: flex; flex-direction: column; gap: 3px; }
+.mt-goals-home { align-items: flex-end; padding-right: 4px; }
+.mt-goals-away { align-items: flex-start; padding-left: 4px; border-right: 1px solid var(--border-soft); }
+.mt-goal-row {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11.5px; color: var(--text-muted);
+}
+.mt-goals-home .mt-goal-row { flex-direction: row-reverse; justify-content: flex-start; }
+.mt-goals-away .mt-goal-row { flex-direction: row; }
+.mt-goal-min {
+  font-size: 10px; font-weight: 700; color: var(--accent);
+  min-width: 26px; text-align: center; flex-shrink: 0;
+}
+.mt-goal-info { display: flex; flex-direction: column; align-items: inherit; gap: 1px; }
+.mt-goal-scorer { font-size: 11.5px; color: var(--text); font-weight: 600; }
+.mt-goal-assist { font-size: 10.5px; color: var(--text-muted); }
+/* Flag images in mini standings table */
+.mmt-flag-img { width: 20px; height: 15px; object-fit: cover; border-radius: 2px; vertical-align: middle; flex-shrink: 0; }
+
+.stnd-flag-img { width: 22px; height: 16px; object-fit: cover; border-radius: 2px; vertical-align: middle; flex-shrink: 0; margin-left: 4px; }
