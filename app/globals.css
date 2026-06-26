@@ -5534,22 +5534,36 @@ html[data-theme="light"] .chat-panel {
   padding: 6px 12px 8px;
   border-top: 1px solid var(--border-soft);
 }
-.mt-goals-col { display: flex; flex-direction: column; gap: 3px; }
-.mt-goals-home { align-items: flex-end; padding-right: 4px; }
-.mt-goals-away { align-items: flex-start; padding-left: 4px; border-right: 1px solid var(--border-soft); }
-.mt-goal-row {
-  display: flex; align-items: center; gap: 4px;
-  font-size: 11.5px; color: var(--text-muted);
+/* Each column stacks entries top-to-bottom */
+.mt-goals-col { display: flex; flex-direction: column; gap: 4px; }
+
+/* Home = right column in RTL — entries right-aligned */
+.mt-goals-home { align-items: flex-end; }
+
+/* Away = left column in RTL — entries left-aligned, separator on right */
+.mt-goals-away {
+  align-items: flex-start;
+  border-right: 1px solid var(--border-soft);
+  padding-right: 8px;
+  padding-left: 0;
 }
-.mt-goals-home .mt-goal-row { flex-direction: row-reverse; justify-content: flex-start; }
-.mt-goals-away .mt-goal-row { flex-direction: row; }
-.mt-goal-min {
-  font-size: 10px; font-weight: 700; color: var(--accent);
-  min-width: 26px; text-align: center; flex-shrink: 0;
+
+/* Each goal entry: one row — scorer (+ assist below) + minute */
+.mt-goal-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: inherit;
+  gap: 1px;
+  font-size: 11.5px;
 }
-.mt-goal-info { display: flex; flex-direction: column; align-items: inherit; gap: 1px; }
-.mt-goal-scorer { font-size: 11.5px; color: var(--text); font-weight: 600; }
-.mt-goal-assist { font-size: 10.5px; color: var(--text-muted); }
+/* Home entry: scorer right, minute at the left end */
+.mt-goals-home .mt-goal-entry { text-align: right; }
+/* Away entry: minute left, scorer to the right */
+.mt-goals-away .mt-goal-entry { text-align: left; }
+
+.mt-goal-scorer { color: var(--text); font-weight: 600; white-space: nowrap; }
+.mt-goal-assist { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
+.mt-goal-min   { font-size: 10px; font-weight: 700; color: var(--accent); }
 /* Flag images in mini standings table */
 .mmt-flag-img { width: 20px; height: 15px; object-fit: cover; border-radius: 2px; vertical-align: middle; flex-shrink: 0; }
 

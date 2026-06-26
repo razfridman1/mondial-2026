@@ -280,30 +280,26 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
         </div>
       </div>
 
-      {/* Goals — vertical list per team, sorted by minute */}
+      {/* Goals — two columns, each team on its own side */}
       {(homeGoals.length > 0 || awayGoals.length > 0) && (
         <div className="mt-goals-strip">
-          {/* Home goals — under home team (right side, RTL) */}
+          {/* Right column = home team (RTL) */}
           <div className="mt-goals-col mt-goals-home">
             {homeGoals.map((g, i) => (
-              <div key={i} className="mt-goal-row">
-                <span className="mt-goal-min">{g.minute != null ? `${g.minute}′` : ""}</span>
-                <span className="mt-goal-info">
-                  <span className="mt-goal-scorer">⚽ {playerNameHe(g.player || "")}</span>
-                  {g.assist && <span className="mt-goal-assist">🅰️ {playerNameHe(g.assist)}</span>}
-                </span>
+              <div key={i} className="mt-goal-entry">
+                <span className="mt-goal-scorer">⚽ {playerNameHe(g.player || "")}</span>
+                {g.assist && <span className="mt-goal-assist">🅰️ {playerNameHe(g.assist)}</span>}
+                <span className="mt-goal-min">{g.minute != null ? g.minute + "′" : ""}</span>
               </div>
             ))}
           </div>
-          {/* Away goals — under away team (left side, RTL) */}
+          {/* Left column = away team (RTL) */}
           <div className="mt-goals-col mt-goals-away">
             {awayGoals.map((g, i) => (
-              <div key={i} className="mt-goal-row">
-                <span className="mt-goal-info">
-                  <span className="mt-goal-scorer">⚽ {playerNameHe(g.player || "")}</span>
-                  {g.assist && <span className="mt-goal-assist">🅰️ {playerNameHe(g.assist)}</span>}
-                </span>
-                <span className="mt-goal-min">{g.minute != null ? `${g.minute}′` : ""}</span>
+              <div key={i} className="mt-goal-entry">
+                <span className="mt-goal-min">{g.minute != null ? g.minute + "′" : ""}</span>
+                <span className="mt-goal-scorer">⚽ {playerNameHe(g.player || "")}</span>
+                {g.assist && <span className="mt-goal-assist">🅰️ {playerNameHe(g.assist)}</span>}
               </div>
             ))}
           </div>
