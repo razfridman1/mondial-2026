@@ -4,7 +4,6 @@ import { useStore } from "@/lib/store";
 import { MATCHES } from "@/lib/data";
 import { applyOverride } from "@/lib/utils";
 import { effectiveUtc } from "@/lib/sim";
-import { resolveAllStages } from "@/lib/bracket";
 import { PredictionRow, type MatchResult } from "./PredictionRow";
 
 const GRACE_MS = 5 * 60 * 1000;   // show for 5 min after saving
@@ -25,7 +24,6 @@ export default function OpenPredictionsTab() {
   const predictions = useStore(s => s.predictions);
   const overrides  = useStore(s => s.overrides);
   const simConfig  = useStore(s => s.simConfig);
-  const matchResults = useStore(s => s.matchResults);
 
   const [now, setNow]     = useState(() => Date.now());
   const [results, setResults] = useState<Record<string, MatchResult>>({});
@@ -66,18 +64,10 @@ export default function OpenPredictionsTab() {
     return () => { cancelled = true; };
   }, []);
 
-  const resolvedMatches = useMemo(() => {
-    const res: Record<string, { home: number; away: number; finishedAt: number; winner?: string }> = {};
-    Object.entries(matchResults).forEach(([id, r]) => {
-      res[id] = r as any;
-    });
-    const base = MATCHES.map(m => applyOverride(m, overrides[m.id]));
-    return resolveAllStages(base, res);
-  }, [matchResults, overrides]);
-
   const openMatches = useMemo(() => {
     const cutoff = now + NEXT_DAYS * 24 * 60 * 60 * 1000;
-    return resolvedMatches.filter(m => {
+    const allMatches = MATCHES.map(m => applyOverride(m, overrides[m.id]));
+    return allMatches.filter(m => {
       const startMs = new Date(effectiveUtc(m.utc, simConfig)).getTime();
       const lockAt  = startMs - 3 * 60 * 1000;
       // Must not be locked yet
