@@ -54,10 +54,18 @@ export async function GET(req: Request) {
       if (existing.exists) { skipped++; continue; }
       const h = Math.floor(Math.random() * 4);
       const a = Math.floor(Math.random() * 4);
-      await db.collection("predictions").doc(docId).set({
-        uid, matchId: m.id, homeScore: h, awayScore: a,
-        updatedAt: now, auto: true,
-      });
+      const isKO = m.stage !== "GROUP";
+      /* For KO matches, set predictedWinner. If score isn't tied, derive
+       * from score. If tied (e.g. 1-1), randomly pick home or away. */
+      let predictedWinner: string | undefined;
+      if (isKO) {
+        if (h > a)      predictedWinner = m.home;
+        else if (a > h) predictedWinner = m.away;
+        else            predictedWinner = Math.random() < 0.5 ? m.home : m.away;
+      }
+      const predPayload: any = { uid, matchId: m.id, homeScore: h, awayScore: a, updatedAt: now, auto: true };
+      if (predictedWinner) predPayload.predictedWinner = predictedWinner;
+      await db.collection("predictions").doc(docId).set(predPayload);
       inserted++;
       const profData = profSnap.docs.find(d => d.id === uid)?.data() as any || {};
       await db.collection("activity").add({
@@ -119,10 +127,18 @@ export async function POST(req: Request) {
       if (existing.exists) { skipped++; continue; }
       const h = Math.floor(Math.random() * 4);
       const a = Math.floor(Math.random() * 4);
-      await db.collection("predictions").doc(docId).set({
-        uid, matchId: m.id, homeScore: h, awayScore: a,
-        updatedAt: now, auto: true,
-      });
+      const isKO = m.stage !== "GROUP";
+      /* For KO matches, set predictedWinner. If score isn't tied, derive
+       * from score. If tied (e.g. 1-1), randomly pick home or away. */
+      let predictedWinner: string | undefined;
+      if (isKO) {
+        if (h > a)      predictedWinner = m.home;
+        else if (a > h) predictedWinner = m.away;
+        else            predictedWinner = Math.random() < 0.5 ? m.home : m.away;
+      }
+      const predPayload: any = { uid, matchId: m.id, homeScore: h, awayScore: a, updatedAt: now, auto: true };
+      if (predictedWinner) predPayload.predictedWinner = predictedWinner;
+      await db.collection("predictions").doc(docId).set(predPayload);
       inserted++;
       const profData = profSnap.docs.find(d => d.id === uid)?.data() as any || {};
       await db.collection("activity").add({

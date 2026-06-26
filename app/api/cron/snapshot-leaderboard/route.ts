@@ -30,12 +30,20 @@ async function snapshot(triggeredBy: string) {
   const { db } = getAdmin();
   const dateKey = israelDateKey();
 
-  /* Load match results */
+  /* Load match results — include winner + isKnockout for correct KO scoring */
   const resSnap = await db.collection("match_results").get();
-  const results: Record<string, { home: number; away: number; finishedAt: number }> = {};
+  const stageById = new Map<string, string>();
+  const { MATCHES } = await import("@/lib/data");
+  for (const m of MATCHES) stageById.set(m.id, m.stage);
+  const results: Record<string, { home: number; away: number; finishedAt: number; winner?: string; isKnockout?: boolean }> = {};
   resSnap.forEach(d => {
     const data = d.data() as any;
-    results[d.id] = { home: data.home, away: data.away, finishedAt: data.finishedAt || 0 };
+    const stage = stageById.get(d.id);
+    const isKO = data.isKnockout || (stage && stage !== "GROUP");
+    const entry: any = { home: data.home, away: data.away, finishedAt: data.finishedAt || 0 };
+    if (data.winner) entry.winner = data.winner;
+    if (isKO) entry.isKnockout = true;
+    results[d.id] = entry;
   });
 
   /* Load all profiles */
