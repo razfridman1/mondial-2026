@@ -1,6 +1,6 @@
 import type { ExternalGoal } from "./football-data-api";
 import { SQUADS, normalizeName } from "./players";
-import { translateNamesToHebrew } from "./ai-result-fallback";
+import { translateNamesToHebrew, lookupAssistsLeaderboardViaAI } from "./ai-result-fallback";
 import { teamCodeFromApiName } from "./team-name-mapper";
 import { TEAMS } from "./data";
 
