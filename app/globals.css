@@ -5526,3 +5526,257 @@ html[data-theme="light"] .chat-panel {
   font-family: inherit;
 }
 .brv-retry-btn:hover { opacity: .85; }
+
+
+/* ====================================================================
+ * PURPLE THEME — fc26 redesign
+ * Primary:  #4B2D8F  (deep purple — group headers, active states)
+ * Navy:     #0D0A3C  (dark navy  — date chips, today badge)
+ * Bg:       #F5F6FA  (very light cool gray)
+ * Card:     #FFFFFF  (pure white)
+ * ==================================================================== */
+
+/* ── Core light-theme tokens ──────────────────────────────────────── */
+html[data-theme="light"] {
+  --bg:          #F5F6FA;
+  --bg-elev:     #FFFFFF;
+  --bg-card:     #FFFFFF;
+  --bg-card-2:   #F0F1F8;
+  --border:      #DDE0EE;
+  --border-soft: #EAECF4;
+  --text:        #12103A;
+  --text-muted:  #5A5880;
+  --text-dim:    #8F8DB8;
+  --accent:      #4B2D8F;
+  --accent-2:    #7C3AED;
+  --primary:     #4B2D8F;
+  --primary-2:   #3B1F7A;
+  --green:       #15803d;
+  --red:         #b91c1c;
+  --orange:      #d97706;
+  --purple:      #4B2D8F;
+  --navy:        #0D0A3C;
+}
+
+html[data-theme="light"] body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ── Header & tabs ────────────────────────────────────────────────── */
+html[data-theme="light"] .header {
+  background: #4B2D8F;
+  border-bottom: none;
+  box-shadow: 0 2px 12px rgba(75, 45, 143, 0.25);
+}
+html[data-theme="light"] .brand-title,
+html[data-theme="light"] .brand-sub,
+html[data-theme="light"] #header-clock { color: rgba(255,255,255,0.9); }
+html[data-theme="light"] .brand-logo {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+html[data-theme="light"] .tabs { border-top: 1px solid rgba(255,255,255,0.15); }
+html[data-theme="light"] .tab-btn {
+  color: rgba(255,255,255,0.65);
+  border-bottom-color: transparent;
+}
+html[data-theme="light"] .tab-btn:hover { color: #fff; }
+html[data-theme="light"] .tab-btn.on {
+  color: #fff;
+  border-bottom-color: #FFD700;
+}
+
+/* ── Section pills (משחקים/חי/היום) ──────────────────────────────── */
+html[data-theme="light"] .mt-sections {
+  background: linear-gradient(180deg,
+    rgba(245,246,250,0.97) 0%,
+    rgba(245,246,250,0.7) 80%,
+    rgba(245,246,250,0) 100%);
+}
+html[data-theme="light"] .mt-pill {
+  background: #FFFFFF;
+  border: 1px solid #DDE0EE;
+  color: #5A5880;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+html[data-theme="light"] .mt-pill:hover {
+  background: #F0F1F8;
+  color: #12103A;
+}
+html[data-theme="light"] .mt-pill.on {
+  background: linear-gradient(135deg, #4B2D8F 0%, #7C3AED 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(75, 45, 143, 0.35);
+}
+html[data-theme="light"] .mt-pill.is-live.on {
+  background: linear-gradient(135deg, #E11D48 0%, #F97316 100%);
+  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.4);
+}
+
+/* ── Day / date headings ──────────────────────────────────────────── */
+html[data-theme="light"] .day-heading {
+  background: #0D0A3C;
+  color: #FFFFFF;
+  border-radius: 8px;
+  border-right: none;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+html[data-theme="light"] .day-heading .muted { color: rgba(255,255,255,0.65); }
+html[data-theme="light"] .chip.chip-strong {
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  border-color: rgba(255,255,255,0.25);
+}
+
+/* ── Section / stage title ────────────────────────────────────────── */
+html[data-theme="light"] .mt-section-heading,
+html[data-theme="light"] .mt-stage-title {
+  background: #4B2D8F;
+  color: #FFFFFF;
+  border: none;
+  box-shadow: 0 2px 10px rgba(75, 45, 143, 0.2);
+}
+html[data-theme="light"] .mt-section-heading .muted { color: rgba(255,255,255,0.6); }
+
+/* ── Match cards (modern view in MatchesTab) ──────────────────────── */
+html[data-theme="light"] .mt-card {
+  background: #FFFFFF;
+  border: 1px solid #E4E6F0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-theme="light"] .mt-card:hover {
+  border-color: #4B2D8F;
+  box-shadow: 0 6px 20px rgba(75, 45, 143, 0.15);
+}
+html[data-theme="light"] .mt-card.status-live {
+  border-color: rgba(225, 29, 72, 0.35);
+  background: #FFFBFB;
+}
+html[data-theme="light"] .mt-card-head { border-bottom: 1px solid #F0F1F8; }
+html[data-theme="light"] .mt-card-foot { border-top: 1px solid #F0F1F8; }
+html[data-theme="light"] .mt-team-name { color: #12103A; }
+html[data-theme="light"] .mt-score-num { color: #12103A; }
+html[data-theme="light"] .mt-score.live .mt-score-num { color: #4B2D8F; }
+html[data-theme="light"] .mt-vs-time { color: #4B2D8F; font-weight: 700; }
+html[data-theme="light"] .mt-live-pill {
+  background: linear-gradient(90deg, #E11D48, #F97316);
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+html[data-theme="light"] .mt-status-pill.finished {
+  background: #0D0A3C;
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+}
+html[data-theme="light"] .mt-status-pill.pregame {
+  background: rgba(75,45,143,0.1);
+  color: #4B2D8F;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+}
+html[data-theme="light"] .mt-status-pill.scheduled {
+  color: #4B2D8F;
+  font-weight: 700;
+}
+html[data-theme="light"] .mt-venue,
+html[data-theme="light"] .mt-broadcast { color: #5A5880; }
+
+/* ── Old-style MatchCard (chip-stage, badges) ─────────────────────── */
+html[data-theme="light"] .chip.chip-stage {
+  background: #4B2D8F;
+  border: none;
+  color: #FFFFFF;
+}
+html[data-theme="light"] .badge-live {
+  background: linear-gradient(90deg, #E11D48, #F97316);
+  color: #fff;
+}
+html[data-theme="light"] .badge-finished {
+  background: #0D0A3C;
+  color: #fff;
+}
+html[data-theme="light"] .badge-pregame {
+  background: rgba(75,45,143,0.12);
+  color: #4B2D8F;
+}
+
+/* ── Old-style MatchCard body ─────────────────────────────────────── */
+html[data-theme="light"] .match-card {
+  background: #FFFFFF;
+  border: 1px solid #E4E6F0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+html[data-theme="light"] .match-card:hover {
+  border-color: #4B2D8F;
+  box-shadow: 0 6px 20px rgba(75,45,143,0.12);
+}
+html[data-theme="light"] .match-card.status-live {
+  border-color: rgba(225, 29, 72, 0.3);
+}
+html[data-theme="light"] .mc-live-score-num { color: #4B2D8F; font-weight: 800; }
+html[data-theme="light"] .mc-live-clock { color: #E11D48; }
+html[data-theme="light"] .mc-venue { color: #5A5880; }
+html[data-theme="light"] .mc-header { border-bottom: 1px solid #F0F1F8; }
+html[data-theme="light"] .mc-broadcast { border-top: 1px solid #F0F1F8; }
+html[data-theme="light"] .team-name { color: #12103A; font-weight: 700; }
+html[data-theme="light"] .vs-label { color: #5A5880; }
+
+/* ── Standings / groups ───────────────────────────────────────────── */
+html[data-theme="light"] .group-card {
+  background: #FFFFFF;
+  border: 1px solid #E4E6F0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+html[data-theme="light"] .group-name {
+  background: #4B2D8F;
+  color: #FFFFFF;
+}
+html[data-theme="light"] .stnd-group-title {
+  background: #4B2D8F;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px 8px 0 0;
+}
+html[data-theme="light"] .stnd-table th { background: #F0F1F8; color: #5A5880; }
+html[data-theme="light"] .stnd-table .highlight { background: #EDE9FA; }
+
+/* ── Buttons and form elements ────────────────────────────────────── */
+html[data-theme="light"] .btn-primary,
+html[data-theme="light"] .seg.on { background: #4B2D8F; color: #fff; border-color: #4B2D8F; }
+html[data-theme="light"] .btn-primary:hover { background: #3B1F7A; }
+html[data-theme="light"] .btn-watch { background: #4B2D8F; color: #fff; border-color: transparent; }
+
+/* ── Cards + filters ──────────────────────────────────────────────── */
+html[data-theme="light"] .filters,
+html[data-theme="light"] .empty-state { background: #FFFFFF; border-color: #E4E6F0; }
+html[data-theme="light"] .seg {
+  background: #F0F1F8;
+  color: #12103A;
+  border-color: #DDE0EE;
+}
+
+/* ── Bracket ──────────────────────────────────────────────────────── */
+html[data-theme="light"] .brv-col-title {
+  background: #4B2D8F;
+  color: #FFFFFF;
+  border: none;
+}
+html[data-theme="light"] .brv-match {
+  background: #FFFFFF;
+  border-color: #E4E6F0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+html[data-theme="light"] .brv-score-win { color: #4B2D8F; }
+html[data-theme="light"] .brv-badge-live { background: #E11D48; }
+html[data-theme="light"] .brv-badge-done { background: #0D0A3C; }
