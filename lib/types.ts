@@ -115,6 +115,7 @@ export interface UserProfile {
    * the user cannot change them (see /api/top-picks). */
   topScorerPick?: TopPick;
   topAssistPick?: TopPick;
+  championPick?: { teamCode: string; setAt: number };
 }
 
 /* A user's one-time guess for the tournament's top scorer / top assists

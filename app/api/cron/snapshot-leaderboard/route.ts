@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
 import { userTotals } from "@/lib/scoring";
+import { computeSpecialPickBonuses } from "@/lib/special-picks-bonus";
 import type { LeaderRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -54,12 +55,15 @@ async function snapshot(triggeredBy: string) {
 
   /* Compute global leaderboard */
   async function computeFor(uids: string[]): Promise<LeaderRow[]> {
+    const profInputs = uids.map(uid => ({ uid, ...profByUid[uid] }));
+    const specialBonuses = await computeSpecialPickBonuses(db, profInputs, results).catch(() => new Map<string, number>());
     const rows: LeaderRow[] = [];
     for (const uid of uids) {
       const prof = profByUid[uid] || {};
       const predSnap = await db.collection("predictions").where("uid", "==", uid).get();
       const preds = predSnap.docs.map(d => d.data() as any);
-      const t = userTotals(preds, results);
+      const specialBonus = specialBonuses.get(uid) || 0;
+      const t = userTotals(preds, results, specialBonus);
       rows.push({
         uid,
         displayName: prof.displayName || "משתמש",

@@ -32,6 +32,19 @@ export function ScoringLegend() {
         <span className="pts pts-fire">🔥 +1</span>
         <span>בונוס מהניחוש הנכון השני ברצף ואילך</span>
       </div>
+
+      <div className="scoring-legend-section">
+        <div className="scoring-legend-stage">🏆 ניחושי טורניר</div>
+        <ul>
+          <li><span className="pts pts-gold">12</span> ניחוש נכון של זוכת המונדיאל</li>
+          <li><span className="pts pts-gold">12</span> ניחוש נכון של מלך השערים</li>
+          <li><span className="pts pts-gold">12</span> ניחוש נכון של מלך הבישולים</li>
+        </ul>
+        <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+          ניחוש זוכה ניתן לשינוי עד תחילת שלב 8 האחרונות.
+          ניחוש מלך השערים/בישולים ניתן לשינוי עד סיום שלב הבתים.
+        </div>
+      </div>
     </aside>
   );
 }

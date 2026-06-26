@@ -15,7 +15,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
-import { groupStageComplete } from "@/lib/bracket";
+import { groupStageComplete, stageComplete } from "@/lib/bracket";
 import { TEAMS } from "@/lib/data";
 import { squadFor } from "@/lib/players";
 import { openScorersShareCard } from "@/lib/share-cards";
@@ -69,7 +69,7 @@ export default function TopScorersTab() {
       </div>
       <p className="muted" style={{ marginTop: 4, marginBottom: 16, fontSize: 13 }}>
         טבלאות השערים והבישולים מתעדכנות אוטומטית לאחר כל משחק שמסתיים.
-        בנוסף, ניתן לבחור מי לדעתך יהיה מלך השערים ומלך הבישולים של הטורניר — ואפשר להחליף את הבחירה כל עוד שלב הבתים לא הסתיים. לאחר סיום שלב הבתים הבחירה ננעלת.
+        ניחוש מלך השערים/בישולים ניתן לשינוי עד סיום שלב הבתים. ניחוש זוכת המונדיאל ניתן לשינוי עד תחילת שלב 8 האחרונות.
       </p>
 
       <div className="topscorers-grid">
@@ -82,6 +82,7 @@ export default function TopScorersTab() {
         profile={profile}
         liveSquads={liveSquads}
         setTopPicks={setTopPicks}
+        topAssists={topAssists}
       />
 
       <AllPicksTable />
@@ -100,8 +101,10 @@ interface AllPicksRow {
   avatarId: string;
   topScorerPick: TopPick | null;
   topAssistPick: TopPick | null;
+  championPick: { teamCode: string } | null;
   scorerCorrect: boolean | null;
   assistCorrect: boolean | null;
+  championCorrect: boolean | null;
 }
 
 function AllPicksTable() {
@@ -160,14 +163,15 @@ function AllPicksTable() {
               <th className="stnd-th-team">משתמש</th>
               <th>🥇 מלך השערים</th>
               <th>🎯 מלך הבישולים</th>
+              <th>🏆 זוכה</th>
             </tr>
           </thead>
           <tbody>
             {data === null && (
-              <tr><td colSpan={3} className="muted" style={{ textAlign: "center", padding: 16 }}>טוען...</td></tr>
+              <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: 16 }}>טוען...</td></tr>
             )}
             {data !== null && data.rows.length === 0 && (
-              <tr><td colSpan={3} className="muted" style={{ textAlign: "center", padding: 16 }}>
+              <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: 16 }}>
                 עדיין אין ניחושים — היו הראשונים לבחור!
               </td></tr>
             )}
@@ -197,6 +201,14 @@ function AllPicksTable() {
                         {row.topAssistPick.playerName}
                         {assistTeam && <> ({assistTeam.flag} {assistTeam.name})</>}
                         {data.finished && (row.assistCorrect ? " ✅" : " ❌")}
+                      </>
+                    ) : "—"}
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    {row.championPick ? (
+                      <>
+                        {(() => { const t = TEAMS[row.championPick.teamCode]; return t ? <>{t.flag} {t.name}</> : row.championPick.teamCode; })()}
+                        {data.finished && (row.championCorrect ? " ✅" : " ❌")}
                       </>
                     ) : "—"}
                   </td>
@@ -267,14 +279,16 @@ function ScorerTable({ title, countLabel, rows, loading }: {
 /* ---------------------------------------------------------------------
  * One-time pick panel.
  * ------------------------------------------------------------------- */
-function TopPicksPanel({ user, profile, liveSquads, setTopPicks }: {
+function TopPicksPanel({ user, profile, liveSquads, setTopPicks, topAssists }: {
   user: ReturnType<typeof useStore.getState>["user"];
   profile: ReturnType<typeof useStore.getState>["profile"];
   liveSquads: Record<string, import("@/lib/players").Player[]>;
   setTopPicks: ReturnType<typeof useStore.getState>["setTopPicks"];
+  topAssists: import("@/app/api/scorers/route").ScorerEntry[];
 }) {
   const matchResults = useStore(s => s.matchResults);
   const locked = groupStageComplete(matchResults);
+  const championLocked = stageComplete("R16", matchResults);
 
   const [scorerTeam, setScorerTeam] = useState("");
   const [scorerPlayer, setScorerPlayer] = useState("");
@@ -286,13 +300,17 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks }: {
 
   const existingScorer = profile?.topScorerPick;
   const existingAssist = profile?.topAssistPick;
+  const existingChampion = (profile as any)?.championPick;
+
+  const [championTeam, setChampionTeam] = useState(existingChampion?.teamCode || "");
 
   /* Pre-fill the form with the user's current pick once the profile loads,
    * so editing shows what's already saved. */
   useEffect(() => {
     if (existingScorer) { setScorerTeam(existingScorer.teamCode); setScorerPlayer(existingScorer.playerName); }
     if (existingAssist) { setAssistTeam(existingAssist.teamCode); setAssistPlayer(existingAssist.playerName); }
-  }, [existingScorer?.teamCode, existingScorer?.playerName, existingAssist?.teamCode, existingAssist?.playerName]);
+    if (existingChampion) setChampionTeam(existingChampion.teamCode);
+  }, [existingScorer?.teamCode, existingScorer?.playerName, existingAssist?.teamCode, existingAssist?.playerName, existingChampion?.teamCode]);
 
   const scorerSquad = useMemo(() => scorerTeam ? squadFor(scorerTeam, liveSquads) : [], [scorerTeam, liveSquads]);
   const assistSquad = useMemo(() => assistTeam ? squadFor(assistTeam, liveSquads) : [], [assistTeam, liveSquads]);
@@ -307,29 +325,60 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks }: {
     );
   }
 
-  /* Once the group stage is complete, picks are locked — show read-only. */
-  if (locked) {
-    const scorerTeamInfo = existingScorer ? TEAMS[existingScorer.teamCode] : null;
-    const assistTeamInfo = existingAssist ? TEAMS[existingAssist.teamCode] : null;
+  const scorerTeamInfo = existingScorer ? TEAMS[existingScorer.teamCode] : null;
+  const assistTeamInfo = existingAssist ? TEAMS[existingAssist.teamCode] : null;
+  const championTeamInfo = existingChampion ? TEAMS[existingChampion.teamCode] : null;
+
+  /* Both scorer/assist AND champion locked — full read-only */
+  if (locked && championLocked) {
     return (
       <div className="topscorers-pick-panel">
-        <h3>🔮 הניחוש שלי (שלב הבתים הסתיים — נעול)</h3>
-        {existingScorer && existingAssist ? (
-          <div className="topscorers-pick-result">
-            <div>
-              <span className="muted">מלך השערים: </span>
-              <strong>{existingScorer.playerName}</strong>
-              {scorerTeamInfo && <span> ({scorerTeamInfo.flag} {scorerTeamInfo.name})</span>}
-            </div>
-            <div>
-              <span className="muted">מלך הבישולים: </span>
-              <strong>{existingAssist.playerName}</strong>
-              {assistTeamInfo && <span> ({assistTeamInfo.flag} {assistTeamInfo.name})</span>}
-            </div>
+        <h3>🔮 הניחוש שלי (נעול)</h3>
+        <div className="topscorers-pick-result">
+          {existingScorer ? (
+            <div><span className="muted">מלך השערים: </span><strong>{existingScorer.playerName}</strong>{scorerTeamInfo && <span> ({scorerTeamInfo.flag} {scorerTeamInfo.name})</span>}</div>
+          ) : <div className="muted">לא נבחר מלך שערים.</div>}
+          {existingAssist ? (
+            <div><span className="muted">מלך הבישולים: </span><strong>{existingAssist.playerName}</strong>{assistTeamInfo && <span> ({assistTeamInfo.flag} {assistTeamInfo.name})</span>}</div>
+          ) : <div className="muted">לא נבחר מלך בישולים.</div>}
+          {existingChampion ? (
+            <div><span className="muted">זוכת המונדיאל: </span><strong>{championTeamInfo?.name || existingChampion.teamCode}</strong>{championTeamInfo && <span> {championTeamInfo.flag}</span>}</div>
+          ) : <div className="muted">לא נבחרה זוכה.</div>}
+        </div>
+      </div>
+    );
+  }
+
+  /* Scorer/assist locked, champion still open */
+  if (locked) {
+    return (
+      <div className="topscorers-pick-panel">
+        <h3>🔮 הניחוש שלי</h3>
+        <div className="topscorers-pick-result" style={{ marginBottom: 12 }}>
+          {existingScorer ? (
+            <div><span className="muted">מלך השערים (נעול): </span><strong>{existingScorer.playerName}</strong>{scorerTeamInfo && <span> ({scorerTeamInfo.flag} {scorerTeamInfo.name})</span>}</div>
+          ) : <div className="muted">מלך השערים — לא נבחר (נעול).</div>}
+          {existingAssist ? (
+            <div><span className="muted">מלך הבישולים (נעול): </span><strong>{existingAssist.playerName}</strong>{assistTeamInfo && <span> ({assistTeamInfo.flag} {assistTeamInfo.name})</span>}</div>
+          ) : <div className="muted">מלך הבישולים — לא נבחר (נעול).</div>}
+        </div>
+        <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
+          ניחוש זוכת המונדיאל ניתן לשינוי עד סיום שלב 8 האחרונות.
+        </p>
+        <div className="topscorers-pick-form">
+          <div className="topscorers-pick-row">
+            <span className="topscorers-pick-label">🏆 זוכת המונדיאל:</span>
+            <select value={championTeam} onChange={e => { setChampionTeam(e.target.value); setSaved(false); }}>
+              <option value="">בחר נבחרת</option>
+              {ALL_TEAMS.map(t => <option key={t.code} value={t.code}>{t.flag} {t.name}</option>)}
+            </select>
           </div>
-        ) : (
-          <p className="muted">לא נבחר ניחוש לפני סיום שלב הבתים.</p>
-        )}
+          {error && <div className="error-text">{error}</div>}
+          {saved && !error && <div className="muted" style={{ fontSize: 12 }}>✅ הניחוש נשמר</div>}
+          <button className="btn btn-primary" onClick={submitChampion} disabled={saving}>
+            {saving ? "שומר..." : existingChampion ? "עדכן ניחוש זוכה" : "שלח ניחוש זוכה"}
+          </button>
+        </div>
       </div>
     );
   }
@@ -348,6 +397,26 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks }: {
       await setTopPicks(
         { teamCode: scorerTeam, playerName: scorerPlayer },
         { teamCode: assistTeam, playerName: assistPlayer },
+        championTeam ? { teamCode: championTeam } : undefined,
+      );
+      setSaved(true);
+    } catch (e: any) {
+      setError(e.message || "שגיאה בשמירה");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitChampion() {
+    if (!championTeam) { setError("יש לבחור נבחרת"); return; }
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await setTopPicks(
+        existingScorer || { teamCode: "", playerName: "" },
+        existingAssist || { teamCode: "", playerName: "" },
+        { teamCode: championTeam },
       );
       setSaved(true);
     } catch (e: any) {
@@ -384,6 +453,13 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks }: {
           <select value={assistPlayer} onChange={e => { setAssistPlayer(e.target.value); setSaved(false); }} disabled={!assistTeam}>
             <option value="">בחר שחקן</option>
             {assistSquad.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+          </select>
+        </div>
+        <div className="topscorers-pick-row">
+          <span className="topscorers-pick-label">🏆 זוכת המונדיאל:</span>
+          <select value={championTeam} onChange={e => { setChampionTeam(e.target.value); setSaved(false); }}>
+            <option value="">בחר נבחרת (אופציונלי עד 8 האחרונות)</option>
+            {ALL_TEAMS.map(t => <option key={t.code} value={t.code}>{t.flag} {t.name}</option>)}
           </select>
         </div>
         {error && <div className="error-text">{error}</div>}

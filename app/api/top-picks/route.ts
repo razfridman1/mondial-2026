@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken } from "@/lib/firebase-admin";
-import { groupStageComplete } from "@/lib/bracket";
+import { groupStageComplete, stageComplete } from "@/lib/bracket";
 import type { MatchResult } from "@/lib/standings";
 import type { TopPick } from "@/lib/types";
 
@@ -8,24 +8,32 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /* =====================================================================
- * /api/top-picks — picks for "מלך השערים והבישולים".
+ * /api/top-picks
  *
- * GET  — returns the caller's current picks (or nulls if not set yet),
- *        plus `locked` (true once the group stage is complete).
- * POST — sets BOTH picks (topScorer + topAssist). Can be changed freely
- *        until the group stage is complete (groupStageComplete) — once
- *        every group's 3 matches have a result, picks are locked and the
- *        request is rejected with 403.
+ * GET  — returns caller's picks + locked flags.
+ * POST — sets topScorer + topAssist (lock: group stage complete).
+ *        Also accepts optional champion (lock: R16 complete / QF starts).
  * ===================================================================*/
 
-async function isLocked(db: FirebaseFirestore.Firestore): Promise<boolean> {
+async function getLockState(db: FirebaseFirestore.Firestore): Promise<{
+  locked: boolean;
+  championLocked: boolean;
+}> {
   const snap = await db.collection("match_results").get();
   const results: Record<string, MatchResult> = {};
   snap.forEach(d => {
     const data = d.data() as any;
-    results[d.id] = { home: data.home, away: data.away, finishedAt: data.finishedAt || 0, ...(data.winner ? { winner: data.winner } : {}) };
+    results[d.id] = {
+      home: data.home,
+      away: data.away,
+      finishedAt: data.finishedAt || 0,
+      ...(data.winner ? { winner: data.winner } : {}),
+    };
   });
-  return groupStageComplete(results);
+  return {
+    locked: groupStageComplete(results),
+    championLocked: stageComplete("R16", results),
+  };
 }
 
 function getUid(req: Request): Promise<string> {
@@ -45,11 +53,13 @@ export async function GET(req: Request) {
   const { db } = getAdmin();
   const snap = await db.collection("profiles").doc(uid).get();
   const data = snap.exists ? (snap.data() || {}) : {};
-  const locked = await isLocked(db);
+  const { locked, championLocked } = await getLockState(db);
   return NextResponse.json({
     topScorerPick: data.topScorerPick || null,
     topAssistPick: data.topAssistPick || null,
+    championPick: data.championPick || null,
     locked,
+    championLocked,
   });
 }
 
@@ -59,38 +69,63 @@ export async function POST(req: Request) {
   catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.status || 401 }); }
 
   const body = await req.json().catch(() => ({}));
-  const { topScorer, topAssist } = body as {
+  const { topScorer, topAssist, champion } = body as {
     topScorer?: { teamCode?: string; playerName?: string };
     topAssist?: { teamCode?: string; playerName?: string };
+    champion?: { teamCode?: string };
   };
 
-  if (
-    !topScorer?.teamCode || !topScorer?.playerName ||
-    !topAssist?.teamCode || !topAssist?.playerName
-  ) {
-    return NextResponse.json({ error: "missing topScorer/topAssist {teamCode, playerName}" }, { status: 400 });
-  }
-
   const { db } = getAdmin();
-
-  if (await isLocked(db)) {
-    const ref = db.collection("profiles").doc(uid);
-    const snap = await ref.get();
-    const data = snap.exists ? (snap.data() || {}) : {};
-    return NextResponse.json({
-      error: "locked",
-      message: "שלב הבתים הסתיים — לא ניתן לשנות יותר את הבחירה",
-      topScorerPick: data.topScorerPick || null,
-      topAssistPick: data.topAssistPick || null,
-    }, { status: 403 });
-  }
-
+  const { locked, championLocked } = await getLockState(db);
   const ref = db.collection("profiles").doc(uid);
   const now = Date.now();
-  const topScorerPick: TopPick = { teamCode: topScorer.teamCode, playerName: topScorer.playerName, setAt: now };
-  const topAssistPick: TopPick = { teamCode: topAssist.teamCode, playerName: topAssist.playerName, setAt: now };
+  const updatePayload: any = {};
 
-  await ref.set({ topScorerPick, topAssistPick }, { merge: true });
+  /* Scorer + Assist picks */
+  if (topScorer || topAssist) {
+    if (locked) {
+      const snap = await ref.get();
+      const data = snap.exists ? (snap.data() || {}) : {};
+      return NextResponse.json({
+        error: "locked",
+        message: "שלב הבתים הסתיים — לא ניתן לשנות את הבחירה",
+        topScorerPick: data.topScorerPick || null,
+        topAssistPick: data.topAssistPick || null,
+      }, { status: 403 });
+    }
+    if (!topScorer?.teamCode || !topScorer?.playerName || !topAssist?.teamCode || !topAssist?.playerName) {
+      return NextResponse.json({ error: "missing topScorer/topAssist {teamCode, playerName}" }, { status: 400 });
+    }
+    updatePayload.topScorerPick = { teamCode: topScorer.teamCode, playerName: topScorer.playerName, setAt: now };
+    updatePayload.topAssistPick = { teamCode: topAssist.teamCode, playerName: topAssist.playerName, setAt: now };
+  }
 
-  return NextResponse.json({ ok: true, topScorerPick, topAssistPick });
+  /* Champion pick */
+  if (champion) {
+    if (championLocked) {
+      return NextResponse.json({
+        error: "champion_locked",
+        message: "שלב ה-16 האחרונות הסתיים — לא ניתן לשנות את ניחוש הזוכה",
+      }, { status: 403 });
+    }
+    if (!champion.teamCode) {
+      return NextResponse.json({ error: "missing champion.teamCode" }, { status: 400 });
+    }
+    updatePayload.championPick = { teamCode: champion.teamCode, setAt: now };
+  }
+
+  if (!Object.keys(updatePayload).length) {
+    return NextResponse.json({ error: "nothing to update" }, { status: 400 });
+  }
+
+  await ref.set(updatePayload, { merge: true });
+
+  return NextResponse.json({
+    ok: true,
+    ...(updatePayload.topScorerPick ? {
+      topScorerPick: updatePayload.topScorerPick,
+      topAssistPick: updatePayload.topAssistPick,
+    } : {}),
+    ...(updatePayload.championPick ? { championPick: updatePayload.championPick } : {}),
+  });
 }

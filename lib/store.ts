@@ -77,7 +77,7 @@ interface MondialState {
   setOverrides: (o: Record<string, BroadcastOverrideDoc>) => void;
   setSimConfig: (c: SimConfig | null) => void;
   loadLiveSquads: () => Promise<void>;
-  setTopPicks: (topScorer: { teamCode: string; playerName: string }, topAssist: { teamCode: string; playerName: string }) => Promise<void>;
+  setTopPicks: (topScorer: { teamCode: string; playerName: string }, topAssist: { teamCode: string; playerName: string }, champion?: { teamCode: string }) => Promise<void>;
 }
 
 export const useStore = create<MondialState>()(
@@ -365,7 +365,7 @@ export const useStore = create<MondialState>()(
           }
         } catch {}
       },
-      setTopPicks: async (topScorer, topAssist) => {
+      setTopPicks: async (topScorer, topAssist, champion) => {
         const u = get().user;
         const prof = get().profile;
         if (!u || !prof) throw new Error("not logged in");
@@ -373,13 +373,13 @@ export const useStore = create<MondialState>()(
         const r = await fetch("/api/top-picks", {
           method: "POST",
           headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-          body: JSON.stringify({ topScorer, topAssist }),
+          body: JSON.stringify({ topScorer, topAssist, ...(champion ? { champion } : {}) }),
         });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) {
           throw new Error(data.message || data.error || "save failed");
         }
-        set({ profile: { ...prof, topScorerPick: data.topScorerPick, topAssistPick: data.topAssistPick } });
+        set({ profile: { ...prof, topScorerPick: data.topScorerPick, topAssistPick: data.topAssistPick, ...(data.championPick ? { championPick: data.championPick } : {}) } });
       },
     }),
     {
