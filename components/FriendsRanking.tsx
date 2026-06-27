@@ -591,9 +591,10 @@ function GroupLeaderboardCard({
             )}
             {rows.length >= 2 && (
               <button
-                className="btn btn-small"
+                className="btn btn-small btn-danger"
                 onClick={() => setShowAnalysis(true)}
                 title="השווה ניקוד בין שני חברים"
+                style={{ fontWeight: 800 }}
               >
                 📊 ניתוח ניקוד
               </button>
