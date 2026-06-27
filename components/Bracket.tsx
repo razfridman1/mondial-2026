@@ -8,38 +8,78 @@ import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import type { MatchResult } from "@/lib/standings";
 
 /* ================================================================
- * Layout constants (full design dimensions — scaled to fit screen)
+ * Flag images — convert emoji regional-indicators → ISO → flagcdn
  * ================================================================ */
-const CW = 142;   // card width
-const CH = 64;    // card height
-const SH = 80;    // slot height (vertical spacing per R32 match)
-const CG = 26;    // gap between round columns
+const SPECIAL_FLAG: Record<string, string> = {
+  ENG: "gb-eng", SCO: "gb-sct", WAL: "gb-wls", NIR: "gb-nir",
+};
+
+function flagUrl(code: string, emoji: string): string {
+  if (SPECIAL_FLAG[code]) return `https://flagcdn.com/20x15/${SPECIAL_FLAG[code]}.png`;
+  try {
+    const chars = [...emoji];
+    if (chars.length >= 2) {
+      const cp = chars[0].codePointAt(0)!;
+      if (cp >= 0x1F1E6 && cp <= 0x1F1FF) {
+        const iso = chars.slice(0, 2)
+          .map(c => String.fromCharCode(c.codePointAt(0)! - 0x1F1E6 + 65))
+          .join("").toLowerCase();
+        return `https://flagcdn.com/20x15/${iso}.png`;
+      }
+    }
+  } catch {}
+  return "";
+}
+
+function FlagImg({ code }: { code: string }) {
+  const t = TEAMS[code];
+  if (!t) return <span style={{ fontSize: 14, lineHeight: 1 }}>❓</span>;
+  const url = flagUrl(code, t.flag ?? "");
+  if (!url) return <span style={{ fontSize: 14, lineHeight: 1 }}>{t.flag}</span>;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      width={22} height={16}
+      alt={code}
+      style={{ flexShrink: 0, borderRadius: 2, objectFit: "cover",
+               border: "1px solid rgba(255,255,255,0.15)" }}
+    />
+  );
+}
+
+/* ================================================================
+ * Layout constants
+ * ================================================================ */
+const CW = 148;  // card width
+const CH = 64;   // card height
+const SH = 82;   // slot height
+const CG = 24;   // column gap
 
 const r32L = 0;
-const r16L = r32L + CW + CG;   // 168
-const qfL  = r16L + CW + CG;   // 336
-const sfL  = qfL  + CW + CG;   // 504
-const finX = sfL  + CW + CG;   // 672
-const sfR  = finX + CW + CG;   // 840
-const qfR  = sfR  + CW + CG;   // 1008
-const r16R = qfR  + CW + CG;   // 1176
-const r32R = r16R + CW + CG;   // 1344
+const r16L = r32L + CW + CG;
+const qfL  = r16L + CW + CG;
+const sfL  = qfL  + CW + CG;
+const finX = sfL  + CW + CG;
+const sfR  = finX + CW + CG;
+const qfR  = sfR  + CW + CG;
+const r16R = qfR  + CW + CG;
+const r32R = r16R + CW + CG;
 
-const TOTAL_W = r32R + CW;   // 1486
-const TOTAL_H = SH * 8;      // 640
-const LABEL_H = 34;
-const CONT_H  = LABEL_H + TOTAL_H + 80; // extra room for trophy + 3rd place
+const TOTAL_W = r32R + CW;    // 9 × 172 = 1548
+const TOTAL_H = SH * 8;       // 656
+const LABEL_H = 36;
+const CONT_H  = LABEL_H + TOTAL_H + 90;
 
-/* Center-Y positions (in SVG / absolute-coord space below label row) */
 const R32Y = Array.from({ length: 8 }, (_, i) => i * SH + SH / 2);
 function avg(a: number, b: number) { return (a + b) / 2; }
-const R16Y = [avg(R32Y[0],R32Y[1]), avg(R32Y[2],R32Y[3]), avg(R32Y[4],R32Y[5]), avg(R32Y[6],R32Y[7])];
+const R16Y = [avg(R32Y[0],R32Y[1]),avg(R32Y[2],R32Y[3]),avg(R32Y[4],R32Y[5]),avg(R32Y[6],R32Y[7])];
 const QFY  = [avg(R16Y[0],R16Y[1]), avg(R16Y[2],R16Y[3])];
 const SFY  = avg(QFY[0], QFY[1]);
 const FINY = SFY;
 
 /* ================================================================
- * Match assignments (visual order top → bottom)
+ * Match assignments
  * ================================================================ */
 const LEFT_R32  = ["M075","M078","M073","M076","M084","M083","M082","M081"];
 const LEFT_R16  = ["M089","M090","M091","M092"];
@@ -52,9 +92,6 @@ const RIGHT_SF  = "M102";
 const FINAL_ID  = "M104";
 const THIRD_ID  = "M103";
 
-/* ================================================================
- * Round labels
- * ================================================================ */
 const ROUND_LABELS = [
   { label: "שלב 32",     cx: r32L + CW/2 },
   { label: "שמינית גמר", cx: r16L + CW/2 },
@@ -68,73 +105,73 @@ const ROUND_LABELS = [
 ];
 
 /* ================================================================
- * SVG connector lines
+ * SVG connectors
  * ================================================================ */
-function conn(x1: number, y1: number, mx: number, x2: number, y2: number) {
+function conn(x1:number,y1:number,mx:number,x2:number,y2:number){
   return `M${x1} ${y1} L${mx} ${y1} L${mx} ${y2} L${x2} ${y2}`;
 }
-function buildConnectors(): string[] {
-  const p: string[] = [];
-  const mx01 = r32L + CW + CG/2;
-  for (let i=0;i<4;i++){const r=R16Y[i];p.push(conn(r32L+CW,R32Y[i*2],mx01,r16L,r));p.push(conn(r32L+CW,R32Y[i*2+1],mx01,r16L,r));}
-  const mx12 = r16L + CW + CG/2;
-  for (let i=0;i<2;i++){const q=QFY[i];p.push(conn(r16L+CW,R16Y[i*2],mx12,qfL,q));p.push(conn(r16L+CW,R16Y[i*2+1],mx12,qfL,q));}
-  const mx23 = qfL + CW + CG/2;
+function buildConnectors(){
+  const p:string[]=[];
+  const mx01=r32L+CW+CG/2;
+  for(let i=0;i<4;i++){const r=R16Y[i];p.push(conn(r32L+CW,R32Y[i*2],mx01,r16L,r));p.push(conn(r32L+CW,R32Y[i*2+1],mx01,r16L,r));}
+  const mx12=r16L+CW+CG/2;
+  for(let i=0;i<2;i++){const q=QFY[i];p.push(conn(r16L+CW,R16Y[i*2],mx12,qfL,q));p.push(conn(r16L+CW,R16Y[i*2+1],mx12,qfL,q));}
+  const mx23=qfL+CW+CG/2;
   p.push(conn(qfL+CW,QFY[0],mx23,sfL,SFY));p.push(conn(qfL+CW,QFY[1],mx23,sfL,SFY));
   p.push(`M${sfL+CW} ${SFY} L${finX} ${FINY}`);
-  const mx78 = r32R - CG/2;
-  for (let i=0;i<4;i++){const r=R16Y[i];p.push(conn(r32R,R32Y[i*2],mx78,r16R+CW,r));p.push(conn(r32R,R32Y[i*2+1],mx78,r16R+CW,r));}
-  const mx67 = r16R - CG/2;
-  for (let i=0;i<2;i++){const q=QFY[i];p.push(conn(r16R,R16Y[i*2],mx67,qfR+CW,q));p.push(conn(r16R,R16Y[i*2+1],mx67,qfR+CW,q));}
-  const mx56 = qfR - CG/2;
+  const mx78=r32R-CG/2;
+  for(let i=0;i<4;i++){const r=R16Y[i];p.push(conn(r32R,R32Y[i*2],mx78,r16R+CW,r));p.push(conn(r32R,R32Y[i*2+1],mx78,r16R+CW,r));}
+  const mx67=r16R-CG/2;
+  for(let i=0;i<2;i++){const q=QFY[i];p.push(conn(r16R,R16Y[i*2],mx67,qfR+CW,q));p.push(conn(r16R,R16Y[i*2+1],mx67,qfR+CW,q));}
+  const mx56=qfR-CG/2;
   p.push(conn(qfR,QFY[0],mx56,sfR+CW,SFY));p.push(conn(qfR,QFY[1],mx56,sfR+CW,SFY));
   p.push(`M${sfR} ${SFY} L${finX+CW} ${FINY}`);
   return p;
 }
-const CONNECTORS = buildConnectors();
+const CONNECTORS=buildConnectors();
 
 /* ================================================================
  * Helpers
  * ================================================================ */
-const matchById = Object.fromEntries(MATCHES.map(m => [m.id, m]));
-function getDateStr(id: string): string {
-  const m = matchById[id];
-  if (!m?.utc) return "";
-  try { return `${formatIsraelDate(m.utc, { short: true })} · ${formatIsraelTime(m.utc)}`; }
-  catch { return ""; }
+const matchById = Object.fromEntries(MATCHES.map(m=>[m.id,m]));
+function getDateStr(id:string){
+  const m=matchById[id];if(!m?.utc)return"";
+  try{return`${formatIsraelDate(m.utc,{short:true})} · ${formatIsraelTime(m.utc)}`;}
+  catch{return"";}
 }
 
 /* ================================================================
  * Team row
  * ================================================================ */
-function TeamRow({ code, score, isWinner, tbd }: {
-  code: string; score: number|null; isWinner: boolean; tbd: boolean;
-}) {
-  const t = TEAMS[code] ?? null;
-  return (
+function TeamRow({code,score,isWinner,tbd}:{
+  code:string;score:number|null;isWinner:boolean;tbd:boolean;
+}){
+  const t=TEAMS[code]??null;
+  return(
     <div style={{
-      display: "flex", alignItems: "center", gap: 5,
-      padding: "2px 3px", borderRadius: 4,
-      background: isWinner ? "rgba(255,255,255,0.12)" : "transparent",
-      fontWeight: isWinner ? 700 : 400,
-      opacity: tbd ? 0.38 : 1,
-      fontStyle: tbd ? "italic" as const : "normal" as const,
+      display:"flex",alignItems:"center",gap:6,
+      padding:"2px 4px",borderRadius:4,
+      background:isWinner?"rgba(255,255,255,0.11)":"transparent",
+      opacity:tbd?0.4:1,
     }}>
-      <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0 }}>
-        {tbd ? "❓" : (t?.flag ?? "🏳")}
-      </span>
+      {tbd
+        ? <span style={{fontSize:14,lineHeight:1,flexShrink:0}}>❓</span>
+        : <FlagImg code={code}/>
+      }
       <span style={{
-        flex: 1, fontSize: 12, fontWeight: isWinner ? 700 : 500,
-        overflow: "hidden", textOverflow: "ellipsis",
-        whiteSpace: "nowrap" as const, lineHeight: 1.2,
-        color: isWinner ? "#ffffff" : "rgba(255,255,255,0.85)",
+        flex:1,fontSize:12.5,fontWeight:isWinner?700:500,
+        overflow:"hidden",textOverflow:"ellipsis",
+        whiteSpace:"nowrap" as const,lineHeight:1.2,
+        color:isWinner?"#ffffff":"rgba(255,255,255,0.88)",
+        fontStyle:tbd?"italic" as const:"normal" as const,
       }}>
-        {tbd ? "?" : (t?.name ?? code)}
+        {tbd?"?":t?.name??code}
       </span>
-      {score !== null && (
+      {score!==null&&(
         <span style={{
-          fontSize: 14, fontWeight: 800, minWidth: 16, textAlign: "right" as const,
-          color: isWinner ? "#fbbf24" : "rgba(255,255,255,0.9)",
+          fontSize:14,fontWeight:800,minWidth:18,
+          textAlign:"right" as const,
+          color:isWinner?"#fbbf24":"rgba(255,255,255,0.9)",
         }}>{score}</span>
       )}
     </div>
@@ -142,270 +179,217 @@ function TeamRow({ code, score, isWinner, tbd }: {
 }
 
 /* ================================================================
- * Match card (absolutely positioned)
+ * Match card
  * ================================================================ */
-function MatchCard({ id, resolved, results, liveScores, x, cy, highlight }: {
-  id: string;
-  resolved: Record<string,{home:string;away:string;winner:string;loser:string}>;
-  results: Record<string,MatchResult>;
-  liveScores: Record<string,LiveScore>;
-  x: number; cy: number;
-  highlight?: boolean;
-}) {
-  const r    = resolved[id];
-  const base = matchById[id];
-  const homeCode = r?.home || base?.home || "";
-  const awayCode = r?.away || base?.away || "";
-  const homeTbd  = !TEAMS[homeCode];
-  const awayTbd  = !TEAMS[awayCode];
-  const res  = results[id];
-  const live = liveScores[id];
-  const homeScore = res?.home ?? (live != null ? live.home : null);
-  const awayScore = res?.away ?? (live != null ? live.away : null);
-  const hasScore  = homeScore !== null && awayScore !== null;
-  const homeWins  = hasScore && homeScore > awayScore;
-  const awayWins  = hasScore && awayScore > homeScore;
-  const winner    = r?.winner || (res?.winner as string|undefined) || "";
-  const isLive = !!live?.minuteLabel && !/HT|FT|AET|AP/i.test(live.minuteLabel ?? "");
-  const isDone = !!res;
-  const dateStr = getDateStr(id);
+function MatchCard({id,resolved,results,liveScores,x,cy,isFinal}:{
+  id:string;
+  resolved:Record<string,{home:string;away:string;winner:string;loser:string}>;
+  results:Record<string,MatchResult>;
+  liveScores:Record<string,LiveScore>;
+  x:number;cy:number;isFinal?:boolean;
+}){
+  const r=resolved[id];const base=matchById[id];
+  const homeCode=r?.home||base?.home||"";
+  const awayCode=r?.away||base?.away||"";
+  const homeTbd=!TEAMS[homeCode];const awayTbd=!TEAMS[awayCode];
+  const res=results[id];const live=liveScores[id];
+  const homeScore=res?.home??(live!=null?live.home:null);
+  const awayScore=res?.away??(live!=null?live.away:null);
+  const hasScore=homeScore!==null&&awayScore!==null;
+  const homeWins=hasScore&&homeScore>awayScore;
+  const awayWins=hasScore&&awayScore>homeScore;
+  const winner=r?.winner||(res?.winner as string|undefined)||"";
+  const isLive=!!live?.minuteLabel&&!/HT|FT|AET|AP/i.test(live.minuteLabel??"");
+  const isDone=!!res;
+  const dateStr=getDateStr(id);
+  const cardH=isFinal?CH+6:CH;
+  const cardW=isFinal?CW+6:CW;
 
-  const cardH = highlight ? CH + 4 : CH;
-  const cardW = highlight ? CW + 4 : CW;
-
-  return (
+  return(
     <div style={{
-      position: "absolute" as const,
-      left: highlight ? x - 2 : x,
-      top: LABEL_H + cy - cardH/2,
-      width: cardW, height: cardH,
-      background: highlight
-        ? "rgba(255,200,50,0.10)"
-        : isDone ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.05)",
-      border: `${highlight ? 1.5 : 1}px solid ${
-        isLive ? "#22c55e"
-        : highlight ? "rgba(255,200,50,0.4)"
-        : isDone ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.12)"
+      position:"absolute" as const,
+      left:isFinal?x-3:x, top:LABEL_H+cy-cardH/2,
+      width:cardW,height:cardH,
+      background:isFinal
+        ?"rgba(251,191,36,0.08)"
+        :isDone?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.05)",
+      border:`${isFinal?1.5:1}px solid ${
+        isLive?"#22c55e"
+        :isFinal?"rgba(251,191,36,0.35)"
+        :isDone?"rgba(255,255,255,0.22)":"rgba(255,255,255,0.13)"
       }`,
-      borderRadius: 8,
-      padding: "4px 6px",
-      boxSizing: "border-box" as const,
-      display: "flex", flexDirection: "column" as const, gap: 2,
-      boxShadow: isLive
-        ? "0 0 10px rgba(34,197,94,0.45)"
-        : highlight ? "0 0 16px rgba(255,200,50,0.2)" : "0 2px 8px rgba(0,0,0,0.3)",
+      borderRadius:8,
+      padding:"5px 7px",
+      boxSizing:"border-box" as const,
+      display:"flex",flexDirection:"column" as const,gap:2,
+      boxShadow:isLive?"0 0 12px rgba(34,197,94,0.5)"
+        :isFinal?"0 0 20px rgba(251,191,36,0.15)":"0 2px 8px rgba(0,0,0,0.35)",
     }}>
-      {isLive && (
+      {isLive&&(
         <div style={{
-          position: "absolute" as const, top: -10, left: "50%",
-          transform: "translateX(-50%)",
-          fontSize: 9, fontWeight: 800, color: "#22c55e",
-          background: "#0a1628", padding: "1px 6px", borderRadius: 4,
-          whiteSpace: "nowrap" as const, border: "1px solid rgba(34,197,94,0.3)",
-        }}>
-          🔴 {live?.minuteLabel}
-        </div>
+          position:"absolute" as const,top:-11,left:"50%",
+          transform:"translateX(-50%)",
+          fontSize:9,fontWeight:800,color:"#22c55e",
+          background:"#070f1e",padding:"1px 6px",borderRadius:4,
+          whiteSpace:"nowrap" as const,border:"1px solid rgba(34,197,94,0.3)",
+        }}>🔴 {live?.minuteLabel}</div>
       )}
       <TeamRow code={homeCode} score={homeScore}
-        isWinner={winner ? winner===homeCode : homeWins} tbd={homeTbd} />
-      <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "0 -2px" }} />
+        isWinner={winner?winner===homeCode:homeWins} tbd={homeTbd}/>
+      <div style={{height:1,background:"rgba(255,255,255,0.08)",margin:"0 -3px"}}/>
       <TeamRow code={awayCode} score={awayScore}
-        isWinner={winner ? winner===awayCode : awayWins} tbd={awayTbd} />
-      {dateStr && (
+        isWinner={winner?winner===awayCode:awayWins} tbd={awayTbd}/>
+      {dateStr&&(
         <div style={{
-          fontSize: 8.5, color: "rgba(255,255,255,0.4)",
-          textAlign: "center" as const, overflow: "hidden",
-          textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
-          marginTop: 1,
-        }}>
-          {dateStr}
-        </div>
+          fontSize:9,color:"rgba(255,255,255,0.38)",
+          textAlign:"center" as const,overflow:"hidden",
+          textOverflow:"ellipsis",whiteSpace:"nowrap" as const,marginTop:1,
+        }}>{dateStr}</div>
       )}
     </div>
   );
 }
 
 /* ================================================================
- * Main component
+ * Main
  * ================================================================ */
-export default function Bracket() {
-  const matchResults = useStore(s => s.matchResults);
-  const liveScores   = useStore(s => s.liveScores);
-  const resolved = useMemo(() => resolveAllStages(matchResults), [matchResults]);
+export default function Bracket(){
+  const matchResults=useStore(s=>s.matchResults);
+  const liveScores  =useStore(s=>s.liveScores);
+  const resolved=useMemo(()=>resolveAllStages(matchResults),[matchResults]);
 
-  const outerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const outerRef=useRef<HTMLDivElement>(null);
+  const [scale,setScale]=useState(1);
 
-  useEffect(() => {
-    const update = () => {
-      if (!outerRef.current) return;
-      const w = outerRef.current.clientWidth - 16; // subtract padding
-      setScale(Math.min(1, w / TOTAL_W));
+  useEffect(()=>{
+    const update=()=>{
+      if(!outerRef.current)return;
+      const w=outerRef.current.clientWidth-8;
+      setScale(Math.min(1, w/TOTAL_W));
     };
     update();
-    let obs: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined" && outerRef.current) {
-      obs = new ResizeObserver(update);
-      obs.observe(outerRef.current);
+    let obs:ResizeObserver|null=null;
+    if(typeof ResizeObserver!=="undefined"&&outerRef.current){
+      obs=new ResizeObserver(update);obs.observe(outerRef.current);
     }
-    return () => obs?.disconnect();
-  }, []);
+    return()=>obs?.disconnect();
+  },[]);
 
-  const mc = (id: string, x: number, cy: number, highlight = false) => (
+  const mc=(id:string,x:number,cy:number,isFinal=false)=>(
     <MatchCard key={id} id={id} resolved={resolved} results={matchResults}
-      liveScores={liveScores} x={x} cy={cy} highlight={highlight} />
+      liveScores={liveScores} x={x} cy={cy} isFinal={isFinal}/>
   );
 
-  const scaledH = Math.round(CONT_H * scale) + 4;
+  const scaledH=Math.round(CONT_H*scale)+4;
 
-  return (
-    <div ref={outerRef} style={{
-      width: "100%", padding: "8px",
-      boxSizing: "border-box" as const,
-    }}>
+  return(
+    <div ref={outerRef} style={{width:"100%",padding:"4px",boxSizing:"border-box" as const}}>
       <div style={{
-        position: "relative",
-        width: "100%",
-        height: scaledH,
-        overflow: "hidden",
-        borderRadius: 14,
-        background: "linear-gradient(160deg, #050f1e 0%, #091525 40%, #060e1c 100%)",
+        position:"relative",width:"100%",height:scaledH,
+        overflow:"hidden",borderRadius:14,
+        background:"linear-gradient(160deg,#060e1c 0%,#08132a 50%,#060d1a 100%)",
       }}>
 
-        {/* ---- Background: football players collage (SVG) ---- */}
-        <svg
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}
-          viewBox={`0 0 ${TOTAL_W} ${CONT_H}`}
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-        >
-          {/* Pitch center elements */}
-          <circle cx={TOTAL_W/2} cy={CONT_H/2-20} r="130" stroke="white" strokeWidth="2" fill="none" opacity="0.04"/>
-          <line x1={TOTAL_W/2} y1="0" x2={TOTAL_W/2} y2={CONT_H} stroke="white" strokeWidth="2" opacity="0.03"/>
-          {/* Left penalty area */}
-          <rect x="0" y={CONT_H*0.3} width="110" height={CONT_H*0.4} stroke="white" strokeWidth="1.5" fill="none" opacity="0.04"/>
-          {/* Right penalty area */}
-          <rect x={TOTAL_W-110} y={CONT_H*0.3} width="110" height={CONT_H*0.4} stroke="white" strokeWidth="1.5" fill="none" opacity="0.04"/>
-          {/* Football outlines */}
-          <circle cx="160" cy="160" r="22" stroke="white" strokeWidth="2" fill="none" opacity="0.06"/>
-          <circle cx={TOTAL_W-160} cy={CONT_H-150} r="18" stroke="white" strokeWidth="2" fill="none" opacity="0.05"/>
-          <circle cx={TOTAL_W/2} cy={CONT_H-60} r="15" stroke="white" strokeWidth="2" fill="none" opacity="0.05"/>
-
-          {/* Player 1 – top-left, kicking right */}
-          <g stroke="white" strokeWidth="3.5" strokeLinecap="round" fill="none" opacity="0.07" transform="translate(70, 90) scale(1.4)">
-            <circle cx="0" cy="0" r="11" fill="white" stroke="none" opacity="0.07"/>
-            <line x1="0" y1="11" x2="0" y2="46"/>
-            <line x1="0" y1="25" x2="-18" y2="40"/>
-            <line x1="0" y1="25" x2="20" y2="36"/>
-            <line x1="0" y1="46" x2="-14" y2="74"/>
-            <line x1="0" y1="46" x2="16" y2="66"/>
-            <line x1="16" y1="66" x2="34" y2="58"/>
+        {/* Background SVG */}
+        <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}
+          viewBox={`0 0 ${TOTAL_W} ${CONT_H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <defs>
+            <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.05"/>
+              <stop offset="100%" stopColor="transparent" stopOpacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width={TOTAL_W} height={CONT_H} fill="url(#glow)"/>
+          {/* Pitch lines */}
+          <circle cx={TOTAL_W/2} cy={CONT_H/2-10} r="140" stroke="white" strokeWidth="1.5" fill="none" opacity="0.04"/>
+          <line x1={TOTAL_W/2} y1="0" x2={TOTAL_W/2} y2={CONT_H} stroke="white" strokeWidth="1.5" opacity="0.03"/>
+          <rect x="0" y={CONT_H*0.28} width="120" height={CONT_H*0.44} stroke="white" strokeWidth="1.5" fill="none" opacity="0.035"/>
+          <rect x={TOTAL_W-120} y={CONT_H*0.28} width="120" height={CONT_H*0.44} stroke="white" strokeWidth="1.5" fill="none" opacity="0.035"/>
+          {/* Footballs */}
+          <circle cx="170" cy="170" r="24" stroke="white" strokeWidth="2" fill="none" opacity="0.055"/>
+          <circle cx={TOTAL_W-170} cy={CONT_H-150} r="20" stroke="white" strokeWidth="2" fill="none" opacity="0.05"/>
+          <circle cx={TOTAL_W/2} cy={CONT_H-55} r="16" stroke="white" strokeWidth="2" fill="none" opacity="0.045"/>
+          {/* Player silhouettes */}
+          <g stroke="white" strokeWidth="3.5" strokeLinecap="round" fill="none" opacity="0.065" transform="translate(72,85) scale(1.4)">
+            <ellipse cx="0" cy="0" rx="9" ry="10" fill="white" stroke="none" opacity="0.065"/>
+            <line x1="0" y1="10" x2="0" y2="46"/><line x1="0" y1="25" x2="-18" y2="40"/>
+            <line x1="0" y1="25" x2="20" y2="36"/><line x1="0" y1="46" x2="-14" y2="75"/>
+            <line x1="0" y1="46" x2="16" y2="66"/><line x1="16" y1="66" x2="34" y2="58"/>
           </g>
-
-          {/* Player 2 – bottom-right, running */}
-          <g stroke="white" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.06" transform="translate(1330, 460) scale(1.3)">
-            <circle cx="0" cy="0" r="10" fill="white" stroke="none" opacity="0.06"/>
-            <line x1="0" y1="10" x2="-4" y2="42"/>
-            <line x1="-2" y1="24" x2="-22" y2="34"/>
-            <line x1="-2" y1="24" x2="16" y2="32"/>
-            <line x1="-4" y1="42" x2="-18" y2="68"/>
-            <line x1="-4" y1="42" x2="10" y2="64"/>
+          <g stroke="white" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.055" transform="translate(1350,440) scale(1.25)">
+            <ellipse cx="0" cy="0" rx="9" ry="10" fill="white" stroke="none" opacity="0.055"/>
+            <line x1="0" y1="10" x2="-4" y2="44"/><line x1="-2" y1="26" x2="-22" y2="36"/>
+            <line x1="-2" y1="26" x2="18" y2="32"/><line x1="-4" y1="44" x2="-18" y2="70"/>
+            <line x1="-4" y1="44" x2="12" y2="66"/>
           </g>
-
-          {/* Player 3 – mid-left, jumping (header) */}
-          <g stroke="white" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.055" transform="translate(200, 390) scale(1.2)">
-            <circle cx="0" cy="0" r="10" fill="white" stroke="none" opacity="0.055"/>
-            <line x1="0" y1="10" x2="5" y2="44"/>
-            <line x1="2" y1="24" x2="-18" y2="20"/>
-            <line x1="2" y1="24" x2="20" y2="18"/>
-            <line x1="5" y1="44" x2="-10" y2="68"/>
-            <line x1="5" y1="44" x2="20" y2="62"/>
+          <g stroke="white" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.05" transform="translate(210,390) scale(1.15)">
+            <ellipse cx="0" cy="0" rx="8" ry="9" fill="white" stroke="none" opacity="0.05"/>
+            <line x1="0" y1="9" x2="5" y2="42"/><line x1="2" y1="24" x2="-20" y2="18"/>
+            <line x1="2" y1="24" x2="20" y2="18"/><line x1="5" y1="42" x2="-10" y2="68"/>
+            <line x1="5" y1="42" x2="20" y2="62"/>
           </g>
-
-          {/* Player 4 – mid-right, celebrating */}
-          <g stroke="white" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.055" transform="translate(1240, 130) scale(1.2)">
-            <circle cx="0" cy="0" r="10" fill="white" stroke="none" opacity="0.055"/>
-            <line x1="0" y1="10" x2="0" y2="42"/>
-            <line x1="0" y1="22" x2="-22" y2="10"/>
-            <line x1="0" y1="22" x2="22" y2="10"/>
-            <line x1="0" y1="42" x2="-12" y2="66"/>
-            <line x1="0" y1="42" x2="14" y2="64"/>
+          <g stroke="white" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.05" transform="translate(1250,135) scale(1.15)">
+            <ellipse cx="0" cy="0" rx="8" ry="9" fill="white" stroke="none" opacity="0.05"/>
+            <line x1="0" y1="9" x2="0" y2="40"/><line x1="0" y1="22" x2="-24" y2="10"/>
+            <line x1="0" y1="22" x2="24" y2="10"/><line x1="0" y1="40" x2="-12" y2="64"/>
+            <line x1="0" y1="40" x2="14" y2="62"/>
           </g>
-
-          {/* Subtle radial glow at center */}
-          <radialGradient id="cg" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.04"/>
-            <stop offset="100%" stopColor="transparent" stopOpacity="0"/>
-          </radialGradient>
-          <rect x="0" y="0" width={TOTAL_W} height={CONT_H} fill="url(#cg)"/>
         </svg>
 
-        {/* ---- Bracket canvas (scaled to fit) ---- */}
+        {/* Bracket canvas */}
         <div style={{
-          position: "absolute", left: 0, top: 0,
-          width: TOTAL_W, height: CONT_H,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
+          position:"absolute",left:0,top:0,
+          width:TOTAL_W,height:CONT_H,
+          transform:`scale(${scale})`,transformOrigin:"top left",
         }}>
-
           {/* Round labels */}
-          {ROUND_LABELS.map(({ label, cx }, i) => (
+          {ROUND_LABELS.map(({label,cx},i)=>(
             <div key={i} style={{
-              position: "absolute" as const, top: 6, left: cx - 60, width: 120,
-              textAlign: "center" as const,
-              fontSize: 11, fontWeight: 800, textTransform: "uppercase" as const,
-              letterSpacing: "0.07em", color: "rgba(255,255,255,0.45)",
-              whiteSpace: "nowrap" as const,
-            }}>
-              {label}
-            </div>
+              position:"absolute" as const,top:7,left:cx-66,width:132,
+              textAlign:"center" as const,fontSize:11,fontWeight:800,
+              textTransform:"uppercase" as const,letterSpacing:"0.07em",
+              color:"rgba(255,255,255,0.42)",whiteSpace:"nowrap" as const,
+            }}>{label}</div>
           ))}
+          <div style={{position:"absolute",top:LABEL_H-5,left:0,right:0,
+            height:1,background:"rgba(255,255,255,0.07)"}}/>
 
-          {/* Divider line under labels */}
-          <div style={{
-            position: "absolute", top: LABEL_H - 4, left: 0, right: 0,
-            height: 1, background: "rgba(255,255,255,0.07)",
-          }} />
-
-          {/* SVG connector lines */}
-          <svg style={{ position:"absolute", top:LABEL_H, left:0, overflow:"visible", pointerEvents:"none" }}
+          {/* SVG connectors */}
+          <svg style={{position:"absolute",top:LABEL_H,left:0,overflow:"visible",pointerEvents:"none"}}
             width={TOTAL_W} height={TOTAL_H}>
-            {CONNECTORS.map((d, i) => (
-              <path key={i} d={d} stroke="rgba(255,255,255,0.22)" strokeWidth={1.5} fill="none"/>
+            {CONNECTORS.map((d,i)=>(
+              <path key={i} d={d} stroke="rgba(255,255,255,0.2)" strokeWidth={1.5} fill="none"/>
             ))}
           </svg>
 
-          {/* Match cards */}
-          {LEFT_R32.map( (id,i) => mc(id, r32L, R32Y[i]))}
-          {LEFT_R16.map( (id,i) => mc(id, r16L, R16Y[i]))}
-          {LEFT_QF.map(  (id,i) => mc(id, qfL,  QFY[i]))}
+          {/* Cards */}
+          {LEFT_R32.map( (id,i)=>mc(id,r32L,R32Y[i]))}
+          {LEFT_R16.map( (id,i)=>mc(id,r16L,R16Y[i]))}
+          {LEFT_QF.map(  (id,i)=>mc(id,qfL, QFY[i]))}
           {mc(LEFT_SF,  sfL,  SFY)}
           {mc(FINAL_ID, finX, FINY, true)}
-          {RIGHT_SF  &&  mc(RIGHT_SF,  sfR,  SFY)}
-          {RIGHT_QF.map( (id,i) => mc(id, qfR,  QFY[i]))}
-          {RIGHT_R16.map((id,i) => mc(id, r16R, R16Y[i]))}
-          {RIGHT_R32.map((id,i) => mc(id, r32R, R32Y[i]))}
+          {mc(RIGHT_SF, sfR,  SFY)}
+          {RIGHT_QF.map( (id,i)=>mc(id,qfR, QFY[i]))}
+          {RIGHT_R16.map((id,i)=>mc(id,r16R,R16Y[i]))}
+          {RIGHT_R32.map((id,i)=>mc(id,r32R,R32Y[i]))}
 
           {/* Trophy */}
           <div style={{
-            position: "absolute" as const,
-            left: finX + CW/2 - 16, top: LABEL_H + FINY + CH/2 + 8,
-            fontSize: 28, lineHeight: 1, textAlign: "center" as const,
-            filter: "drop-shadow(0 0 8px rgba(251,191,36,0.6))",
+            position:"absolute" as const,
+            left:finX+CW/2-15,top:LABEL_H+FINY+CH/2+10,
+            fontSize:28,lineHeight:1,textAlign:"center" as const,
+            filter:"drop-shadow(0 0 10px rgba(251,191,36,0.7))",
           }}>🏆</div>
 
-          {/* 3rd place label */}
+          {/* 3rd place */}
           <div style={{
-            position: "absolute" as const,
-            left: finX, top: LABEL_H + FINY + CH/2 + 48,
-            width: CW, textAlign: "center" as const,
-            fontSize: 9, fontWeight: 700, textTransform: "uppercase" as const,
-            letterSpacing: "0.05em", color: "rgba(255,255,255,0.35)",
+            position:"absolute" as const,
+            left:finX,top:LABEL_H+FINY+CH/2+50,
+            width:CW,textAlign:"center" as const,
+            fontSize:9,fontWeight:700,textTransform:"uppercase" as const,
+            letterSpacing:"0.05em",color:"rgba(255,255,255,0.32)",
           }}>מקום שלישי</div>
-
-          {/* 3rd place match */}
-          {mc(THIRD_ID, finX, FINY + CH + 78)}
-
+          {mc(THIRD_ID,finX,FINY+CH+80)}
         </div>
       </div>
     </div>
