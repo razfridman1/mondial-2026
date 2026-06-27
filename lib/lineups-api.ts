@@ -1,43 +1,48 @@
 /* =====================================================================
- * lineups-api.ts — fetch lineups via API-Football fixture lookup
- * Works for ALL 48 WC 2026 teams (no hardcoded team ID table).
- * Flow: Firestore cache (6h) → AF /fixtures?league=1 → AF /lineups
- *       → TheSportsDB fallback via lookupLineupsViaAI
+ * lineups-api.ts — fetch lineups via TheSportsDB (primary)
+ * Env: THESPORTSDB_API_KEY
+ * Flow: Firestore cache (6h) → TheSportsDB /lookuplineup → fallback AI
  * ===================================================================*/
 import { getAdmin } from "./firebase-admin";
 import type { TeamLineup, Formation } from "./lineups";
 import type { Player, Position } from "./players";
 import { lookupLineupsViaAI } from "./ai-result-fallback";
-import { fetchAfWcFixtures, fetchAfLineups } from "./api-football-wc";
+import {
+  fetchTsdbWcEvents,
+  fetchTsdbLineup,
+  type TsdbLineupEntry,
+} from "./thesportsdb";
 import { teamCodeFromApiName as _tcfa } from "./team-name-mapper";
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 const POS_MAP: Record<string, Position> = { G: "GK", D: "DEF", M: "MID", F: "FWD" };
+const ALLOW_FORMATIONS: Formation[] = ["4-3-3","4-4-2","3-5-2","4-2-3-1","5-3-2"];
 
-function parseFormation(s: string | undefined): Formation {
-  const allow: Formation[] = ["4-3-3","4-4-2","3-5-2","4-2-3-1","5-3-2"];
-  return (allow.includes(s as Formation) ? s : "4-3-3") as Formation;
+function parseFormation(s: string | null | undefined): Formation {
+  return (ALLOW_FORMATIONS.includes(s as Formation) ? s : "4-3-3") as Formation;
 }
 
-function toTeamLineup(teamCode: string, raw: any): TeamLineup {
-  const formation = parseFormation(raw.formation);
-  const startXI: any[] = raw.startXI || [];
-  const slots = startXI.map((row: any, idx: number) => {
-    const pp = row.player;
-    const [r, c] = (pp.grid || "1:1").split(":").map(Number);
+function buildTeamLineup(
+  teamCode: string,
+  starters: TsdbLineupEntry[],
+): TeamLineup {
+  const formation = parseFormation(starters[0]?.strFormation ?? null);
+  const slots = starters.map((entry, idx) => {
+    const posShort = (entry.strPositionShort || "M").toUpperCase();
+    const pos = POS_MAP[posShort] || "MID";
     return {
-      pos: POS_MAP[pp.pos] || "MID",
-      x: ((c || 1) - 1) * 20 + 10,
-      y: ((r || 1) - 1) * 18 + 8,
-      role: pp.pos,
+      pos: pos as Position,
+      x: (idx % 4) * 20 + 10,
+      y: Math.floor(idx / 4) * 18 + 8,
+      role: posShort,
       player: {
-        id: String(teamCode) + "-" + String(pp.id),
+        id: `${teamCode}-tsdb-${idx}`,
         teamCode,
-        name: pp.name,
-        nameEn: pp.name,
-        position: POS_MAP[pp.pos] || "MID",
-        jersey: pp.number || (idx + 1),
+        name: entry.strPlayer || `שחקן ${idx + 1}`,
+        nameEn: entry.strPlayer || "",
+        position: pos as Position,
+        jersey: Number(entry.intSquadNumber) || (idx + 1),
         club: "-",
         age: 0,
       } as Player,
@@ -52,9 +57,6 @@ export async function fetchLiveLineups(
   homeCode: string,
   awayCode: string,
 ): Promise<{ home: TeamLineup; away: TeamLineup } | null> {
-  const apiKey = process.env.API_FOOTBALL_KEY;
-  if (!apiKey) return null;
-
   const { db } = getAdmin();
   const cacheRef = db.collection("live_lineups").doc(matchId);
   const now = Date.now();
@@ -64,56 +66,63 @@ export async function fetchLiveLineups(
     const cache = await cacheRef.get();
     if (cache.exists) {
       const data = cache.data() as any;
-      if (data.cachedAt && now - data.cachedAt < CACHE_TTL_MS && data.home && data.away) {
+      if (data.home && data.away && data.cachedAt && now - data.cachedAt < CACHE_TTL_MS) {
         return { home: data.home, away: data.away };
       }
     }
   } catch { /* cache miss */ }
 
   try {
-    // --- Find fixture from full season list (covers all 48 teams) ---
-    const allFixtures = await fetchAfWcFixtures();
+    // --- Find event from season list ---
+    const allEvents = await fetchTsdbWcEvents();
     const targetMs = new Date(dateIso).getTime();
 
-    const fixture = allFixtures.find(f => {
-      const fixMs = new Date(f.fixture.date).getTime();
-      if (Math.abs(fixMs - targetMs) > 12 * 60 * 60 * 1000) return false;
-      const fh = _tcfa(f.teams.home.name);
-      const fa = _tcfa(f.teams.away.name);
+    const event = allEvents.find(e => {
+      const ts = e.strTimestamp ? e.strTimestamp + "Z" : `${e.dateEvent}T${e.strTime || "12:00:00"}Z`;
+      const evMs = new Date(ts).getTime();
+      if (Math.abs(evMs - targetMs) > 12 * 60 * 60 * 1000) return false;
+      const fh = _tcfa(e.strHomeTeam || "");
+      const fa = _tcfa(e.strAwayTeam || "");
       return (fh === homeCode && fa === awayCode) || (fh === awayCode && fa === homeCode);
     });
 
-    if (!fixture) return null;
-    const fixtureId = fixture.fixture.id;
+    if (!event?.idEvent) return null;
 
-    // --- Fetch lineups for this fixture ---
-    const rawLineups = await fetchAfLineups(fixtureId);
-    if (!rawLineups || rawLineups.length < 2) return null;
+    // --- Fetch lineup entries ---
+    const entries = await fetchTsdbLineup(event.idEvent);
+    if (!entries.length) return null;
 
-    // Match lineup teams to our home/away codes
-    const homeRaw = rawLineups.find(l => {
-      const code = _tcfa(l.team.name);
-      return code === homeCode;
-    }) || rawLineups[0];
-    const awayRaw = rawLineups.find(l => {
-      const code = _tcfa(l.team.name);
-      return code === awayCode;
-    }) || rawLineups[1];
+    // Starters only (strSubstitute === "No" or not "Yes")
+    const starters = entries.filter(e => (e.strSubstitute || "No").toUpperCase() !== "YES");
+    if (starters.length < 2) return null;
 
-    if (!homeRaw.startXI?.length || !awayRaw.startXI?.length) return null;
+    // Split by home/away — strHome "Yes" = home team
+    const homeStarters = starters.filter(e => e.strHome === "Yes");
+    const awayStarters = starters.filter(e => e.strHome === "No");
 
-    const home = toTeamLineup(homeCode, homeRaw);
-    const away = toTeamLineup(awayCode, awayRaw);
+    if (homeStarters.length < 5 || awayStarters.length < 5) return null;
+
+    // If TheSportsDB home team is swapped vs our homeCode, swap back
+    const tsdbHomeCode = _tcfa(homeStarters[0]?.strTeam || "");
+    let home: TeamLineup;
+    let away: TeamLineup;
+    if (!tsdbHomeCode || tsdbHomeCode === homeCode) {
+      home = buildTeamLineup(homeCode, homeStarters);
+      away = buildTeamLineup(awayCode, awayStarters);
+    } else {
+      home = buildTeamLineup(homeCode, awayStarters);
+      away = buildTeamLineup(awayCode, homeStarters);
+    }
 
     // Cache result
-    await cacheRef.set({ home, away, cachedAt: now, fixtureId }).catch(() => {});
+    await cacheRef.set({ home, away, cachedAt: now, idEvent: event.idEvent }).catch(() => {});
     return { home, away };
   } catch {
     return null;
   }
 }
 
-/* TheSportsDB fallback */
+/* TheSportsDB / AI fallback (used by /api/lineups route when primary fails) */
 export async function fetchAiLineups(
   _matchId: string,
   dateIso: string,

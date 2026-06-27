@@ -2035,7 +2035,7 @@ button { font-family: inherit; cursor: pointer; }
 .leaderboard { display: flex; flex-direction: column; gap: 6px; }
 .lb-row {
   display: grid;
-  grid-template-columns: 40px auto 1fr auto;
+  grid-template-columns: 40px auto 1fr repeat(5, minmax(48px, auto)) auto;
   gap: 10px;
   align-items: center;
   background: var(--bg-card);
@@ -2061,6 +2061,21 @@ button { font-family: inherit; cursor: pointer; }
 }
 .lb-rank { font-size: 18px; font-weight: 900; color: var(--accent); text-align: center; }
 .lb-name { font-weight: 700; }
+.lb-stat-col {
+  font-size: 12px; font-weight: 700; text-align: center;
+  color: var(--text); white-space: nowrap;
+}
+.lb-header-row {
+  display: grid;
+  grid-template-columns: 40px auto 1fr repeat(5, minmax(48px, auto)) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 12px 6px;
+  font-size: 10px; font-weight: 600; color: var(--text-muted);
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 4px;
+}
+.lb-header-row .lb-stat-col { color: var(--text-muted); font-weight: 600; }
 .lb-stats { font-size: 11px; margin-top: 2px; }
 .lb-points {
   font-size: 22px; font-weight: 900; color: var(--accent);
@@ -2102,7 +2117,9 @@ button { font-family: inherit; cursor: pointer; }
 .team-detail .pitch-svg { max-height: 580px; }
 
 @media (max-width: 720px) {
-  .lb-row { grid-template-columns: 32px auto 1fr auto; padding: 6px 10px; font-size: 13px; }
+  .lb-row { grid-template-columns: 32px auto 1fr repeat(5, minmax(40px, auto)) auto; padding: 6px 10px; font-size: 13px; }
+  .lb-header-row { grid-template-columns: 32px auto 1fr repeat(5, minmax(40px, auto)) auto; font-size: 9px; }
+  .lb-stat-col { font-size: 11px; }
   .lb-points { font-size: 18px; }
   .squad-grid { grid-template-columns: 1fr; }
   .pitch-svg { max-height: 50vh; }

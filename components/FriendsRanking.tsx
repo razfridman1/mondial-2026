@@ -659,8 +659,24 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
   if (!rows.length) return <div className="empty-state">אין עדיין נתונים — כשיתחילו המשחקים יופיע leaderboard חי.</div>;
   return (
     <>
-      <div className="leaderboard">
-        {rows.map(r => (
+      <div className="leaderboard" style={{ overflowX: "auto" }}>
+        {/* Header row */}
+        <div className="lb-header-row">
+          <div></div>
+          <div></div>
+          <div>שם</div>
+          <div className="lb-stat-col">📊 דיוק</div>
+          <div className="lb-stat-col">🎯 מדויקים</div>
+          <div className="lb-stat-col">🔥 סטריק</div>
+          <div className="lb-stat-col">✅ נכונות</div>
+          <div className="lb-stat-col">📝 ניחושים</div>
+          <div style={{ textAlign: "center" }}>נק׳</div>
+        </div>
+        {rows.map(r => {
+          const accuracyPct = r.finishedCount > 0
+            ? Math.round((r.resultCount / r.finishedCount) * 100)
+            : 0;
+          return (
           <div
             key={r.uid}
             role="button"
@@ -677,13 +693,16 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
                 {r.displayName}
                 {r.uid === myUid && <span className="chip" style={{ marginInlineStart: 6, fontSize: 9 }}>אתה</span>}
               </div>
-              {/* Per-user mini stats (exactCount, streak, resultCount) — removed
-               * per design: keep the leaderboard clean. Stats are still available
-               * by clicking a user (UserStatsModal). */}
             </div>
+            <div className="lb-stat-col">{accuracyPct}%</div>
+            <div className="lb-stat-col">{r.exactCount}</div>
+            <div className="lb-stat-col">{r.streak}</div>
+            <div className="lb-stat-col">{r.resultCount}</div>
+            <div className="lb-stat-col">{r.finishedCount}</div>
             <div className="lb-points">{r.totalPoints}<span className="muted" style={{ fontSize: 11 }}> נק׳</span></div>
           </div>
-        ))}
+          );
+        })}
       </div>
       {openUser && (
         <UserStatsModal
