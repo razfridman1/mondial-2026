@@ -1013,36 +1013,66 @@ function ScoreAnalysisModal({
     const accA = rowA.finishedCount > 0 ? Math.round(rowA.resultCount / rowA.finishedCount * 100) : 0;
     const accB = rowB.finishedCount > 0 ? Math.round(rowB.resultCount / rowB.finishedCount * 100) : 0;
 
+    // Estimate explained points from visible stats
+    // Each exact hit ≈ 7 pts (group) or 8 (KO) — use 7 as conservative estimate
+    // Each non-exact correct ≈ 3–4 pts — use 3.5 average
+    // Streak bonus: +1 per correct in a streak (from 2nd onwards); max streak alone
+    //   doesn't tell us the cumulative bonus — we can only note the difference
+    const exactPtsEst    = exactDiff * 7;
+    const nonExactPtsEst = nonExactDiff * 3;
+    const statExplained  = exactPtsEst + nonExactPtsEst;
+    const unexplained    = ptsDiff - statExplained;
+
     // Build insight bullets
     const insights: { icon: string; text: string; adv: "a" | "b" | "tie" }[] = [];
 
     if (exactDiff !== 0) {
       const who = exactDiff > 0 ? rowA.displayName : rowB.displayName;
-      const adv = exactDiff > 0 ? "a" : "b";
+      const adv: "a"|"b" = exactDiff > 0 ? "a" : "b";
       const est = Math.abs(exactDiff) * 7;
-      insights.push({ icon: "🎯", adv, text: `ל-${who} יש ${Math.abs(exactDiff)} פגיעות מדויקות יותר — שווה כ-${est} נק׳ יתרון` });
+      insights.push({ icon: "🎯", adv, text: `ל-${who} יש ${Math.abs(exactDiff)} פגיעות מדויקות יותר — מסביר כ-${est} נק׳ מתוך ההפרש` });
     }
 
     if (nonExactDiff !== 0) {
       const who = nonExactDiff > 0 ? rowA.displayName : rowB.displayName;
-      const adv = nonExactDiff > 0 ? "a" : "b";
-      insights.push({ icon: "✅", adv, text: `ל-${who} יש ${Math.abs(nonExactDiff)} תוצאות נכונות יותר (ללא פגיעה מדויקת) — כ-${Math.abs(nonExactDiff) * 3} נק׳` });
+      const adv: "a"|"b" = nonExactDiff > 0 ? "a" : "b";
+      insights.push({ icon: "✅", adv, text: `ל-${who} יש ${Math.abs(nonExactDiff)} תוצאות נכונות יותר — מסביר כ-${Math.abs(nonExactDiff) * 3} נק׳` });
     }
 
+    // Streak: only mention if it could plausibly explain some gap
     if (streakDiff !== 0) {
       const who = streakDiff > 0 ? rowA.displayName : rowB.displayName;
-      const adv = streakDiff > 0 ? "a" : "b";
-      insights.push({ icon: "🔥", adv, text: `ל-${who} סטריק ארוך יותר (${Math.abs(streakDiff)} ניחושים נוספים ברצף) — בונוס נקודות נוסף` });
+      const adv: "a"|"b" = streakDiff > 0 ? "a" : "b";
+      insights.push({ icon: "🔥", adv, text: `ל-${who} סטריק מקסימלי ארוך יותר (${Math.abs(streakDiff)} ניחושים נכונים נוספים ברצף) — מסביר חלק מבונוס הסטריק` });
+    }
+
+    // When visible stats can't explain the gap → hidden factors
+    if (Math.abs(unexplained) >= 2 && absDiff > 0) {
+      const who = unexplained > 0 ? rowA.displayName : rowB.displayName;
+      const adv: "a"|"b" = unexplained > 0 ? "a" : "b";
+      const factors: string[] = [];
+      if (Math.abs(unexplained) >= 1)
+        factors.push("בונוס הפרש שערים (4 נק׳ במקום 3 כשהפרש השערים מדויק)");
+      if (Math.abs(unexplained) >= 3)
+        factors.push("ניחושים נכונים בשלב נוקאאוט (8/5 נק׳ במקום 7/4)");
+      if (Math.abs(unexplained) >= 2 && streakDiff === 0)
+        factors.push("צבירת בונוס סטריק לאורך הטורניר (לא מוצג בסטריק המקסימלי)");
+      insights.push({
+        icon: "💡", adv,
+        text: `עוד כ-${Math.abs(unexplained)} נק׳ לטובת ${who} נובעות ככל הנראה מ: ${factors.join(" · ")}`,
+      });
     }
 
     if (finishedDiff !== 0) {
       const who = finishedDiff > 0 ? rowA.displayName : rowB.displayName;
-      const adv = finishedDiff > 0 ? "a" : "b";
-      insights.push({ icon: "📝", adv, text: `ל-${who} יש ${Math.abs(finishedDiff)} ניחושים נוספים לספירה — יותר הזדמנויות לנקודות` });
+      const adv: "a"|"b" = finishedDiff > 0 ? "a" : "b";
+      insights.push({ icon: "📝", adv, text: `ל-${who} יש ${Math.abs(finishedDiff)} ניחושים יותר שנספרו — יותר הזדמנויות לנקודות` });
     }
 
-    if (insights.length === 0) {
-      insights.push({ icon: "🤝", adv: "tie", text: "פרופיל הניקוד דומה מאוד — ההפרש נובע ככל הנראה מבונוסי הפרש שערים ו/או סטריק" });
+    if (insights.length === 0 && absDiff === 0) {
+      insights.push({ icon: "🤝", adv: "tie", text: "שני החברים עם אותו ניקוד מדויק!" });
+    } else if (insights.length === 0) {
+      insights.push({ icon: "💡", adv: "tie", text: "ההפרש נובע מבונוס הפרש שערים ו/או ניחושים בשלב נוקאאוט — הנתונים הנצפים זהים" });
     }
 
     return { leader, trailer, absDiff, ptsDiff, exactDiff, resultDiff, streakDiff, accA, accB, insights, rowA, rowB };
