@@ -152,6 +152,7 @@ export interface LeaderRow {
   avatarId: string;
   totalPoints: number;
   exactCount: number;       // exact-score predictions
+  differentialCount: number; // correct result + goal diff (not exact)
   resultCount: number;      // correct result only
   predictionsCount: number;
   finishedCount: number;    // predictions for matches that have a result

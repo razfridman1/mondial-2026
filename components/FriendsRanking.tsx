@@ -634,6 +634,7 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
           <div>שם</div>
           <div className="lb-stat-col">📊<br/>דיוק</div>
           <div className="lb-stat-col">🎯<br/>מדויקים</div>
+          <div className="lb-stat-col">⚽<br/>הפרש</div>
           <div className="lb-stat-col">🔥<br/>סטריק</div>
           <div className="lb-stat-col">✅<br/>נכונות</div>
           <div style={{ textAlign: "center" }}>🏆<br/>נק׳</div>
@@ -662,6 +663,7 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
             </div>
             <div className="lb-stat-col">{accuracyPct}%</div>
             <div className="lb-stat-col">{r.exactCount}</div>
+            <div className="lb-stat-col">{r.differentialCount}</div>
             <div className="lb-stat-col">{r.streak}</div>
             <div className="lb-stat-col">{r.resultCount}</div>
             <div className="lb-points">{r.totalPoints}<span className="muted" style={{ fontSize: 11 }}> נק׳</span></div>
@@ -949,81 +951,75 @@ function ScoreAnalysisModal({
     const trailer = ptsDiff >= 0 ? rowB : rowA;
     const absDiff = Math.abs(ptsDiff);
 
-    const exactDiff    = rowA.exactCount  - rowB.exactCount;
-    const resultDiff   = rowA.resultCount - rowB.resultCount;
-    const streakDiff   = rowA.streak      - rowB.streak;
-    const finishedDiff = rowA.finishedCount - rowB.finishedCount;
-
-    const nonExactA = rowA.resultCount - rowA.exactCount;
-    const nonExactB = rowB.resultCount - rowB.exactCount;
-    const nonExactDiff = nonExactA - nonExactB;
-
     const accA = rowA.finishedCount > 0 ? Math.round(rowA.resultCount / rowA.finishedCount * 100) : 0;
     const accB = rowB.finishedCount > 0 ? Math.round(rowB.resultCount / rowB.finishedCount * 100) : 0;
 
-    // Estimate explained points from visible stats
-    // Each exact hit ≈ 7 pts (group) or 8 (KO) — use 7 as conservative estimate
-    // Each non-exact correct ≈ 3–4 pts — use 3.5 average
-    // Streak bonus: +1 per correct in a streak (from 2nd onwards); max streak alone
-    //   doesn't tell us the cumulative bonus — we can only note the difference
-    const exactPtsEst    = exactDiff * 7;
-    const nonExactPtsEst = nonExactDiff * 3;
-    const statExplained  = exactPtsEst + nonExactPtsEst;
-    const unexplained    = ptsDiff - statExplained;
+    // Accurate point breakdown per user
+    // Group: exact=7, diff=4, plain=3 | KO: exact=8, diff=5, plain=3
+    // We approximate group prices (≈7/4/3) — small error only for KO matches
+    function calcBreakdown(r: LeaderRow) {
+      const plainCorrect = r.resultCount - r.exactCount - (r.differentialCount ?? 0);
+      const exactPts  = r.exactCount * 7;
+      const diffPts   = (r.differentialCount ?? 0) * 4;
+      const plainPts  = plainCorrect * 3;
+      const basePts   = exactPts + diffPts + plainPts;
+      // streakPts includes streak bonus + any admin bonus awards (absorbed together)
+      const streakPts = Math.max(0, r.totalPoints - basePts);
+      return { exactPts, diffPts, plainPts, basePts, streakPts, plainCorrect };
+    }
+    const bdA = calcBreakdown(rowA!);
+    const bdB = calcBreakdown(rowB!);
 
-    // Build insight bullets
+    const diffs = {
+      exact:    rowA.exactCount - rowB.exactCount,
+      diff:     (rowA.differentialCount ?? 0) - (rowB.differentialCount ?? 0),
+      result:   rowA.resultCount - rowB.resultCount,
+      streak:   rowA.streak - rowB.streak,
+      finished: rowA.finishedCount - rowB.finishedCount,
+      exactPts: bdA.exactPts - bdB.exactPts,
+      diffPts:  bdA.diffPts  - bdB.diffPts,
+      plainPts: bdA.plainPts - bdB.plainPts,
+      streakPts:bdA.streakPts- bdB.streakPts,
+    };
+
     const insights: { icon: string; text: string; adv: "a" | "b" | "tie" }[] = [];
 
-    if (exactDiff !== 0) {
-      const who = exactDiff > 0 ? rowA.displayName : rowB.displayName;
-      const adv: "a"|"b" = exactDiff > 0 ? "a" : "b";
-      const est = Math.abs(exactDiff) * 7;
-      insights.push({ icon: "🎯", adv, text: `ל-${who} יש ${Math.abs(exactDiff)} פגיעות מדויקות יותר — מסביר כ-${est} נק׳ מתוך ההפרש` });
+    if (diffs.exact !== 0) {
+      const who = diffs.exact > 0 ? rowA.displayName : rowB.displayName;
+      const adv: "a"|"b" = diffs.exact > 0 ? "a" : "b";
+      insights.push({ icon: "🎯", adv,
+        text: `ל-${who} יש ${Math.abs(diffs.exact)} פגיעות מדויקות יותר — מוסיף ${Math.abs(diffs.exactPts)} נק׳` });
     }
 
-    if (nonExactDiff !== 0) {
-      const who = nonExactDiff > 0 ? rowA.displayName : rowB.displayName;
-      const adv: "a"|"b" = nonExactDiff > 0 ? "a" : "b";
-      insights.push({ icon: "✅", adv, text: `ל-${who} יש ${Math.abs(nonExactDiff)} תוצאות נכונות יותר — מסביר כ-${Math.abs(nonExactDiff) * 3} נק׳` });
+    if (diffs.diff !== 0) {
+      const who = diffs.diff > 0 ? rowA.displayName : rowB.displayName;
+      const adv: "a"|"b" = diffs.diff > 0 ? "a" : "b";
+      insights.push({ icon: "⚽", adv,
+        text: `ל-${who} יש ${Math.abs(diffs.diff)} ניחושים יותר עם הפרש שערים נכון — מוסיף ${Math.abs(diffs.diffPts)} נק׳` });
     }
 
-    // Streak: only mention if it could plausibly explain some gap
-    if (streakDiff !== 0) {
-      const who = streakDiff > 0 ? rowA.displayName : rowB.displayName;
-      const adv: "a"|"b" = streakDiff > 0 ? "a" : "b";
-      insights.push({ icon: "🔥", adv, text: `ל-${who} סטריק מקסימלי ארוך יותר (${Math.abs(streakDiff)} ניחושים נכונים נוספים ברצף) — מסביר חלק מבונוס הסטריק` });
+    if (diffs.plainPts !== 0) {
+      const who = diffs.plainPts > 0 ? rowA.displayName : rowB.displayName;
+      const adv: "a"|"b" = diffs.plainPts > 0 ? "a" : "b";
+      const n = Math.abs(Math.round(diffs.plainPts / 3));
+      insights.push({ icon: "✅", adv,
+        text: `ל-${who} יש ${n} תוצאות נכונות יותר (ללא בונוסים) — מוסיף ${Math.abs(diffs.plainPts)} נק׳` });
     }
 
-    // When visible stats can't explain the gap → hidden factors
-    if (Math.abs(unexplained) >= 2 && absDiff > 0) {
-      const who = unexplained > 0 ? rowA.displayName : rowB.displayName;
-      const adv: "a"|"b" = unexplained > 0 ? "a" : "b";
-      const factors: string[] = [];
-      if (Math.abs(unexplained) >= 1)
-        factors.push("בונוס הפרש שערים (4 נק׳ במקום 3 כשהפרש השערים מדויק)");
-      if (Math.abs(unexplained) >= 3)
-        factors.push("ניחושים נכונים בשלב נוקאאוט (8/5 נק׳ במקום 7/4)");
-      if (Math.abs(unexplained) >= 2 && streakDiff === 0)
-        factors.push("צבירת בונוס סטריק לאורך הטורניר (לא מוצג בסטריק המקסימלי)");
-      insights.push({
-        icon: "💡", adv,
-        text: `עוד כ-${Math.abs(unexplained)} נק׳ לטובת ${who} נובעות ככל הנראה מ: ${factors.join(" · ")}`,
-      });
-    }
-
-    if (finishedDiff !== 0) {
-      const who = finishedDiff > 0 ? rowA.displayName : rowB.displayName;
-      const adv: "a"|"b" = finishedDiff > 0 ? "a" : "b";
-      insights.push({ icon: "📝", adv, text: `ל-${who} יש ${Math.abs(finishedDiff)} ניחושים יותר שנספרו — יותר הזדמנויות לנקודות` });
+    if (diffs.streakPts !== 0) {
+      const who = diffs.streakPts > 0 ? rowA.displayName : rowB.displayName;
+      const adv: "a"|"b" = diffs.streakPts > 0 ? "a" : "b";
+      insights.push({ icon: "🔥", adv,
+        text: `ל-${who} בונוס סטריק גבוה יותר לאורך הטורניר — מוסיף ${Math.abs(diffs.streakPts)} נק׳` });
     }
 
     if (insights.length === 0 && absDiff === 0) {
       insights.push({ icon: "🤝", adv: "tie", text: "שני החברים עם אותו ניקוד מדויק!" });
     } else if (insights.length === 0) {
-      insights.push({ icon: "💡", adv: "tie", text: "ההפרש נובע מבונוס הפרש שערים ו/או ניחושים בשלב נוקאאוט — הנתונים הנצפים זהים" });
+      insights.push({ icon: "💡", adv: "tie", text: "כל הנתונים זהים — ייתכן הפרש קטן מבונוסי שלב נוקאאוט (8/5 נק׳ במקום 7/4)" });
     }
 
-    return { leader, trailer, absDiff, ptsDiff, exactDiff, resultDiff, streakDiff, accA, accB, insights, rowA, rowB };
+    return { leader, trailer, absDiff, ptsDiff, diffs, bdA, bdB, accA, accB, insights, rowA, rowB };
   }, [rowA, rowB]);
 
   const selectStyle: React.CSSProperties = {
@@ -1101,13 +1097,15 @@ function ScoreAnalysisModal({
                 <div style={{ textAlign: "center" }}>הפרש</div>
               </div>
               {[
-                { label: "🎯 מדויקים",      a: rowA.exactCount,    b: rowB.exactCount,    suffix: "" },
-                { label: "✅ תוצאות נכונות", a: rowA.resultCount,   b: rowB.resultCount,   suffix: "" },
-                { label: "🔥 סטריק",         a: rowA.streak,        b: rowB.streak,        suffix: "" },
-                { label: "📊 דיוק",          a: analysis.accA,      b: analysis.accB,      suffix: "%" },
-                { label: "🏆 סך נקודות",     a: rowA.totalPoints,   b: rowB.totalPoints,   suffix: "" },
-              ].map(({ label, a, b, suffix }) => {
+                { label: "🎯 מדויקים",          a: rowA.exactCount,             b: rowB.exactCount,             suffix: "", pts: true,  ptsA: analysis.bdA.exactPts,   ptsB: analysis.bdB.exactPts  },
+                { label: "⚽ הפרש שערים",        a: rowA.differentialCount ?? 0, b: rowB.differentialCount ?? 0, suffix: "", pts: true,  ptsA: analysis.bdA.diffPts,    ptsB: analysis.bdB.diffPts   },
+                { label: "✅ תוצאות נכונות",     a: rowA.resultCount - rowA.exactCount - (rowA.differentialCount ?? 0), b: rowB.resultCount - rowB.exactCount - (rowB.differentialCount ?? 0), suffix: "", pts: true, ptsA: analysis.bdA.plainPts, ptsB: analysis.bdB.plainPts },
+                { label: "🔥 בונוס סטריק",       a: analysis.bdA.streakPts,      b: analysis.bdB.streakPts,      suffix: " נק׳", pts: false },
+                { label: "📊 דיוק",              a: analysis.accA,               b: analysis.accB,               suffix: "%",    pts: false },
+                { label: "🏆 סך נקודות",         a: rowA.totalPoints,            b: rowB.totalPoints,            suffix: "",     pts: false },
+              ].map(({ label, a, b, suffix, pts, ptsA, ptsB }) => {
                 const diff = a - b;
+                const ptsDiff2 = pts && ptsA !== undefined && ptsB !== undefined ? ptsA - ptsB : null;
                 return (
                   <div key={label} style={{
                     display: "grid", gridTemplateColumns: "1fr 80px 80px 80px",
@@ -1116,13 +1114,24 @@ function ScoreAnalysisModal({
                     fontSize: 13,
                   }}>
                     <div style={{ fontWeight: 600 }}>{label}</div>
-                    <div style={{ textAlign: "center", fontWeight: 800, color: diff > 0 ? "var(--green)" : "var(--text)" }}>{a}{suffix}</div>
-                    <div style={{ textAlign: "center", fontWeight: 800, color: diff < 0 ? "var(--green)" : "var(--text)" }}>{b}{suffix}</div>
+                    <div style={{ textAlign: "center", fontWeight: 800, color: diff > 0 ? "var(--green)" : "var(--text)" }}>
+                      {a}{suffix}
+                      {pts && ptsA !== undefined && <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600 }}>{ptsA} נק׳</div>}
+                    </div>
+                    <div style={{ textAlign: "center", fontWeight: 800, color: diff < 0 ? "var(--green)" : "var(--text)" }}>
+                      {b}{suffix}
+                      {pts && ptsB !== undefined && <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600 }}>{ptsB} נק׳</div>}
+                    </div>
                     <div style={{
                       textAlign: "center", fontWeight: 800,
                       color: diff > 0 ? "var(--green)" : diff < 0 ? "var(--red)" : "var(--text-muted)",
                     }}>
                       {diff === 0 ? "—" : diff > 0 ? `+${diff}${suffix}` : `${diff}${suffix}`}
+                      {ptsDiff2 !== null && ptsDiff2 !== 0 && (
+                        <div style={{ fontSize: 10, color: ptsDiff2 > 0 ? "var(--green)" : "var(--red)", fontWeight: 700 }}>
+                          {ptsDiff2 > 0 ? `+${ptsDiff2}` : ptsDiff2} נק׳
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1290,6 +1299,7 @@ function MatchBlock({ row, onOpen }: { row: MatchRow; onOpen: () => void }) {
       </div>
       {row.result && (
         <div className="muted" style={{ fontSize: 12, padding: "0 8px 8px" }}>
+
           ⚽ תוצאה סופית: {row.result.home} : {row.result.away}
         </div>
       )}

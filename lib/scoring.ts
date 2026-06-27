@@ -127,7 +127,7 @@ export function userTotals(
   }>,
   bonusPoints: number = 0,
 ) {
-  let total = 0, exact = 0, result = 0, streak = 0, currentStreak = 0;
+  let total = 0, exact = 0, result = 0, diff = 0, streak = 0, currentStreak = 0;
   // sort predictions by finish time
   const finished = preds
     .map(p => ({ p, r: results[p.matchId] }))
@@ -147,6 +147,7 @@ export function userTotals(
     total += pts;
     if (sc.exact) exact++;
     if (sc.resultCorrect) result++;
+    if (sc.diffCorrect && !sc.exact) diff++;
     if (pts > 0) {
       currentStreak++;
       // Streak bonus only kicks in from the 2nd consecutive correct guess
@@ -165,6 +166,7 @@ export function userTotals(
     totalPoints: total,
     exactCount: exact,
     resultCount: result,
+    differentialCount: diff,
     predictionsCount: preds.length,
     finishedCount: finished.length,
     streak,
