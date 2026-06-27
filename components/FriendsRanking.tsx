@@ -522,6 +522,7 @@ function GroupLeaderboardCard({
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(!collapsed);
   const [showScoringKey, setShowScoringKey] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
 
   async function load() {
     /* Same defense as the parent component: never fetch a global
@@ -576,26 +577,6 @@ function GroupLeaderboardCard({
         </button>
         {open && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {inviteCode && (
-              <button
-                className="btn btn-small wa-btn"
-                onClick={() => {
-                  const origin = typeof window !== "undefined" ? window.location.origin : "";
-                  const url = `${origin}/?invite=${inviteCode}`;
-                  const cleanGroupName = groupName.replace(/^[🌍🏆📊]+\s*/, "");
-                  const msg =
-                    `🏆 הצטרף לקבוצת מונדיאל 2026 שלי "${cleanGroupName}"!\n` +
-                    `נחש תוצאות משחקים, התחרה מול חברים על לוח תוצאות חי 🔮\n\n` +
-                    `${url}\n\n` +
-                    `(או הזן את הקוד ידנית: ${inviteCode})\n\n` +
-                    `⚠️ חשוב: כדי לא להתבקש סיסמה בכל כניסה — פִּתחו את הקישור בדפדפן (Chrome/Safari), לחצו על תפריט (⋮) ובחרו "הוסף למסך הבית". כך תישארו מחוברים תמיד.`;
-                  shareToWhatsApp(msg);
-                }}
-                title="הזמן חבר להצטרף לקבוצה בווטסאפ"
-              >
-                ➕ צרף חבר
-              </button>
-            )}
             {rows.length > 0 && (
               <button
                 className="btn btn-small wa-btn"
@@ -608,6 +589,15 @@ function GroupLeaderboardCard({
                 💬 שתף טבלה
               </button>
             )}
+            {rows.length >= 2 && (
+              <button
+                className="btn btn-small"
+                onClick={() => setShowAnalysis(true)}
+                title="השווה ניקוד בין שני חברים"
+              >
+                📊 ניתוח ניקוד
+              </button>
+            )}
             <button
               className="btn btn-small"
               onClick={() => setShowScoringKey(true)}
@@ -615,32 +605,6 @@ function GroupLeaderboardCard({
             >
               🧮 מפתח ניקוד
             </button>
-            <button
-              className="btn btn-small wa-btn"
-              onClick={() => shareToWhatsApp(weeklyReminderShareText(groupId ? groupName : null))}
-              title="שלח לקבוצה תזכורת בווטסאפ למלא ניחושים לשבוע"
-            >
-              ⏰ תזכורת ניחושים
-            </button>
-            {onLeave && (
-              <button
-                className="btn btn-small"
-                disabled={memberCount <= 1}
-                title={memberCount <= 1 ? "אין משתמשים נוספים בקבוצה" : "יציאה מהקבוצה"}
-                onClick={onLeave}
-              >
-                🚪 צא מהקבוצה
-              </button>
-            )}
-            {isOwner && onDelete && (
-              <button
-                className="btn btn-small btn-danger"
-                title={memberCount > 1 ? "לא ניתן למחוק כאשר יש עוד חברים" : "מחיקת הקבוצה"}
-                onClick={onDelete}
-              >
-                🗑️ מחק קבוצה
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -650,27 +614,18 @@ function GroupLeaderboardCard({
           : <Leaderboard rows={rows} myUid={myUid} predictionRows={predictionRows} />
       )}
       {showScoringKey && <ScoringLegendModal onClose={() => setShowScoringKey(false)} />}
+      {showAnalysis && rows.length >= 2 && (
+        <ScoreAnalysisModal rows={rows} myUid={myUid} onClose={() => setShowAnalysis(false)} />
+      )}
     </div>
   );
 }
 
 function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid: string; predictionRows: MatchRow[] }) {
   const [openUser, setOpenUser] = useState<LeaderRow | null>(null);
-  const [showAnalysis, setShowAnalysis] = useState(false);
   if (!rows.length) return <div className="empty-state">אין עדיין נתונים — כשיתחילו המשחקים יופיע leaderboard חי.</div>;
   return (
     <>
-      {rows.length >= 2 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-          <button
-            className="btn btn-small"
-            onClick={() => setShowAnalysis(true)}
-            style={{ gap: 6, display: "flex", alignItems: "center" }}
-          >
-            📊 ניתוח ניקוד
-          </button>
-        </div>
-      )}
       <div className="leaderboard" style={{ overflowX: "auto" }}>
         {/* Header row */}
         <div className="lb-header-row">
@@ -720,13 +675,6 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
           isMe={openUser.uid === myUid}
           predictionRows={predictionRows}
           onClose={() => setOpenUser(null)}
-        />
-      )}
-      {showAnalysis && (
-        <ScoreAnalysisModal
-          rows={rows}
-          myUid={myUid}
-          onClose={() => setShowAnalysis(false)}
         />
       )}
     </>
