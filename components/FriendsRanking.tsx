@@ -669,7 +669,6 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
           <div className="lb-stat-col">🎯<br/>מדויקים</div>
           <div className="lb-stat-col">🔥<br/>סטריק</div>
           <div className="lb-stat-col">✅<br/>נכונות</div>
-          <div className="lb-stat-col">📝<br/>ניחושים</div>
           <div style={{ textAlign: "center" }}>🏆<br/>נק׳</div>
         </div>
         {rows.map(r => {
@@ -698,7 +697,6 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
             <div className="lb-stat-col">{r.exactCount}</div>
             <div className="lb-stat-col">{r.streak}</div>
             <div className="lb-stat-col">{r.resultCount}</div>
-            <div className="lb-stat-col">{r.finishedCount}</div>
             <div className="lb-points">{r.totalPoints}<span className="muted" style={{ fontSize: 11 }}> נק׳</span></div>
           </div>
           );

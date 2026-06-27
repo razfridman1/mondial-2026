@@ -2035,7 +2035,7 @@ button { font-family: inherit; cursor: pointer; }
 .leaderboard { display: flex; flex-direction: column; gap: 6px; }
 .lb-row {
   display: grid;
-  grid-template-columns: 36px 44px minmax(120px, 1.5fr) repeat(5, 1fr) minmax(72px, auto);
+  grid-template-columns: 36px 44px minmax(140px, 2fr) repeat(4, 1fr) minmax(80px, auto);
   gap: 0;
   align-items: center;
   background: var(--bg-card);
@@ -2063,13 +2063,13 @@ button { font-family: inherit; cursor: pointer; }
 .lb-rank { font-size: 16px; font-weight: 900; color: var(--accent); text-align: center; }
 .lb-name { font-weight: 700; }
 .lb-stat-col {
-  font-size: 14px; font-weight: 800; text-align: center;
+  font-size: 15px; font-weight: 800; text-align: center;
   color: var(--text); white-space: nowrap;
-  padding: 0 4px;
+  padding: 0 6px;
 }
 .lb-header-row {
   display: grid;
-  grid-template-columns: 36px 44px minmax(120px, 1.5fr) repeat(5, 1fr) minmax(72px, auto);
+  grid-template-columns: 36px 44px minmax(140px, 2fr) repeat(4, 1fr) minmax(80px, auto);
   gap: 0;
   align-items: center;
   padding: 8px 12px 8px;
@@ -2121,8 +2121,8 @@ button { font-family: inherit; cursor: pointer; }
 .team-detail .pitch-svg { max-height: 580px; }
 
 @media (max-width: 720px) {
-  .lb-row { grid-template-columns: 30px 36px minmax(80px, 1.2fr) repeat(5, 1fr) minmax(56px, auto); padding: 0 8px; font-size: 12px; min-height: 46px; }
-  .lb-header-row { grid-template-columns: 30px 36px minmax(80px, 1.2fr) repeat(5, 1fr) minmax(56px, auto); font-size: 9px; padding: 6px 8px; }
+  .lb-row { grid-template-columns: 28px 34px minmax(80px, 1.6fr) repeat(4, 1fr) minmax(54px, auto); padding: 0 8px; font-size: 12px; min-height: 46px; }
+  .lb-header-row { grid-template-columns: 28px 34px minmax(80px, 1.6fr) repeat(4, 1fr) minmax(54px, auto); font-size: 9px; padding: 6px 8px; }
   .lb-stat-col { font-size: 12px; }
   .lb-points { font-size: 15px; }
   .lb-points { font-size: 18px; }
