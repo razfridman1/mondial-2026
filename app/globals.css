@@ -2060,10 +2060,10 @@ button { font-family: inherit; cursor: pointer; }
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.lb-rank { font-size: 16px; font-weight: 900; color: var(--accent); text-align: center; }
+.lb-rank { font-size: 18px; font-weight: 900; color: var(--accent); text-align: center; }
 .lb-name { font-weight: 700; }
 .lb-stat-col {
-  font-size: 15px; font-weight: 800; text-align: center;
+  font-size: 17px; font-weight: 800; text-align: center;
   color: var(--text); white-space: nowrap;
   padding: 0 6px;
 }
@@ -2073,16 +2073,16 @@ button { font-family: inherit; cursor: pointer; }
   gap: 0;
   align-items: center;
   padding: 8px 12px 8px;
-  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
   border-bottom: 2px solid var(--border-soft);
   margin-bottom: 6px;
   text-align: center;
 }
 .lb-header-row > *:nth-child(3) { text-align: start; }
-.lb-header-row .lb-stat-col { color: var(--text-muted); font-weight: 700; font-size: 11px; }
+.lb-header-row .lb-stat-col { color: var(--text-muted); font-weight: 700; font-size: 12px; }
 .lb-stats { font-size: 11px; margin-top: 2px; }
 .lb-points {
-  font-size: 20px; font-weight: 900; color: var(--accent);
+  font-size: 22px; font-weight: 900; color: var(--accent);
   text-align: center; padding: 0 4px;
 }
 
@@ -2128,17 +2128,17 @@ button { font-family: inherit; cursor: pointer; }
   }
   .lb-header-row {
     grid-template-columns: 26px 28px minmax(60px, 1.2fr) repeat(5, minmax(28px, 1fr)) minmax(46px, auto);
-    font-size: 9px; padding: 5px 6px; gap: 0;
+    font-size: 10px; padding: 5px 6px; gap: 0;
     line-height: 1.2;
   }
-  .lb-header-row .lb-stat-col { font-size: 9px; }
-  .lb-stat-col { font-size: 11px; padding: 0 2px; }
-  .lb-points { font-size: 13px; padding: 0 2px; }
-  .lb-rank { font-size: 12px; }
+  .lb-header-row .lb-stat-col { font-size: 10px; }
+  .lb-stat-col { font-size: 12px; padding: 0 2px; }
+  .lb-points { font-size: 15px; padding: 0 2px; }
+  .lb-rank { font-size: 13px; }
   /* Clamp avatar inside lb-row to 24px */
   .lb-avatar { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .lb-avatar > * { width: 24px !important; height: 24px !important; min-width: 24px !important; font-size: 12px !important; }
-  .lb-name { font-size: 11px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-name { font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .squad-grid { grid-template-columns: 1fr; }
   .pitch-svg { max-height: 50vh; }
 }
