@@ -195,9 +195,10 @@ export function resolveAllStages(
        * unused team from the 8 best 3rd-placed pool. */
       if (!homeCode && /^3[A-Z\/]+$/.test(m.home)) homeCode = relaxedThird() || "";
       if (!awayCode && /^3[A-Z\/]+$/.test(m.away)) awayCode = relaxedThird() || "";
-      /* Fallback to literal placeholder text if still empty. */
-      if (!homeCode) homeCode = m.home;
-      if (!awayCode) awayCode = m.away;
+      /* Only use literal fallback if it's an actual team code — prevents "TBD"
+       * from leaking into resolved matches and appearing in prediction tabs. */
+      if (!homeCode && TEAMS[m.home]) homeCode = m.home;
+      if (!awayCode && TEAMS[m.away]) awayCode = m.away;
       const r = results[m.id];
       if (r) {
         let winner = "", loser = "";
