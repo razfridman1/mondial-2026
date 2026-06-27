@@ -656,9 +656,21 @@ function GroupLeaderboardCard({
 
 function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid: string; predictionRows: MatchRow[] }) {
   const [openUser, setOpenUser] = useState<LeaderRow | null>(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   if (!rows.length) return <div className="empty-state">אין עדיין נתונים — כשיתחילו המשחקים יופיע leaderboard חי.</div>;
   return (
     <>
+      {rows.length >= 2 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <button
+            className="btn btn-small"
+            onClick={() => setShowAnalysis(true)}
+            style={{ gap: 6, display: "flex", alignItems: "center" }}
+          >
+            📊 ניתוח ניקוד
+          </button>
+        </div>
+      )}
       <div className="leaderboard" style={{ overflowX: "auto" }}>
         {/* Header row */}
         <div className="lb-header-row">
@@ -708,6 +720,13 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
           isMe={openUser.uid === myUid}
           predictionRows={predictionRows}
           onClose={() => setOpenUser(null)}
+        />
+      )}
+      {showAnalysis && (
+        <ScoreAnalysisModal
+          rows={rows}
+          myUid={myUid}
+          onClose={() => setShowAnalysis(false)}
         />
       )}
     </>
@@ -961,6 +980,207 @@ function UserStatsModal({
     </div>
   );
 }
+
+/* ===================================================================
+ * ScoreAnalysisModal — compare two group members' scoring breakdown
+ * =================================================================== */
+function ScoreAnalysisModal({
+  rows, myUid, onClose,
+}: { rows: LeaderRow[]; myUid: string; onClose: () => void }) {
+  const [uidA, setUidA] = useState(myUid || rows[0]?.uid || "");
+  const [uidB, setUidB] = useState(rows.find(r => r.uid !== uidA)?.uid || "");
+
+  const rowA = rows.find(r => r.uid === uidA) ?? null;
+  const rowB = rows.find(r => r.uid === uidB) ?? null;
+
+  const analysis = useMemo(() => {
+    if (!rowA || !rowB || rowA.uid === rowB.uid) return null;
+
+    const ptsDiff = rowA.totalPoints - rowB.totalPoints;
+    const leader  = ptsDiff >= 0 ? rowA : rowB;
+    const trailer = ptsDiff >= 0 ? rowB : rowA;
+    const absDiff = Math.abs(ptsDiff);
+
+    const exactDiff    = rowA.exactCount  - rowB.exactCount;
+    const resultDiff   = rowA.resultCount - rowB.resultCount;
+    const streakDiff   = rowA.streak      - rowB.streak;
+    const finishedDiff = rowA.finishedCount - rowB.finishedCount;
+
+    const nonExactA = rowA.resultCount - rowA.exactCount;
+    const nonExactB = rowB.resultCount - rowB.exactCount;
+    const nonExactDiff = nonExactA - nonExactB;
+
+    const accA = rowA.finishedCount > 0 ? Math.round(rowA.resultCount / rowA.finishedCount * 100) : 0;
+    const accB = rowB.finishedCount > 0 ? Math.round(rowB.resultCount / rowB.finishedCount * 100) : 0;
+
+    // Build insight bullets
+    const insights: { icon: string; text: string; adv: "a" | "b" | "tie" }[] = [];
+
+    if (exactDiff !== 0) {
+      const who = exactDiff > 0 ? rowA.displayName : rowB.displayName;
+      const adv = exactDiff > 0 ? "a" : "b";
+      const est = Math.abs(exactDiff) * 7;
+      insights.push({ icon: "🎯", adv, text: `ל-${who} יש ${Math.abs(exactDiff)} פגיעות מדויקות יותר — שווה כ-${est} נק׳ יתרון` });
+    }
+
+    if (nonExactDiff !== 0) {
+      const who = nonExactDiff > 0 ? rowA.displayName : rowB.displayName;
+      const adv = nonExactDiff > 0 ? "a" : "b";
+      insights.push({ icon: "✅", adv, text: `ל-${who} יש ${Math.abs(nonExactDiff)} תוצאות נכונות יותר (ללא פגיעה מדויקת) — כ-${Math.abs(nonExactDiff) * 3} נק׳` });
+    }
+
+    if (streakDiff !== 0) {
+      const who = streakDiff > 0 ? rowA.displayName : rowB.displayName;
+      const adv = streakDiff > 0 ? "a" : "b";
+      insights.push({ icon: "🔥", adv, text: `ל-${who} סטריק ארוך יותר (${Math.abs(streakDiff)} ניחושים נוספים ברצף) — בונוס נקודות נוסף` });
+    }
+
+    if (finishedDiff !== 0) {
+      const who = finishedDiff > 0 ? rowA.displayName : rowB.displayName;
+      const adv = finishedDiff > 0 ? "a" : "b";
+      insights.push({ icon: "📝", adv, text: `ל-${who} יש ${Math.abs(finishedDiff)} ניחושים נוספים לספירה — יותר הזדמנויות לנקודות` });
+    }
+
+    if (insights.length === 0) {
+      insights.push({ icon: "🤝", adv: "tie", text: "פרופיל הניקוד דומה מאוד — ההפרש נובע ככל הנראה מבונוסי הפרש שערים ו/או סטריק" });
+    }
+
+    return { leader, trailer, absDiff, ptsDiff, exactDiff, resultDiff, streakDiff, accA, accB, insights, rowA, rowB };
+  }, [rowA, rowB]);
+
+  const selectStyle: React.CSSProperties = {
+    background: "var(--bg-elev)", border: "1px solid var(--border)",
+    color: "var(--text)", borderRadius: 8, padding: "6px 10px",
+    fontSize: 14, fontWeight: 700, flex: 1, minWidth: 0,
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog" style={{ maxWidth: 560 }}>
+        <button className="modal-close" onClick={onClose} aria-label="סגור">✕</button>
+        <h2 style={{ marginTop: 0, marginBottom: 16 }}>📊 ניתוח ניקוד</h2>
+
+        {/* Selectors */}
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 20, flexWrap: "wrap" }}>
+          <select style={selectStyle} value={uidA} onChange={e => setUidA(e.target.value)}>
+            {rows.map(r => <option key={r.uid} value={r.uid}>{r.displayName} (#{r.rank})</option>)}
+          </select>
+          <span style={{ fontWeight: 900, fontSize: 18, color: "var(--text-muted)", flexShrink: 0 }}>מול</span>
+          <select style={selectStyle} value={uidB} onChange={e => setUidB(e.target.value)}>
+            {rows.filter(r => r.uid !== uidA).map(r => <option key={r.uid} value={r.uid}>{r.displayName} (#{r.rank})</option>)}
+          </select>
+        </div>
+
+        {analysis && rowA && rowB ? (
+          <>
+            {/* Points banner */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "1fr auto 1fr",
+              gap: 12, alignItems: "center", marginBottom: 20,
+              background: "var(--bg-elev)", borderRadius: 12, padding: "14px 16px",
+            }}>
+              <div style={{ textAlign: "center" }}>
+                <AvatarDisplay avatarId={rowA.avatarId} size={44} />
+                <div style={{ fontWeight: 800, marginTop: 4, fontSize: 14 }}>{rowA.displayName}</div>
+                <div style={{ fontSize: 28, fontWeight: 900, color: "var(--accent)", marginTop: 2 }}>{rowA.totalPoints}</div>
+                <div className="muted" style={{ fontSize: 11 }}>נק׳ · מקום #{rowA.rank}</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                {analysis.absDiff === 0 ? (
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "var(--text-muted)" }}>שוויון</div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 2 }}>הפרש</div>
+                    <div style={{
+                      fontSize: 22, fontWeight: 900,
+                      color: analysis.ptsDiff >= 0 ? "var(--green)" : "var(--red)",
+                    }}>
+                      {analysis.ptsDiff > 0 ? "+" : ""}{analysis.ptsDiff}
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>נק׳</div>
+                  </>
+                )}
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <AvatarDisplay avatarId={rowB.avatarId} size={44} />
+                <div style={{ fontWeight: 800, marginTop: 4, fontSize: 14 }}>{rowB.displayName}</div>
+                <div style={{ fontSize: 28, fontWeight: 900, color: "var(--accent)", marginTop: 2 }}>{rowB.totalPoints}</div>
+                <div className="muted" style={{ fontSize: 11 }}>נק׳ · מקום #{rowB.rank}</div>
+              </div>
+            </div>
+
+            {/* Stat comparison table */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 80px 80px 80px",
+                gap: 8, padding: "6px 10px",
+                fontSize: 11, fontWeight: 700, color: "var(--text-muted)",
+                borderBottom: "1px solid var(--border-soft)",
+              }}>
+                <div>קטגוריה</div>
+                <div style={{ textAlign: "center" }}>{rowA.displayName.split(" ")[0]}</div>
+                <div style={{ textAlign: "center" }}>{rowB.displayName.split(" ")[0]}</div>
+                <div style={{ textAlign: "center" }}>הפרש</div>
+              </div>
+              {[
+                { label: "🎯 מדויקים",      a: rowA.exactCount,    b: rowB.exactCount,    suffix: "" },
+                { label: "✅ תוצאות נכונות", a: rowA.resultCount,   b: rowB.resultCount,   suffix: "" },
+                { label: "🔥 סטריק",         a: rowA.streak,        b: rowB.streak,        suffix: "" },
+                { label: "📊 דיוק",          a: analysis.accA,      b: analysis.accB,      suffix: "%" },
+                { label: "🏆 סך נקודות",     a: rowA.totalPoints,   b: rowB.totalPoints,   suffix: "" },
+              ].map(({ label, a, b, suffix }) => {
+                const diff = a - b;
+                return (
+                  <div key={label} style={{
+                    display: "grid", gridTemplateColumns: "1fr 80px 80px 80px",
+                    gap: 8, padding: "8px 10px",
+                    borderBottom: "1px solid var(--border-soft)",
+                    fontSize: 13,
+                  }}>
+                    <div style={{ fontWeight: 600 }}>{label}</div>
+                    <div style={{ textAlign: "center", fontWeight: 800, color: diff > 0 ? "var(--green)" : "var(--text)" }}>{a}{suffix}</div>
+                    <div style={{ textAlign: "center", fontWeight: 800, color: diff < 0 ? "var(--green)" : "var(--text)" }}>{b}{suffix}</div>
+                    <div style={{
+                      textAlign: "center", fontWeight: 800,
+                      color: diff > 0 ? "var(--green)" : diff < 0 ? "var(--red)" : "var(--text-muted)",
+                    }}>
+                      {diff === 0 ? "—" : diff > 0 ? `+${diff}${suffix}` : `${diff}${suffix}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Insight bullets */}
+            <div style={{
+              background: "var(--bg-elev)", borderRadius: 10,
+              padding: "12px 14px", fontSize: 13, lineHeight: 1.6,
+            }}>
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>💡 מה מסביר את ההפרש?</div>
+              {analysis.insights.map((ins, i) => (
+                <div key={i} style={{ marginBottom: 6, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <span style={{ flexShrink: 0 }}>{ins.icon}</span>
+                  <span style={{
+                    color: ins.adv === "a" ? "var(--green)" : ins.adv === "b" ? "var(--red)" : "var(--text-muted)",
+                  }}>{ins.text}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : rowA?.uid === rowB?.uid ? (
+          <div className="empty-state">בחר שני חברים שונים להשוואה</div>
+        ) : (
+          <div className="empty-state">בחר שני חברים להשוואה</div>
+        )}
+
+        <div className="mc-actions" style={{ marginTop: 16 }}>
+          <button className="btn btn-primary" onClick={onClose}>סגור</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function StatTile({
   icon, value, label, tooltip, big = false,
