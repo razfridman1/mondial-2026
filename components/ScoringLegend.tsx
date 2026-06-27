@@ -22,10 +22,14 @@ export function ScoringLegend() {
       <div className="scoring-legend-section">
         <div className="scoring-legend-stage">🥊 שלבי נוקאאוט</div>
         <ul>
-          <li><span className="pts pts-gold">8</span> תוצאה מדויקת + מנצח</li>
-          <li><span className="pts pts-silver">5</span> מנצח נכון + הפרש שערים</li>
-          <li><span className="pts pts-bronze">3</span> רק מנצח נכון (כולל הארכה/פנדלים)</li>
+          <li><span className="pts pts-gold">8</span> תוצאה מדויקת ב-90 דק׳ + מנצח נכון</li>
+          <li><span className="pts pts-silver">5</span> מנצח נכון + הפרש שערים זהה ב-90 דק׳</li>
+          <li><span className="pts pts-bronze">3</span> רק מנצח נכון</li>
+          <li><span className="pts pts-zero">0</span> מנצח שגוי — גם אם התוצאה ב-90 דק׳ נכונה</li>
         </ul>
+        <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+          ⚠️ התוצאה מתייחסת ל-90 דקות בלבד. מנצח לפי הארכה/פנדלים נבחר בנפרד מהתוצאה — אם בחרת את המנצח הנכון ב-90 דק׳ הסתיים 1-1, קיבלת 3 נק׳ גם אם ניחשת 2-0.
+        </div>
       </div>
 
       <div className="scoring-legend-bonus">

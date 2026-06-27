@@ -2395,6 +2395,7 @@ button { font-family: inherit; cursor: pointer; }
 .scoring-legend .pts-silver { background: linear-gradient(135deg, #cbd5e1, #94a3b8); color: #1a1a1a; }
 .scoring-legend .pts-bronze { background: linear-gradient(135deg, #fb923c, #c2410c); color: #1a1a1a; }
 .scoring-legend .pts-fire   { background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; min-width: auto; padding: 0 10px; flex-shrink: 0; }
+.scoring-legend .pts-zero   { background: rgba(255,255,255,0.08); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.15); }
 .scoring-legend-bonus {
   margin-top: 10px;
   padding-top: 8px;
@@ -5605,3 +5606,300 @@ html[data-theme="light"] .chat-panel {
 .stnd-flag-img { width: 22px; height: 16px; object-fit: cover; border-radius: 2px; vertical-align: middle; flex-shrink: 0; margin-left: 4px; }
 
 .team-flag-img { width: 40px; height: 30px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto 4px; }
+
+/* ================================================================
+ * Bracket.tsx — Visual tournament bracket tree
+ * ================================================================ */
+
+/* ---- Root & tree layout --------------------------------------- */
+.bkt-root {
+  padding: 8px 4px 24px;
+  font-family: inherit;
+}
+
+/* Desktop bracket tree (hidden on narrow screens) */
+.bkt-tree {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  min-height: 640px;
+}
+
+/* Mobile list view */
+.bkt-mobile { display: none; }
+
+/* ---- Two halves ---------------------------------------------- */
+.bkt-half {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  align-items: stretch;
+}
+.bkt-half-left  { flex-direction: row; }
+.bkt-half-right { flex-direction: row-reverse; }
+
+/* ---- Center column -------------------------------------------- */
+.bkt-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 12px;
+  flex-shrink: 0;
+  min-width: 180px;
+}
+.bkt-trophy {
+  font-size: 48px;
+  text-align: center;
+  line-height: 1;
+  margin: 4px 0;
+}
+.bkt-final-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.bkt-third-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 8px;
+}
+.bkt-third-wrap {
+  opacity: 0.85;
+}
+
+/* ---- Column labels -------------------------------------------- */
+.bkt-col-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 4px 0 8px;
+  white-space: nowrap;
+}
+
+/* ---- Generic column ------------------------------------------- */
+.bkt-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.bkt-col-matches {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-around;
+  align-items: center;
+  gap: 0;
+}
+
+/* R32 column: widest */
+.bkt-col-r32-left,
+.bkt-col-r32-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 148px;
+  max-width: 160px;
+}
+
+/* R16 column */
+.bkt-col-r16-left,
+.bkt-col-r16-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  max-width: 160px;
+}
+
+/* QF column */
+.bkt-col-qf-left,
+.bkt-col-qf-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  max-width: 160px;
+}
+
+/* SF column */
+.bkt-col-sf-left,
+.bkt-col-sf-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  max-width: 160px;
+}
+
+.bkt-col-r32-left  .bkt-col-matches,
+.bkt-col-r32-right .bkt-col-matches { justify-content: space-around; }
+
+.bkt-col-r16-left  .bkt-col-matches,
+.bkt-col-r16-right .bkt-col-matches { justify-content: space-around; }
+
+.bkt-col-qf-left   .bkt-col-matches,
+.bkt-col-qf-right  .bkt-col-matches { justify-content: space-around; }
+
+.bkt-col-sf-left   .bkt-col-matches,
+.bkt-col-sf-right  .bkt-col-matches { justify-content: center; }
+
+/* ---- Pair groups within R32 columns -------------------------- */
+.bkt-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: relative;
+  padding: 2px 0;
+}
+
+/* Connector lines from R32 pair → R16 */
+.bkt-pair-left {
+  border-right: 2px solid rgba(255,255,255,0.2);
+  margin-right: 0;
+}
+.bkt-pair-right {
+  border-left: 2px solid rgba(255,255,255,0.2);
+  margin-left: 0;
+}
+
+/* ---- R16 groups (pair of R16 matches that feed one QF) -------- */
+.bkt-r16-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: relative;
+}
+.bkt-r16-group-left {
+  border-right: 2px solid rgba(255,255,255,0.15);
+}
+.bkt-r16-group-right {
+  border-left: 2px solid rgba(255,255,255,0.15);
+}
+
+/* QF slot spacing */
+.bkt-qf-slot {
+  display: flex;
+  align-items: center;
+}
+.bkt-sf-slot {
+  display: flex;
+  align-items: center;
+}
+
+/* ---- Match card ----------------------------------------------- */
+.bkt-card {
+  background: var(--card-bg, rgba(255,255,255,0.06));
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 130px;
+  cursor: default;
+  position: relative;
+  transition: border-color 0.2s;
+}
+.bkt-card:hover {
+  border-color: rgba(255,255,255,0.25);
+}
+.bkt-card.bkt-done {
+  border-color: rgba(255,255,255,0.15);
+}
+.bkt-card.bkt-live {
+  border-color: #22c55e;
+  box-shadow: 0 0 6px rgba(34,197,94,0.3);
+}
+
+/* ---- Team row -------------------------------------------------- */
+.bkt-team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border-radius: 4px;
+  font-size: 12.5px;
+}
+.bkt-team-winner {
+  background: rgba(255,255,255,0.08);
+  font-weight: 700;
+}
+.bkt-team-tbd {
+  opacity: 0.45;
+  font-style: italic;
+}
+.bkt-flag { font-size: 16px; flex-shrink: 0; line-height: 1; }
+.bkt-name { flex: 1; font-size: 12px; line-height: 1.2; }
+.bkt-score {
+  font-size: 14px;
+  font-weight: 800;
+  min-width: 18px;
+  text-align: center;
+  color: var(--text);
+}
+.bkt-team-winner .bkt-score {
+  color: #fbbf24;
+}
+
+/* ---- Meta (date/time) ----------------------------------------- */
+.bkt-meta {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Live badge ----------------------------------------------- */
+.bkt-live-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #22c55e;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+/* ---- Mobile view --------------------------------------------- */
+@media (max-width: 860px) {
+  .bkt-tree { display: none; }
+  .bkt-mobile { display: block; }
+
+  .bkt-mob-round {
+    margin-bottom: 20px;
+  }
+  .bkt-mob-round-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .bkt-mob-matches {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .bkt-card {
+    min-width: unset;
+  }
+}
+
+@media (max-width: 520px) {
+  .bkt-mob-matches {
+    grid-template-columns: 1fr;
+  }
+}
+
