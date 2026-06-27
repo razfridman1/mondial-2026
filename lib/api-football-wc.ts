@@ -1,23 +1,22 @@
 /* =====================================================================
  * api-football-wc.ts — API-Football (v3.football.api-sports.io)
  *
- * PRIMARY data source for WC 2026 match results, live scores,
- * goal events, and lineups.
+ * PRIMARY data source for WC 2026 lineups, live scores, and goal events.
  *
- * Set FOOTBALL_API_KEY and FOOTBALL_API_URL in Vercel env vars.
- * Optional: AF_WC_LEAGUE_ID (default: 1 — FIFA World Cup)
- *
- * Exported helpers follow the same conventions as thesportsdb.ts so
- * ai-result-fallback.ts can call one then fall back to the other.
+ * Env vars (set in Vercel + .env.local):
+ *   API_FOOTBALL_KEY   — api-sports.io key (dashboard.api-football.com)
+ *   API_FOOTBALL_HOST  — hostname override (default: v3.football.api-sports.io)
+ *   AF_WC_LEAGUE_ID    — league ID override (default: 1 = FIFA World Cup)
  * ===================================================================*/
 
 import { teamCodeFromApiName } from "./team-name-mapper";
 
 // ---- Config ---------------------------------------------------------
 
-function afKey(): string | undefined { return process.env.FOOTBALL_API_KEY; }
+function afKey(): string | undefined { return process.env.API_FOOTBALL_KEY; }
 function afBaseUrl(): string {
-  return (process.env.FOOTBALL_API_URL ?? "https://v3.football.api-sports.io").replace(/\/$/, "");
+  const host = process.env.API_FOOTBALL_HOST || "v3.football.api-sports.io";
+  return "https://" + host.replace(/^\/\/|^https?:\/\//, "").replace(/\/$/, "");
 }
 
 export const AF_WC_LEAGUE  = Number(process.env.AF_WC_LEAGUE_ID ?? 1);

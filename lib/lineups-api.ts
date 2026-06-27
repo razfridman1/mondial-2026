@@ -52,7 +52,7 @@ export async function fetchLiveLineups(
   homeCode: string,
   awayCode: string,
 ): Promise<{ home: TeamLineup; away: TeamLineup } | null> {
-  const apiKey = process.env.FOOTBALL_API_KEY;
+  const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey) return null;
 
   const { db } = getAdmin();
