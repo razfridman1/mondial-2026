@@ -2035,13 +2035,14 @@ button { font-family: inherit; cursor: pointer; }
 .leaderboard { display: flex; flex-direction: column; gap: 6px; }
 .lb-row {
   display: grid;
-  grid-template-columns: 40px auto 1fr repeat(5, minmax(48px, auto)) auto;
-  gap: 10px;
+  grid-template-columns: 36px 44px minmax(120px, 1.5fr) repeat(5, 1fr) minmax(72px, auto);
+  gap: 0;
   align-items: center;
   background: var(--bg-card);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
+  padding: 0 12px;
+  min-height: 52px;
 }
 .lb-row.is-first  { border-color: var(--accent);        background: linear-gradient(90deg, rgba(255,210,74,0.10), var(--bg-card)); }
 .lb-row.is-second { border-color: #c0c0c0; }
@@ -2059,27 +2060,30 @@ button { font-family: inherit; cursor: pointer; }
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.lb-rank { font-size: 18px; font-weight: 900; color: var(--accent); text-align: center; }
+.lb-rank { font-size: 16px; font-weight: 900; color: var(--accent); text-align: center; }
 .lb-name { font-weight: 700; }
 .lb-stat-col {
-  font-size: 12px; font-weight: 700; text-align: center;
+  font-size: 14px; font-weight: 800; text-align: center;
   color: var(--text); white-space: nowrap;
+  padding: 0 4px;
 }
 .lb-header-row {
   display: grid;
-  grid-template-columns: 40px auto 1fr repeat(5, minmax(48px, auto)) auto;
-  gap: 10px;
+  grid-template-columns: 36px 44px minmax(120px, 1.5fr) repeat(5, 1fr) minmax(72px, auto);
+  gap: 0;
   align-items: center;
-  padding: 4px 12px 6px;
-  font-size: 10px; font-weight: 600; color: var(--text-muted);
-  border-bottom: 1px solid var(--border-soft);
-  margin-bottom: 4px;
+  padding: 8px 12px 8px;
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  border-bottom: 2px solid var(--border-soft);
+  margin-bottom: 6px;
+  text-align: center;
 }
-.lb-header-row .lb-stat-col { color: var(--text-muted); font-weight: 600; }
+.lb-header-row > *:nth-child(3) { text-align: start; }
+.lb-header-row .lb-stat-col { color: var(--text-muted); font-weight: 700; font-size: 11px; }
 .lb-stats { font-size: 11px; margin-top: 2px; }
 .lb-points {
-  font-size: 22px; font-weight: 900; color: var(--accent);
-  text-align: left;
+  font-size: 20px; font-weight: 900; color: var(--accent);
+  text-align: center; padding: 0 4px;
 }
 
 /* ---------- ACTIVITY FEED ---------- */
@@ -2117,9 +2121,10 @@ button { font-family: inherit; cursor: pointer; }
 .team-detail .pitch-svg { max-height: 580px; }
 
 @media (max-width: 720px) {
-  .lb-row { grid-template-columns: 32px auto 1fr repeat(5, minmax(40px, auto)) auto; padding: 6px 10px; font-size: 13px; }
-  .lb-header-row { grid-template-columns: 32px auto 1fr repeat(5, minmax(40px, auto)) auto; font-size: 9px; }
-  .lb-stat-col { font-size: 11px; }
+  .lb-row { grid-template-columns: 30px 36px minmax(80px, 1.2fr) repeat(5, 1fr) minmax(56px, auto); padding: 0 8px; font-size: 12px; min-height: 46px; }
+  .lb-header-row { grid-template-columns: 30px 36px minmax(80px, 1.2fr) repeat(5, 1fr) minmax(56px, auto); font-size: 9px; padding: 6px 8px; }
+  .lb-stat-col { font-size: 12px; }
+  .lb-points { font-size: 15px; }
   .lb-points { font-size: 18px; }
   .squad-grid { grid-template-columns: 1fr; }
   .pitch-svg { max-height: 50vh; }

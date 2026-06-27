@@ -665,12 +665,12 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
           <div></div>
           <div></div>
           <div>שם</div>
-          <div className="lb-stat-col">📊 דיוק</div>
-          <div className="lb-stat-col">🎯 מדויקים</div>
-          <div className="lb-stat-col">🔥 סטריק</div>
-          <div className="lb-stat-col">✅ נכונות</div>
-          <div className="lb-stat-col">📝 ניחושים</div>
-          <div style={{ textAlign: "center" }}>נק׳</div>
+          <div className="lb-stat-col">📊<br/>דיוק</div>
+          <div className="lb-stat-col">🎯<br/>מדויקים</div>
+          <div className="lb-stat-col">🔥<br/>סטריק</div>
+          <div className="lb-stat-col">✅<br/>נכונות</div>
+          <div className="lb-stat-col">📝<br/>ניחושים</div>
+          <div style={{ textAlign: "center" }}>🏆<br/>נק׳</div>
         </div>
         {rows.map(r => {
           const accuracyPct = r.finishedCount > 0
@@ -688,7 +688,7 @@ function Leaderboard({ rows, myUid, predictionRows }: { rows: LeaderRow[]; myUid
           >
             <div className="lb-rank">#{r.rank}</div>
             <div className="lb-avatar"><AvatarDisplay avatarId={r.avatarId} size={36} /></div>
-            <div className="lb-name">
+            <div className="lb-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               <div>
                 {r.displayName}
                 {r.uid === myUid && <span className="chip" style={{ marginInlineStart: 6, fontSize: 9 }}>אתה</span>}
