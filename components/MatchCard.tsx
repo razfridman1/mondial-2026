@@ -316,8 +316,8 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
 
 
       <div className="status-chips">
-        {isFinished && myPrediction ? (
-          /* Match finished: show prediction + actual + score earned */
+        {matchResult && myPrediction ? (
+          /* Official result in DB + prediction: show score + points */
           <div className="pred-result-stack">
             <div className="pred-result-row">
               <span className="pred-result-key">🔮 ההימור שלך:</span>
@@ -332,8 +332,8 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
               <span className="pred-result-key">ניקוד: {myScore?.points ?? 0}</span>
             </div>
           </div>
-        ) : isFinished && !myPrediction ? (
-          /* Match finished but no prediction */
+        ) : matchResult && !myPrediction ? (
+          /* Official result in DB but no prediction */
           <div className="pred-result-stack">
             <div className="pred-result-row">
               <span className="pred-result-key">🏁 תוצאה:</span>
@@ -343,7 +343,7 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
               <span>לא הוזן ניחוש למשחק זה</span>
             </div>
           </div>
-        ) : status === "finished" && live && myPrediction ? (
+        ) : isFinished && live && myPrediction ? (
           /* Match presumed over but official result not yet recorded —
            * show the live ticker score as a provisional final result. */
           <div className="pred-result-stack">
