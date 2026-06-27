@@ -250,29 +250,30 @@ const GROUP_FIXTURES: GroupFixture[] = [
  * ===================================================================*/
 interface KnockoutFixture {
   stage: StageId;
-  utc: string;       // ISO UTC, verbatim from football-data.org
-  home: string;      // bracket placeholder (e.g., "1A", "W R32-1")
-  away: string;      // bracket placeholder
+  utc: string;       // ISO UTC
+  home: string;      // team code OR bracket placeholder (e.g., "1A", "W R32-1")
+  away: string;      // team code OR bracket placeholder
+  venue?: string;    // optional venue code when known
 }
 
 const KNOCKOUT_FIXTURES: KnockoutFixture[] = [
-  /* ---- R32 / LAST_32 (16 matches) ---- */
-  { stage: "R32", utc: "2026-06-28T19:00:00Z", home: "1A",          away: "2B"           },
-  { stage: "R32", utc: "2026-06-29T17:00:00Z", home: "1C",          away: "2D"           },
-  { stage: "R32", utc: "2026-06-29T20:30:00Z", home: "1E",          away: "2F"           },
-  { stage: "R32", utc: "2026-06-30T01:00:00Z", home: "1G",          away: "2H"           },
-  { stage: "R32", utc: "2026-06-30T17:00:00Z", home: "1I",          away: "2J"           },
-  { stage: "R32", utc: "2026-06-30T21:00:00Z", home: "1K",          away: "2L"           },
-  { stage: "R32", utc: "2026-07-01T01:00:00Z", home: "1B",          away: "3A/C/D/E"     },
-  { stage: "R32", utc: "2026-07-01T16:00:00Z", home: "1D",          away: "3B/E/F"       },
-  { stage: "R32", utc: "2026-07-01T20:00:00Z", home: "1F",          away: "3A/B/C/G"     },
-  { stage: "R32", utc: "2026-07-02T00:00:00Z", home: "1H",          away: "3C/F/I/J"     },
-  { stage: "R32", utc: "2026-07-02T19:00:00Z", home: "1J",          away: "3D/E/H/K"     },
-  { stage: "R32", utc: "2026-07-02T23:00:00Z", home: "1L",          away: "3F/G/J/L"     },
-  { stage: "R32", utc: "2026-07-03T03:00:00Z", home: "2A",          away: "2C"           },
-  { stage: "R32", utc: "2026-07-03T18:00:00Z", home: "2E",          away: "2G"           },
-  { stage: "R32", utc: "2026-07-03T22:00:00Z", home: "2I",          away: "2K"           },
-  { stage: "R32", utc: "2026-07-04T01:30:00Z", home: "3C/D/H",      away: "3I/J/L"       },
+  /* ---- R32 / LAST_32 (16 matches) — teams confirmed 27 June 2026 ---- */
+  { stage: "R32", utc: "2026-06-28T19:00:00Z", home: "RSA", away: "CAN", venue: "LAX" },
+  { stage: "R32", utc: "2026-06-29T17:00:00Z", home: "GER", away: "PAR", venue: "BOS" },
+  { stage: "R32", utc: "2026-06-29T20:30:00Z", home: "BRA", away: "JPN", venue: "HOU" },
+  { stage: "R32", utc: "2026-06-30T01:00:00Z", home: "NED", away: "MAR", venue: "MTY" },
+  { stage: "R32", utc: "2026-06-30T17:00:00Z", home: "CIV", away: "NOR", venue: "DAL" },
+  { stage: "R32", utc: "2026-06-30T21:00:00Z", home: "FRA", away: "SWE", venue: "NYC" },
+  { stage: "R32", utc: "2026-07-01T01:00:00Z", home: "MEX", away: "ECU", venue: "AZT" },
+  { stage: "R32", utc: "2026-07-01T16:00:00Z", home: "ENG", away: "SEN", venue: "ATL" },
+  { stage: "R32", utc: "2026-07-01T20:00:00Z", home: "EGY", away: "KOR", venue: "SEA" },
+  { stage: "R32", utc: "2026-07-02T00:00:00Z", home: "USA", away: "BIH", venue: "SFO" },
+  { stage: "R32", utc: "2026-07-02T19:00:00Z", home: "ESP", away: "AUT", venue: "LAX" },
+  { stage: "R32", utc: "2026-07-02T23:00:00Z", home: "POR", away: "GHA", venue: "TOR" },
+  { stage: "R32", utc: "2026-07-03T03:00:00Z", home: "SUI", away: "ALG", venue: "VAN" },
+  { stage: "R32", utc: "2026-07-03T18:00:00Z", home: "AUS", away: "IRN", venue: "DAL" },
+  { stage: "R32", utc: "2026-07-03T22:00:00Z", home: "ARG", away: "CPV", venue: "MIA" },
+  { stage: "R32", utc: "2026-07-04T01:30:00Z", home: "COL", away: "CRO", venue: "KAN" },
 
   /* ---- R16 / LAST_16 (8 matches) ---- */
   { stage: "R16", utc: "2026-07-04T17:00:00Z", home: "W R32-1",     away: "W R32-2"      },
@@ -351,9 +352,9 @@ function buildMatches(): Match[] {
       group: null,
       home: kf.home,
       away: kf.away,
-      homeIsPlaceholder: true,
-      awayIsPlaceholder: true,
-      venue: "TBD",
+      homeIsPlaceholder: !TEAMS[kf.home],
+      awayIsPlaceholder: !TEAMS[kf.away],
+      venue: kf.venue ?? "TBD",
       status: "scheduled",
       channels: pickChannels(i, kf.stage, false),
       preGameMinutes: STAGE_PRE_GAME_MINUTES[kf.stage],

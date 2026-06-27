@@ -22,9 +22,9 @@ import {
  *
  * PRIMARY:  API-Football (v3.football.api-sports.io)
  * FALLBACK: TheSportsDB
+ * STATIC:   Known R32 fixtures (injected when APIs lack R32 data)
  *
- * STRICT: only what the API returns.
- * No hardcoded bracket structure. No simulated progression.
+ * STRICT: only what the API returns — or known static fixtures.
  * ================================================================ */
 
 // ---- Types -------------------------------------------------------
@@ -62,6 +62,45 @@ export interface BracketData {
 
 const CACHE_TTL = 2 * 60 * 1000;
 let _cache: { data: BracketData; at: number } | null = null;
+
+// ---- Static R32 fixtures (known as of 27 June 2026) -------------
+
+const STATIC_R32: BracketMatch[] = [
+  { idEvent: "sr32-1",  homeTeam: "דרום אפריקה", homeCode: "RSA", awayTeam: "קנדה",        awayCode: "CAN", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-06-28T19:00:00Z", venue: "SoFi Stadium",          city: "Inglewood",   source: "static" },
+  { idEvent: "sr32-2",  homeTeam: "גרמניה",       homeCode: "GER", awayTeam: "פרגוואי",     awayCode: "PAR", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-06-29T17:00:00Z", venue: "Gillette Stadium",      city: "Foxboro",     source: "static" },
+  { idEvent: "sr32-3",  homeTeam: "ברזיל",        homeCode: "BRA", awayTeam: "יפן",          awayCode: "JPN", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-06-29T20:30:00Z", venue: "NRG Stadium",           city: "Houston",     source: "static" },
+  { idEvent: "sr32-4",  homeTeam: "הולנד",        homeCode: "NED", awayTeam: "מרוקו",        awayCode: "MAR", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-06-30T01:00:00Z", venue: "Estadio BBVA",          city: "Monterrey",   source: "static" },
+  { idEvent: "sr32-5",  homeTeam: "חוף השנהב",    homeCode: "CIV", awayTeam: "נורווגיה",     awayCode: "NOR", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-06-30T17:00:00Z", venue: "AT&T Stadium",          city: "Arlington",   source: "static" },
+  { idEvent: "sr32-6",  homeTeam: "צרפת",         homeCode: "FRA", awayTeam: "שוודיה",       awayCode: "SWE", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-06-30T21:00:00Z", venue: "MetLife Stadium",       city: "New Jersey",  source: "static" },
+  { idEvent: "sr32-7",  homeTeam: "מקסיקו",       homeCode: "MEX", awayTeam: "אקוודור",      awayCode: "ECU", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-07-01T01:00:00Z", venue: "Estadio Azteca",        city: "Mexico City", source: "static" },
+  { idEvent: "sr32-8",  homeTeam: "אנגליה",        homeCode: "ENG", awayTeam: "סנגל",         awayCode: "SEN", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-07-01T16:00:00Z", venue: "Mercedes-Benz Stadium", city: "Atlanta",     source: "static" },
+  { idEvent: "sr32-9",  homeTeam: "מצרים",         homeCode: "EGY", awayTeam: "דרום קוריאה",  awayCode: "KOR", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-07-01T20:00:00Z", venue: "Lumen Field",           city: "Seattle",     source: "static" },
+  { idEvent: "sr32-10", homeTeam: "ארה\"ב", homeCode: "USA", awayTeam: "בוסניה",      awayCode: "BIH", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-07-02T00:00:00Z", venue: "Levi's Stadium",        city: "Santa Clara", source: "static" },
+  { idEvent: "sr32-11", homeTeam: "ספרד",          homeCode: "ESP", awayTeam: "אוסטריה",      awayCode: "AUT", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-07-02T19:00:00Z", venue: "SoFi Stadium",          city: "Inglewood",   source: "static" },
+  { idEvent: "sr32-12", homeTeam: "פורטוגל",       homeCode: "POR", awayTeam: "גאנה",         awayCode: "GHA", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-07-02T23:00:00Z", venue: "BMO Field",             city: "Toronto",     source: "static" },
+  { idEvent: "sr32-13", homeTeam: "שווייץ",        homeCode: "SUI", awayTeam: "אלג'יריה",    awayCode: "ALG", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-07-03T03:00:00Z", venue: "BC Place",              city: "Vancouver",   source: "static" },
+  { idEvent: "sr32-14", homeTeam: "אוסטרליה",      homeCode: "AUS", awayTeam: "איראן",        awayCode: "IRN", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-07-03T18:00:00Z", venue: "AT&T Stadium",          city: "Arlington",   source: "static" },
+  { idEvent: "sr32-15", homeTeam: "ארגנטינה",      homeCode: "ARG", awayTeam: "כף ורדה",      awayCode: "CPV", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-07-03T22:00:00Z", venue: "Hard Rock Stadium",     city: "Miami",       source: "static" },
+  { idEvent: "sr32-16", homeTeam: "קולומביה",       homeCode: "COL", awayTeam: "קרואטיה",      awayCode: "CRO", homeScore: null, awayScore: null, status: "NS", timestamp: "2026-07-04T01:30:00Z", venue: "Arrowhead Stadium",     city: "Kansas City", source: "static" },
+];
+
+const STATIC_R32_ROUND: BracketRound = {
+  name: "Round of 32",
+  title: "שלב 32 האחרונות",
+  order: 1,
+  matches: STATIC_R32.sort((a, b) =>
+    (a.timestamp || "").localeCompare(b.timestamp || "")
+  ),
+};
+
+/** Inject static R32 into rounds if API didn't return any R32 data. */
+function ensureR32(rounds: BracketRound[]): BracketRound[] {
+  const hasR32 = rounds.some(r =>
+    /round.of.32|last.32|r32/i.test(r.name) && r.matches.length > 0
+  );
+  if (hasR32) return rounds;
+  return [STATIC_R32_ROUND, ...rounds];
+}
 
 // ---- TheSportsDB knockout helpers --------------------------------
 
@@ -139,7 +178,7 @@ export async function GET() {
           });
         }
 
-        const rounds: BracketRound[] = [...roundMap.entries()]
+        let rounds: BracketRound[] = [...roundMap.entries()]
           .map(([name, matches]) => ({
             name,
             title: afRoundTitle(name),
@@ -150,6 +189,8 @@ export async function GET() {
           }))
           .filter(r => r.matches.length > 0)
           .sort((a, b) => a.order - b.order);
+
+        rounds = ensureR32(rounds);
 
         const data: BracketData = {
           rounds,
@@ -193,7 +234,7 @@ export async function GET() {
         });
       }
 
-      const rounds: BracketRound[] = [...roundMap.entries()]
+      let rounds: BracketRound[] = [...roundMap.entries()]
         .map(([name, matches]) => ({
           name,
           title: tsdbRoundTitle(name),
@@ -204,6 +245,8 @@ export async function GET() {
         }))
         .filter(r => r.matches.length > 0)
         .sort((a, b) => a.order - b.order);
+
+      rounds = ensureR32(rounds);
 
       const data: BracketData = {
         rounds,
@@ -217,15 +260,27 @@ export async function GET() {
       });
     }
 
-    // No keys configured
-    const empty: BracketData = { rounds: [], fetchedAt: now, total: 0, source: "none" };
-    return NextResponse.json(empty);
+    // No keys configured — still serve static R32
+    const data: BracketData = {
+      rounds: [STATIC_R32_ROUND],
+      fetchedAt: now,
+      total: STATIC_R32.length,
+      source: "static",
+    };
+    _cache = { data, at: now };
+    return NextResponse.json(data, {
+      headers: { "Cache-Control": "public, max-age=120, stale-while-revalidate=60" },
+    });
 
   } catch (err) {
     console.error("[bracket] fetch error:", err);
-    return NextResponse.json(
-      { error: "Failed to load bracket data", rounds: [], fetchedAt: now, total: 0, source: "error" },
-      { status: 500 }
-    );
+    // On error, return static R32 so the bracket still shows something useful
+    const data: BracketData = {
+      rounds: [STATIC_R32_ROUND],
+      fetchedAt: now,
+      total: STATIC_R32.length,
+      source: "static",
+    };
+    return NextResponse.json(data, { status: 200 });
   }
 }
