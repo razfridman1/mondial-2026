@@ -127,6 +127,7 @@ export default function SuperAdminPanel() {
         <summary>🎁 בונוסים ידניים — הוספת/הפחתת נקודות</summary>
         <BonusAwardsPanel />
       </details>
+
     </section>
   );
 }
@@ -1969,3 +1970,4 @@ function BonusAwardsPanel() {
     </div>
   );
 }
+

@@ -216,8 +216,35 @@ export default function FriendsRanking() {
     );
   }
 
+  // Scorer picks banner: show June 28, change June 29, hide June 30+
+  const scorerBanner = (() => {
+    const now = new Date();
+    const il = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }));
+    const month = il.getMonth() + 1; // 1-based
+    const day = il.getDate();
+    if (month === 6 && day === 28) return "⚽ ניתן למלא מלך השערים והבישולים — עד מחר!";
+    if (month === 6 && day === 29) return "⚡ יום אחרון למלא מלך שערים ובישולים!";
+    return null;
+  })();
+
   return (
     <section>
+      {scorerBanner && (
+        <div style={{
+          background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-2, #f59e0b) 100%)",
+          color: "#fff",
+          textAlign: "center",
+          padding: "14px 16px",
+          borderRadius: 12,
+          marginBottom: 14,
+          fontSize: 18,
+          fontWeight: 800,
+          letterSpacing: 0.2,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+        }}>
+          {scorerBanner}
+        </div>
+      )}
       <h2 className="sec-title">🏆 דירוג חברים</h2>
 
       {/* Filter row + create-group button. The "🌍 גלובלי" option has
