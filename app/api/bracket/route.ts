@@ -77,14 +77,14 @@ const STATIC_R32: BracketMatch[] = [
   { idEvent:"sr32-14", homeTeam:"אוסטרליה",    homeCode:"AUS", awayTeam:"מצרים",   awayCode:"EGY", homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-03T18:00:00Z", venue:"AT&T Stadium",           city:"Arlington",    source:"static" },
   { idEvent:"sr32-15", homeTeam:"ארגנטינה",    homeCode:"ARG", awayTeam:"כף ורדה", awayCode:"CPV", homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-03T22:00:00Z", venue:"Hard Rock Stadium",      city:"Miami",        source:"static" },
   /* ── Home team confirmed, opponent TBD ────────────────────────────────────────────── */
-  { idEvent:"sr32-7",  homeTeam:"מקסיקו",      homeCode:"MEX", awayTeam:null,      awayCode:null,  homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-01T01:00:00Z", venue:"Estadio Azteca",         city:"Mexico City",  source:"static" },
-  { idEvent:"sr32-8",  homeTeam:"אנגליה",      homeCode:"ENG", awayTeam:null,      awayCode:null,  homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-01T16:00:00Z", venue:"Mercedes-Benz Stadium",  city:"Atlanta",      source:"static" },
-  { idEvent:"sr32-9",  homeTeam:"בלגיה",       homeCode:"BEL", awayTeam:null,      awayCode:null,  homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-01T20:00:00Z", venue:"Lumen Field",            city:"Seattle",      source:"static" },
-  { idEvent:"sr32-13", homeTeam:"שווייץ",      homeCode:"SUI", awayTeam:null,      awayCode:null,  homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-03T03:00:00Z", venue:"BC Place",               city:"Vancouver",    source:"static" },
+  { idEvent:"sr32-7",  homeTeam:"מקסיקו",      homeCode:"MEX", awayTeam:"אקוודור",  awayCode:"ECU", homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-01T01:00:00Z", venue:"Estadio Azteca",         city:"Mexico City",  source:"static" },
+  { idEvent:"sr32-8",  homeTeam:"אנגליה",      homeCode:"ENG", awayTeam:'דר"ק (קונגו)', awayCode:"COD", homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-01T16:00:00Z", venue:"Mercedes-Benz Stadium",  city:"Atlanta",      source:"static" },
+  { idEvent:"sr32-9",  homeTeam:"בלגיה",       homeCode:"BEL", awayTeam:"סנגל",    awayCode:"SEN", homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-01T20:00:00Z", venue:"Lumen Field",            city:"Seattle",      source:"static" },
+  { idEvent:"sr32-13", homeTeam:"שווייץ",      homeCode:"SUI", awayTeam:"איראן",   awayCode:"IRN", homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-03T03:00:00Z", venue:"BC Place",               city:"Vancouver",    source:"static" },
   /* ── Both teams TBD ───────────────────────────────────────────────────────────────── */
-  { idEvent:"sr32-11", homeTeam:null,          homeCode:null,  awayTeam:null,      awayCode:null,  homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-02T19:00:00Z", venue:"SoFi Stadium",           city:"Inglewood",    source:"static" },
-  { idEvent:"sr32-12", homeTeam:null,          homeCode:null,  awayTeam:null,      awayCode:null,  homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-02T23:00:00Z", venue:"BMO Field",              city:"Toronto",      source:"static" },
-  { idEvent:"sr32-16", homeTeam:null,          homeCode:null,  awayTeam:null,      awayCode:null,  homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-04T01:30:00Z", venue:"Arrowhead Stadium",      city:"Kansas City",  source:"static" },
+  { idEvent:"sr32-11", homeTeam:"פורטוגל",     homeCode:"POR", awayTeam:"קרואטיה", awayCode:"CRO", homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-02T19:00:00Z", venue:"SoFi Stadium",           city:"Inglewood",    source:"static" },
+  { idEvent:"sr32-12", homeTeam:"ספרד",        homeCode:"ESP", awayTeam:"אוסטריה", awayCode:"AUT", homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-02T23:00:00Z", venue:"BMO Field",              city:"Toronto",      source:"static" },
+  { idEvent:"sr32-16", homeTeam:"קולומביה",    homeCode:"COL", awayTeam:"גאנה",    awayCode:"GHA", homeScore:null, awayScore:null, status:"NS", timestamp:"2026-07-04T01:30:00Z", venue:"Arrowhead Stadium",      city:"Kansas City",  source:"static" },
 ];
 
 const STATIC_R32_ROUND: BracketRound = {

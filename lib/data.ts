@@ -265,18 +265,18 @@ const KNOCKOUT_FIXTURES: KnockoutFixture[] = [
   { stage: "R32", utc: "2026-06-30T01:00:00Z", home: "NED", away: "MAR", venue: "MTY" },
   { stage: "R32", utc: "2026-06-30T17:00:00Z", home: "CIV", away: "NOR", venue: "DAL" },
   { stage: "R32", utc: "2026-06-30T21:00:00Z", home: "FRA", away: "SWE", venue: "NYC" },
-  /* Home team confirmed; away TBD (best 3rd-place team from groups — announced after group stage): */
-  { stage: "R32", utc: "2026-07-01T01:00:00Z", home: "MEX", away: "TBD", venue: "AZT" },
-  { stage: "R32", utc: "2026-07-01T16:00:00Z", home: "ENG", away: "TBD", venue: "ATL" },
-  { stage: "R32", utc: "2026-07-01T20:00:00Z", home: "BEL", away: "TBD", venue: "SEA" },
+  /* All R32 fixtures confirmed after group stage (verified 28 June 2026): */
+  { stage: "R32", utc: "2026-07-01T01:00:00Z", home: "MEX", away: "ECU", venue: "AZT" },
+  { stage: "R32", utc: "2026-07-01T16:00:00Z", home: "ENG", away: "COD", venue: "ATL" },
+  { stage: "R32", utc: "2026-07-01T20:00:00Z", home: "BEL", away: "SEN", venue: "SEA" },
   { stage: "R32", utc: "2026-07-02T00:00:00Z", home: "USA", away: "BIH", venue: "SFO" },
-  /* Both TBD until group stage complete: */
-  { stage: "R32", utc: "2026-07-02T19:00:00Z", home: "TBD", away: "TBD", venue: "LAX" },
-  { stage: "R32", utc: "2026-07-02T23:00:00Z", home: "TBD", away: "TBD", venue: "TOR" },
-  { stage: "R32", utc: "2026-07-03T03:00:00Z", home: "SUI", away: "TBD", venue: "VAN" },
+
+  { stage: "R32", utc: "2026-07-02T19:00:00Z", home: "POR", away: "CRO", venue: "LAX" },
+  { stage: "R32", utc: "2026-07-02T23:00:00Z", home: "ESP", away: "AUT", venue: "TOR" },
+  { stage: "R32", utc: "2026-07-03T03:00:00Z", home: "SUI", away: "IRN", venue: "VAN" },
   { stage: "R32", utc: "2026-07-03T18:00:00Z", home: "AUS", away: "EGY", venue: "DAL" },
   { stage: "R32", utc: "2026-07-03T22:00:00Z", home: "ARG", away: "CPV", venue: "MIA" },
-  { stage: "R32", utc: "2026-07-04T01:30:00Z", home: "TBD", away: "TBD", venue: "KAN" },
+  { stage: "R32", utc: "2026-07-04T01:30:00Z", home: "COL", away: "GHA", venue: "KAN" },
 
   /* ---- R16 / LAST_16 (8 matches) ---- */
   /*
