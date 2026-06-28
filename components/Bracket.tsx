@@ -323,7 +323,7 @@ export default function Bracket(){
               position:"absolute" as const,top:7,left:cx-66,width:132,
               textAlign:"center" as const,fontSize:11,fontWeight:800,
               textTransform:"uppercase" as const,letterSpacing:"0.07em",
-              color:"#1e2d50",fontWeight:800,whiteSpace:"nowrap" as const,
+              color:"#1e2d50",whiteSpace:"nowrap" as const,
             }}>{label}</div>
           ))}
           <div style={{position:"absolute",top:LABEL_H-5,left:0,right:0,
