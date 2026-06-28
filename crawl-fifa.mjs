@@ -90,8 +90,11 @@ async function scrapePlayerStats(type) {
       var tm      = after.match(/^([A-Z]{3})/);
       var team    = tm ? tm[1] : after.slice(0, 3);
       var vals    = Array.from(tr.querySelectorAll("td.scrollable-column span.value"));
-      var goals   = vals[0] ? vals[0].textContent.trim() : "0";
-      var assists = vals[1] ? vals[1].textContent.trim() : "0";
+      // After clicking Assists tab, the primary stat moves to index 0
+      var primaryVal   = vals[0] ? vals[0].textContent.trim() : "0";
+      var secondaryVal = vals[1] ? vals[1].textContent.trim() : "0";
+      var goals   = statType === "assists" ? secondaryVal : primaryVal;
+      var assists = statType === "assists" ? primaryVal   : secondaryVal;
       var value   = statType === "assists" ? assists : goals;
       return { rank: Number(rank)||0, name: name, team: team, goals: Number(goals)||0, assists: Number(assists)||0, value: Number(value)||0, displayValue: value||"0" };
     }).filter(function(r) { return r.name && r.rank > 0; });

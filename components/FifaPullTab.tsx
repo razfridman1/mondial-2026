@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useStore } from "@/lib/store";
 import { getFirebase } from "@/lib/firebase";
 
@@ -136,6 +136,14 @@ export default function FifaPullTab() {
   const [busy,         setBusy]         = useState<Record<string, boolean>>({});
   const [errors,       setErrors]       = useState<Record<string, string>>({});
   const [updated,      setUpdated]      = useState<Record<string, string>>({});
+  const loaded = useRef(false);
+
+  // Auto-load all sections once on mount so data persists across tab switches
+  useEffect(() => {
+    if (!user?.isAdmin || loaded.current) return;
+    loaded.current = true;
+    (["scorers", "assists", "fixtures", "matchcentre"] as PullType[]).forEach(t => pull(t, true));
+  }, [user]);
 
   if (!user?.isAdmin) return (
     <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
@@ -143,9 +151,9 @@ export default function FifaPullTab() {
     </div>
   );
 
-  async function pull(type: PullType) {
+  async function pull(type: PullType, silent = false) {
     setBusy(b => ({ ...b, [type]: true }));
-    setErrors(e => ({ ...e, [type]: "" }));
+    if (!silent) setErrors(e => ({ ...e, [type]: "" }));
     try {
       const res = await fetch(`/api/admin/fifa-pull?type=${type}`, { headers: await adminAuthHeaders() });
       const json = await res.json();
@@ -155,11 +163,11 @@ export default function FifaPullTab() {
         if (type === "fixtures")     setFixtures(json.rows     || []);
         if (type === "matchcentre")  setMatchResults(json.rows || []);
         if (json.updatedAt) setUpdated(u => ({ ...u, [type]: json.updatedAt }));
-      } else {
+      } else if (!silent) {
         setErrors(e => ({ ...e, [type]: json.error || "Error" }));
       }
     } catch (err: any) {
-      setErrors(e => ({ ...e, [type]: err.message }));
+      if (!silent) setErrors(e => ({ ...e, [type]: err.message }));
     } finally {
       setBusy(b => ({ ...b, [type]: false }));
     }
