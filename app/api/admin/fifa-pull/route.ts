@@ -20,23 +20,30 @@ export async function GET(req: NextRequest) {
   try {
     if (type === "scorers") {
       const doc = await db.collection("live_data").doc("fifa_scorers").get();
-      if (!doc.exists) return NextResponse.json({ ok: false, error: "אין נתונים — הרץ: node crawl-fifa.mjs --only scorers" });
+      if (!doc.exists) return NextResponse.json({ ok: false, error: "No data - run: node crawl-fifa.mjs --only scorers" });
       const data = doc.data()!;
       return NextResponse.json({ ok: true, type, rows: data.scorers || [], updatedAt: data.updatedAt });
     }
 
     if (type === "assists") {
       const doc = await db.collection("live_data").doc("fifa_assists").get();
-      if (!doc.exists) return NextResponse.json({ ok: false, error: "אין נתונים — הרץ: node crawl-fifa.mjs --only assists" });
+      if (!doc.exists) return NextResponse.json({ ok: false, error: "No data - run: node crawl-fifa.mjs --only assists" });
       const data = doc.data()!;
       return NextResponse.json({ ok: true, type, rows: data.assists || [], updatedAt: data.updatedAt });
     }
 
     if (type === "fixtures") {
       const doc = await db.collection("live_data").doc("cached_fixtures_fifa").get();
-      if (!doc.exists) return NextResponse.json({ ok: false, error: "אין נתונים — הרץ: node crawl-fifa.mjs --only fixtures" });
+      if (!doc.exists) return NextResponse.json({ ok: false, error: "No data - run: node crawl-fifa.mjs --only fixtures" });
       const data = doc.data()!;
       return NextResponse.json({ ok: true, type, rows: data.matches || data.raw?.matches || [], updatedAt: data.updatedAt });
+    }
+
+    if (type === "matchcentre") {
+      const doc = await db.collection("live_data").doc("fifa_match_results").get();
+      if (!doc.exists) return NextResponse.json({ ok: false, error: "No data - run: node crawl-fifa.mjs --only matchcentre" });
+      const data = doc.data()!;
+      return NextResponse.json({ ok: true, type, rows: data.matches || [], updatedAt: data.updatedAt });
     }
 
     return NextResponse.json({ error: "Unknown type" }, { status: 400 });

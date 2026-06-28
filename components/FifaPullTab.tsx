@@ -8,7 +8,7 @@ async function adminAuthHeaders() {
   return { "content-type": "application/json", authorization: `Bearer ${token}` };
 }
 
-type PullType = "scorers" | "assists" | "fixtures";
+type PullType = "scorers" | "assists" | "fixtures" | "matchcentre";
 
 function ScorersView({ data, label }: { data: any[]; label: string }) {
   return (
@@ -35,6 +35,34 @@ function ScorersView({ data, label }: { data: any[]; label: string }) {
   );
 }
 
+function MatchResultsView({ data }: { data: any[] }) {
+  if (!data.length) return <p className="muted" style={{ fontSize: 14 }}>אין תוצאות</p>;
+  return (
+    <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+      <thead>
+        <tr style={{ color: "var(--text-muted)" }}>
+          <th style={{ textAlign: "right", padding: "4px 8px" }}>בית</th>
+          <th style={{ padding: "4px 8px" }}>תוצאה</th>
+          <th style={{ textAlign: "left", padding: "4px 8px" }}>חוץ</th>
+          <th style={{ textAlign: "left", padding: "4px 8px", fontSize: 11 }}>סטטוס</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((m: any, i: number) => (
+          <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
+            <td style={{ padding: "4px 8px", fontWeight: 600, textAlign: "right" }}>{m.home}</td>
+            <td style={{ padding: "4px 8px", textAlign: "center", fontWeight: 800, fontSize: 16 }}>
+              {m.homeScore ?? "?"} - {m.awayScore ?? "?"}
+            </td>
+            <td style={{ padding: "4px 8px", fontWeight: 600 }}>{m.away}</td>
+            <td style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 11 }}>{m.date || m.status || ""}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function FixturesView({ data }: { data: any[] }) {
   return (
     <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
@@ -51,7 +79,7 @@ function FixturesView({ data }: { data: any[] }) {
           <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
             <td style={{ padding: "4px 8px", fontWeight: 600 }}>{e.home || e.homeTeam}</td>
             <td style={{ padding: "4px 8px", textAlign: "center", fontWeight: 700 }}>
-              {e.score ?? (e.homeScore !== undefined ? `${e.homeScore}–${e.awayScore}` : "vs")}
+              {e.score ?? (e.homeScore !== undefined ? `${e.homeScore}-${e.awayScore}` : "vs")}
             </td>
             <td style={{ padding: "4px 8px", fontWeight: 600 }}>{e.away || e.awayTeam}</td>
             <td style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 12 }}>{e.date}</td>
@@ -71,27 +99,27 @@ function PullSection({ label, hint, children, onPull, busy, error, updatedAt, ha
         <strong style={{ fontSize: 20, fontWeight: 800 }}>{label}</strong>
         <button className="btn btn-primary" onClick={onPull} disabled={busy}
                 style={{ fontSize: 15, padding: "8px 20px" }}>
-          {busy ? "⏳ טוען..." : "↓ משוך"}
+          {busy ? "loading..." : "pull"}
         </button>
         {updatedAt && (
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            עודכן: {new Date(updatedAt).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })}
+            updated: {new Date(updatedAt).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })}
           </span>
         )}
       </div>
       <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 12px" }}>
-        לרענון: <code>{hint}</code>
+        refresh: <code>{hint}</code>
       </p>
 
       {error && (
         <div style={{ fontSize: 14, color: "var(--red)", background: "rgba(239,68,68,0.1)",
                       borderRadius: 8, padding: "10px 16px", marginBottom: 10 }}>
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
       {!hasData && !busy && !error && (
-        <p className="muted" style={{ fontSize: 14, margin: 0 }}>לחץ "משוך" לטעינת הנתונים מ-Firestore.</p>
+        <p className="muted" style={{ fontSize: 14, margin: 0 }}>Click "pull" to load data from Firestore.</p>
       )}
 
       {hasData && <div>{children}</div>}
@@ -101,16 +129,17 @@ function PullSection({ label, hint, children, onPull, busy, error, updatedAt, ha
 
 export default function FifaPullTab() {
   const user = useStore(s => s.user);
-  const [scorers,  setScorers]  = useState<any[]>([]);
-  const [assists,  setAssists]  = useState<any[]>([]);
-  const [fixtures, setFixtures] = useState<any[]>([]);
-  const [busy,     setBusy]     = useState<Record<string, boolean>>({});
-  const [errors,   setErrors]   = useState<Record<string, string>>({});
-  const [updated,  setUpdated]  = useState<Record<string, string>>({});
+  const [scorers,      setScorers]      = useState<any[]>([]);
+  const [assists,      setAssists]      = useState<any[]>([]);
+  const [fixtures,     setFixtures]     = useState<any[]>([]);
+  const [matchResults, setMatchResults] = useState<any[]>([]);
+  const [busy,         setBusy]         = useState<Record<string, boolean>>({});
+  const [errors,       setErrors]       = useState<Record<string, string>>({});
+  const [updated,      setUpdated]      = useState<Record<string, string>>({});
 
   if (!user?.isAdmin) return (
     <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
-      🔒 גישה לאדמין בלבד
+      Admin only
     </div>
   );
 
@@ -121,12 +150,13 @@ export default function FifaPullTab() {
       const res = await fetch(`/api/admin/fifa-pull?type=${type}`, { headers: await adminAuthHeaders() });
       const json = await res.json();
       if (json.ok) {
-        if (type === "scorers")  setScorers(json.rows  || []);
-        if (type === "assists")  setAssists(json.rows  || []);
-        if (type === "fixtures") setFixtures(json.rows || []);
+        if (type === "scorers")      setScorers(json.rows      || []);
+        if (type === "assists")      setAssists(json.rows      || []);
+        if (type === "fixtures")     setFixtures(json.rows     || []);
+        if (type === "matchcentre")  setMatchResults(json.rows || []);
         if (json.updatedAt) setUpdated(u => ({ ...u, [type]: json.updatedAt }));
       } else {
-        setErrors(e => ({ ...e, [type]: json.error || "שגיאה" }));
+        setErrors(e => ({ ...e, [type]: json.error || "Error" }));
       }
     } catch (err: any) {
       setErrors(e => ({ ...e, [type]: err.message }));
@@ -138,28 +168,34 @@ export default function FifaPullTab() {
   return (
     <section style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px", display: "flex", flexDirection: "column", gap: 24 }}>
       <div>
-        <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🌐 FIFA נתונים — Crawler</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>FIFA Data - Crawler</h2>
         <p className="muted" style={{ fontSize: 13 }}>
-          הנתונים נמשכים מ-FIFA.com באמצעות Playwright. להרצה: <code>node crawl-fifa.mjs</code>
+          Data from FIFA.com via Playwright. Run: <code>node crawl-fifa.mjs</code>
         </p>
       </div>
 
-      <PullSection label="⚽ מלך השערים" hint="node crawl-fifa.mjs --only scorers"
+      <PullSection label="Top Scorers" hint="node crawl-fifa.mjs --only scorers"
         onPull={() => pull("scorers")} busy={!!busy.scorers}
         error={errors.scorers || ""} updatedAt={updated.scorers} hasData={scorers.length > 0}>
-        <ScorersView data={scorers} label="שערים" />
+        <ScorersView data={scorers} label="Goals" />
       </PullSection>
 
-      <PullSection label="🎯 מלך הבישולים" hint="node crawl-fifa.mjs --only assists"
+      <PullSection label="Top Assists" hint="node crawl-fifa.mjs --only assists"
         onPull={() => pull("assists")} busy={!!busy.assists}
         error={errors.assists || ""} updatedAt={updated.assists} hasData={assists.length > 0}>
-        <ScorersView data={assists} label="בישולים" />
+        <ScorersView data={assists} label="Assists" />
       </PullSection>
 
-      <PullSection label="📅 לוח משחקים" hint="node crawl-fifa.mjs --only fixtures"
+      <PullSection label="Fixtures" hint="node crawl-fifa.mjs --only fixtures"
         onPull={() => pull("fixtures")} busy={!!busy.fixtures}
         error={errors.fixtures || ""} updatedAt={updated.fixtures} hasData={fixtures.length > 0}>
         <FixturesView data={fixtures} />
+      </PullSection>
+
+      <PullSection label="Match Results" hint="node crawl-fifa.mjs --only matchcentre"
+        onPull={() => pull("matchcentre")} busy={!!busy.matchcentre}
+        error={errors.matchcentre || ""} updatedAt={updated.matchcentre} hasData={matchResults.length > 0}>
+        <MatchResultsView data={matchResults} />
       </PullSection>
     </section>
   );
