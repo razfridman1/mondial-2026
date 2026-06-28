@@ -24,7 +24,8 @@ const NAV: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: boolean
   { id: "standings",     label: "📊 טבלאות",        hideOnMobile: true },
   { id: "bracket",       label: "🏆 שלב הנוקאאוט" },
   /* Profile tab removed from nav — accessed via username click in header */
-  { id: "matchlist" | "fifapull",     label: "📋 רשימת משחקים",  adminOnly: true },
+  { id: "matchlist",     label: "📋 רשימת משחקים",  adminOnly: true },
+  { id: "fifapull",      label: "🌐 FIFA נתונים",    adminOnly: true },
   { id: "admin",         label: "👥 ניהול משתמשים", adminOnly: true },
   { id: "simulation",    label: "🎲 ניהול ניחושים", adminOnly: true },
   { id: "superadmin",    label: "🛡️ שליטה מלאה",    adminOnly: true },
