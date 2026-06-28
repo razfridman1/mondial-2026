@@ -222,8 +222,9 @@ export default function FriendsRanking() {
     const il = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }));
     const month = il.getMonth() + 1; // 1-based
     const day = il.getDate();
-    if (month === 6 && day === 28) return "⚽ ניתן למלא מלך השערים והבישולים — עד מחר!";
-    if (month === 6 && day === 29) return "⚡ יום אחרון למלא מלך שערים ובישולים!";
+    if (month === 6 && day === 28) return "⚽ ניתן למלא מלך השערים והבישולים — עוד יומיים!";
+    if (month === 6 && day === 29) return "⚽ ניתן למלא מלך השערים והבישולים — עד מחר!";
+    if (month === 6 && day === 30) return "⚡ יום אחרון למלא מלך שערים ובישולים!";
     return null;
   })();
 
@@ -267,7 +268,11 @@ export default function FriendsRanking() {
         </div>
       </div>
 
-      {leaderboardGroups.length === 0 ? (
+      {selectedLb === "__global__" ? (
+        <div style={{ marginTop: 12 }}>
+          <GlobalLeaderboardCard myUid={user.uid} />
+        </div>
+      ) : leaderboardGroups.length === 0 ? (
         <div className="empty-state" style={{ marginTop: 12 }}>
           עוד לא הצטרפת לקבוצה. צור קבוצה חדשה או הצטרף עם קוד הזמנה כדי לראות
           את לוח התוצאות ואת הניחושים של חברי הקבוצה שלך.
@@ -391,7 +396,7 @@ function GroupsSelect({
   const [coords, setCoords] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 260 });
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const current = groups.find(g => g.id === selectedId);
+  const current = selectedId === "__global__" ? { name: "כל משתמשי FC26" } : groups.find(g => g.id === selectedId);
 
   function reposition() {
     const r = btnRef.current?.getBoundingClientRect();
@@ -439,6 +444,18 @@ function GroupsSelect({
               עוד לא הצטרפת לקבוצה. צור קבוצה חדשה או הצטרף עם קוד הזמנה.
             </div>
           )}
+
+          <button
+            role="menuitemradio"
+            aria-checked={selectedId === "__global__"}
+            className={`groups-dd-item ${selectedId === "__global__" ? "on" : ""}`}
+            onClick={() => { onSelect("__global__"); setOpen(false); }}
+          >
+            <span className="groups-dd-item-name">🌍 כל משתמשי FC26</span>
+            {selectedId === "__global__" && <span className="groups-dd-check">✓</span>}
+          </button>
+
+          {groups.length > 0 && <div className="groups-dd-sep">הקבוצות שלי</div>}
 
           {groups.map(g => (
             <button
@@ -523,6 +540,49 @@ function JoinGroupBtn({ onJoined }: { onJoined: () => void }) {
     } finally { setBusy(false); }
   }
   return <button className="btn" onClick={join} disabled={busy}>🔑 הצטרף עם קוד</button>;
+}
+
+/* ===================================================================
+ * GlobalLeaderboardCard — leaderboard for ALL users across all groups
+ * =================================================================== */
+function GlobalLeaderboardCard({ myUid }: { myUid: string }) {
+  const [rows, setRows] = useState<LeaderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const fb = getFirebase();
+      const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
+      if (!tok) return;
+      const r = await fetch("/api/leaderboard/global", { headers: { authorization: `Bearer ${tok}` } });
+      if (r.ok) setRows(await r.json());
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div style={{
+      background: "var(--bg-card)",
+      border: "1px solid var(--border-soft)",
+      borderRadius: 12,
+      padding: 12,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <span style={{ fontWeight: 800, fontSize: 15 }}>🌍 כל משתמשי FC26</span>
+        {rows.length > 0 && (
+          <button
+            className="btn btn-small wa-btn"
+            onClick={() => openLeaderboardShareCard(rows, "כל משתמשי FC26")}
+          >💬 שתף טבלה</button>
+        )}
+      </div>
+      {loading && !rows.length
+        ? <div className="muted">…טוען</div>
+        : <Leaderboard rows={rows} myUid={myUid} predictionRows={[]} />
+      }
+    </div>
+  );
 }
 
 /* ===================================================================
@@ -877,7 +937,9 @@ function UserStatsModal({
             • 🤝 <strong>תיקו</strong> (1:1 — 2:2): <strong>3 נק׳</strong> (אין בונוס הפרש שערים בתיקו)<br/>
             • ❌ <strong>פספוס</strong> (3:1 — 1:2): <strong>0 נק׳</strong> (וסטריק נשבר)<br/>
             <br/>
-            <strong>שלב הנוקאאוט (אין תיקו — חובה לבחור מי תעלה):</strong><br/>
+            <strong>שלב הנוקאאוט — חובה לבחור מי תעלה:</strong><br/>
+            📌 ניחוש התוצאה הוא לסוף 90 הדקות. אם יש תיקו ב-90 דק׳ — המשחק נמשך להארכה (30 דק׳). אם עדיין תיקו — פנדלים מכריעים. הניחוש שלך הוא התוצאה ב-90 דק׳, והמנצח הוא מי שמעפיל בסוף.<br/>
+            <br/>
             • 🎯 <strong>מנצחת + תוצאת 90 דק׳ מדויקת</strong>: <strong>8 נק׳</strong><br/>
             • ✅ <strong>מנצחת + הפרש שערים נכון</strong>: <strong>5 נק׳</strong><br/>
             • ✅ <strong>מנצחת בלבד</strong>: <strong>3 נק׳</strong><br/>

@@ -287,7 +287,7 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks, topAssists }: {
   topAssists: import("@/app/api/scorers/route").ScorerEntry[];
 }) {
   const matchResults = useStore(s => s.matchResults);
-  const SCORER_DEADLINE = new Date("2026-06-29T23:59:59+03:00").getTime();
+  const SCORER_DEADLINE = new Date("2026-06-30T23:59:59+03:00").getTime();
   const locked = Date.now() > SCORER_DEADLINE && groupStageComplete(matchResults);
   const championLocked = stageComplete("R16", matchResults);
 

@@ -74,7 +74,7 @@ export default function PredictionForm({ match, onClose }: { match: Match; onClo
       else if (a > h) pickedWinner = match.away;
       else            pickedWinner = winner;
       if (!pickedWinner) {
-        setError("בנוקאאוט: 90 דק׳ הסתיימו בתיקו לפי הניחוש שלך — בחר מי תעלה לאחר הארכה/פנדלים.");
+        setError("בנוקאאוט: 90 דק׳ הסתיימו בתיקו לפי הניחוש שלך — בחר מי תעלה (הארכה 30 דק׳, ואם צריך פנדלים).");
         return;
       }
     }
@@ -177,7 +177,7 @@ export default function PredictionForm({ match, onClose }: { match: Match; onClo
           </div>
           {winnerRequired && (
             <div className="pred-msg is-locked" style={{ marginTop: 6, fontSize: 12 }}>
-              ⚠ ניחוש תיקו — חובה לבחור מי תעלה (הארכה/פנדלים)
+              ⚠ ניחוש תיקו ב-90 דק׳ — חובה לבחור מי תעלה (הארכה 30 דק׳, ואם צריך פנדלים)
             </div>
           )}
         </div>

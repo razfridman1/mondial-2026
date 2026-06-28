@@ -30,8 +30,8 @@ async function getLockState(db: FirebaseFirestore.Firestore): Promise<{
       ...(data.winner ? { winner: data.winner } : {}),
     };
   });
-  // Extended deadline: scorer/assist picks open until end of June 29, 2026 (Israel time)
-  const SCORER_DEADLINE = new Date("2026-06-29T23:59:59+03:00").getTime();
+  // Extended deadline: scorer/assist picks open until end of June 30, 2026 (Israel time)
+  const SCORER_DEADLINE = new Date("2026-06-30T23:59:59+03:00").getTime();
   const scorerDeadlinePassed = Date.now() > SCORER_DEADLINE;
   return {
     locked: scorerDeadlinePassed && groupStageComplete(results),

@@ -114,82 +114,53 @@ async function scrapePlayerStats(type) {
   return results;
 }
 
-// ── FIXTURES ──────────────────────────────────────────────────────────────────
-async function scrapeFixtures() {
-  console.log("📅 Scraping fixtures...");
-  await page.goto(URLS.fixtures, { waitUntil: "load", timeout: 60000 });
-  await page.waitForTimeout(5000);
-  await waitFor("[class*='MatchCard'], [class*='match-card'], [class*='fixture'], table", 15000);
-
-  const data = await page.evaluate(function() {
-    var matches = [];
-    var cards = document.querySelectorAll("[class*='MatchCard'], [class*='match-card'], [class*='fixture-card']");
-    cards.forEach(function(card) {
-      var teams  = Array.from(card.querySelectorAll("[class*='TeamName'], [class*='team-name']")).map(function(e) { return e.textContent.trim(); });
-      var score  = card.querySelector("[class*='Score'], [class*='score']");
-      var date   = card.querySelector("[class*='Date'], [class*='date'], time");
-      var status = card.querySelector("[class*='Status'], [class*='status']");
-      matches.push({ home: teams[0], away: teams[1], score: score ? score.textContent.trim() : null, date: date ? date.textContent.trim() : null, status: status ? status.textContent.trim() : null });
-    });
-    return { matches: matches };
-  });
-
-  console.log("  fixtures: " + (data.matches ? data.matches.length : 0) + " matches");
-  return data;
-}
-
-// ── MATCH CENTRE (WC scores-fixtures page) ───────────────────────────────────
-async function scrapeMatchCentre() {
-  console.log("🏟️  Scraping WC match results...");
+// ── SHARED: extract all matches from scores-fixtures page ─────────────────────
+async function extractAllMatches() {
   const url = BASE + "/scores-fixtures";
   await page.goto(url, { waitUntil: "load", timeout: 60000 });
   await page.waitForTimeout(6000);
-
-  // Dismiss cookie/consent overlay
   await page.evaluate(function() {
     var sdk = document.getElementById("onetrust-consent-sdk");
     if (sdk) sdk.remove();
-    var filter = document.querySelector(".onetrust-pc-dark-filter");
-    if (filter) filter.remove();
+    var f = document.querySelector(".onetrust-pc-dark-filter");
+    if (f) f.remove();
   });
+  await waitFor("[class*=match-row_score]", 15000);
 
-  // Wait for score elements
-  await waitFor("[class*=match-row_score], [class*=MatchScore], [class*=match-score]", 15000);
-
-  const matches = await page.evaluate(function() {
-    // Helper: clean text
+  return await page.evaluate(function() {
     function txt(el) { return el ? el.textContent.trim().replace(/\s+/g, " ") : ""; }
 
-    // Find the ancestor of an element at a given depth
-    function ancestor(el, depth) {
-      var cur = el;
-      for (var i = 0; i < depth && cur; i++) cur = cur.parentElement;
-      return cur;
+    // ── Date header extraction ───────────────────────────────────────────────
+    var MONTHS = { january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12 };
+    function parseDate(text) {
+      var m = (text||"").toLowerCase().match(/(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)(?:\s+(\d{4}))?/);
+      if (!m) return null;
+      var mo = MONTHS[m[2]], yr = m[3] ? parseInt(m[3]) : 2026;
+      return yr + "-" + String(mo).padStart(2,"0") + "-" + String(parseInt(m[1])).padStart(2,"0");
     }
 
-    // Find all score spans (discovered class: match-row_score__*)
+    // Collect all leaf elements whose text parses as a date
+    var dateNodes = [];
+    Array.from(document.querySelectorAll("*")).forEach(function(el) {
+      if (el.children.length > 0) return; // leaf only
+      var t = txt(el);
+      if (t.length < 5 || t.length > 60) return;
+      var d = parseDate(t);
+      if (d) dateNodes.push({ date: d, node: el });
+    });
+
+    // ── Score container grouping (same as before) ──────────────────────────
     var scoreSpans = Array.from(document.querySelectorAll("[class*=match-row_score]"));
-    if (!scoreSpans.length) {
-      // Fallback: try any score-looking elements near team names
-      scoreSpans = Array.from(document.querySelectorAll("[class*=score__]")).filter(function(el) {
-        return /^\d+$/.test(el.textContent.trim());
-      });
-    }
+    if (!scoreSpans.length) return { matches: [], debug: "no score spans" };
 
-    if (!scoreSpans.length) return { matches: [], debug: "no score spans found" };
-
-    // Group score spans by their grandparent (the score container holds home+away)
-    // Walk up until we find a container that has exactly 2 score children
     var containers = new Map();
     scoreSpans.forEach(function(span) {
       var cur = span;
       for (var i = 0; i < 5 && cur; i++) {
         cur = cur.parentElement;
         if (!cur) break;
-        var scores = cur.querySelectorAll ? Array.from(cur.querySelectorAll("[class*=match-row_score]")) : [];
-        if (scores.length === 2) {
-          var key = cur;
-          if (!containers.has(key)) containers.set(key, cur);
+        if (Array.from(cur.querySelectorAll("[class*=match-row_score]")).length === 2) {
+          if (!containers.has(cur)) containers.set(cur, cur);
           break;
         }
       }
@@ -198,37 +169,26 @@ async function scrapeMatchCentre() {
     var results = [];
 
     containers.forEach(function(scoreBox) {
-      // scoreBox has exactly 2 score spans
       var scores = Array.from(scoreBox.querySelectorAll("[class*=match-row_score]"));
       var homeScore = txt(scores[0]);
       var awayScore = txt(scores[1]);
 
-      // Walk up from scoreBox to find the full match row (contains team names)
       var matchContainer = scoreBox;
-      var home = "", away = "", matchDate = "", status = "";
+      var home = "", away = "", status = "";
 
       for (var depth = 1; depth <= 8; depth++) {
         matchContainer = matchContainer.parentElement;
         if (!matchContainer) break;
-
-        // Try to find team names — look for elements with "team" in class or with country/name-like text
         var teamEls = Array.from(matchContainer.querySelectorAll("[class*=team], [class*=Team], [class*=club], [class*=Club]"));
         var nameEls = teamEls.filter(function(el) {
-          // Must be a leaf-ish element with 2-40 chars of text (team abbreviation or full name)
           var t = txt(el);
           return t.length >= 2 && t.length <= 40 && !el.querySelector("[class*=team]");
         });
-
         if (nameEls.length >= 2) {
           home = txt(nameEls[0]);
           away = txt(nameEls[nameEls.length - 1]);
-          // Date/time
-          var dateEl = matchContainer.querySelector("time, [class*=date], [class*=Date], [class*=time], [class*=Time]");
-          if (dateEl) matchDate = txt(dateEl);
-          // Status (FT, Live, etc.) — strip digits to avoid picking up score text
           var statusEl = matchContainer.querySelector("[class*=status], [class*=Status], [class*=result], [class*=Result]");
           if (statusEl) {
-            // Clone and remove score spans so we only get the status text
             var clone = statusEl.cloneNode(true);
             Array.from(clone.querySelectorAll("[class*=score], [class*=Score]")).forEach(function(n) { n.remove(); });
             status = clone.textContent.trim().replace(/\s+/g, " ");
@@ -237,50 +197,63 @@ async function scrapeMatchCentre() {
         }
       }
 
-      // Fallback: if no team class found, extract meaningful text nodes from matchContainer siblings
+      // Fallback
       if (!home && matchContainer) {
-        // Get all text from siblings of scoreBox that aren't the scoreBox itself
-        var allText = Array.from(matchContainer.children || [])
+        var texts = Array.from(matchContainer.children || [])
           .filter(function(ch) { return ch !== scoreBox && ch.querySelectorAll("[class*=match-row_score]").length === 0; })
           .map(function(ch) { return txt(ch); })
           .filter(function(t) { return t.length >= 2 && t.length <= 50; });
-        if (allText.length >= 2) {
-          home = allText[0];
-          away = allText[allText.length - 1];
-        }
+        if (texts.length >= 2) { home = texts[0]; away = texts[texts.length - 1]; }
+      }
+
+      // ── Find nearest preceding date header using compareDocumentPosition ──
+      var matchDate = "";
+      // Iterate dateNodes in reverse; first one where scoreBox comes AFTER it = nearest
+      for (var i = dateNodes.length - 1; i >= 0; i--) {
+        // DOCUMENT_POSITION_FOLLOWING (4): scoreBox follows dateNodes[i].node
+        var pos = dateNodes[i].node.compareDocumentPosition(scoreBox);
+        if (pos & 4) { matchDate = dateNodes[i].date; break; }
       }
 
       if (home || homeScore) {
-        results.push({
-          home: home || "?",
-          away: away || "?",
-          homeScore: homeScore,
-          awayScore: awayScore,
-          date: matchDate,
-          status: status,
-        });
+        results.push({ home: home || "?", away: away || "?", homeScore, awayScore,
+                       date: status, status, matchDate });
       }
     });
 
-    // Deduplicate (same home+away)
     var seen = new Set();
-    results = results.filter(function(m) {
-      var key = m.home + "|" + m.away;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
+    var deduped = results.filter(function(m) {
+      var k = m.home + "|" + m.away;
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
     });
 
-    return { matches: results, scoreSpanCount: scoreSpans.length, containerCount: containers.size };
+    return { matches: deduped, dateNodeCount: dateNodes.length, containerCount: containers.size };
   });
+}
 
-  console.log("  matchcentre: " + (matches.matches ? matches.matches.length : 0) + " matches, scoreSpans=" + matches.scoreSpanCount + ", containers=" + matches.containerCount);
-  if (matches.matches && matches.matches.length > 0) {
-    console.log("  Sample:", JSON.stringify(matches.matches.slice(0, 3), null, 2));
-  } else {
-    console.log("  debug:", matches.debug || "no matches extracted");
-  }
-  return matches;
+// ── FIXTURES ──────────────────────────────────────────────────────────────────
+async function scrapeFixtures() {
+  console.log("📅 Scraping fixtures...");
+  const data = await extractAllMatches();
+  // Fixtures = upcoming matches (not FT, not started)
+  const upcoming = (data.matches || []).filter(function(m) {
+    return !m.status || (m.status !== "FT" && !m.status.match(/^\d+'/));
+  });
+  console.log("  fixtures: " + upcoming.length + " upcoming (of " + (data.matches||[]).length + " total)");
+  return { matches: upcoming };
+}
+
+// ── MATCH CENTRE (WC scores-fixtures page) ───────────────────────────────────
+async function scrapeMatchCentre() {
+  console.log("🏟️  Scraping WC match results...");
+  const data = await extractAllMatches();
+  const results = (data.matches || []).filter(function(m) {
+    return m.status === "FT" || (m.homeScore !== "" && m.awayScore !== "" && m.homeScore !== undefined && m.awayScore !== undefined);
+  });
+  console.log("  matchcentre: " + results.length + " completed matches (of " + (data.matches||[]).length + " total, dateNodes=" + data.dateNodeCount + ")");
+  if (results.length > 0) console.log("  Sample:", JSON.stringify(results.slice(0, 3), null, 2));
+  return { matches: results };
 }
 
 // ── Push to Firestore ─────────────────────────────────────────────────────────

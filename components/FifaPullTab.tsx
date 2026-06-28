@@ -126,7 +126,7 @@ function MatchResultsView({ data }: { data: any[] }) {
               <FlagImg code={m.away} /> {teamName(m.away)}
             </td>
             <td style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 11, textAlign: "center" }}>
-              {m.scrapedAt ? formatDate(m.scrapedAt) : ""}
+              {m.matchDate ? formatDate(m.matchDate) : ""}
             </td>
             <td style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 11, textAlign: "center" }}>
               {m.date || m.status || ""}
