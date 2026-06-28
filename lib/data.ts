@@ -271,9 +271,9 @@ const KNOCKOUT_FIXTURES: KnockoutFixture[] = [
   { stage: "R32", utc: "2026-07-01T20:00:00Z", home: "BEL", away: "SEN", venue: "SEA" },
   { stage: "R32", utc: "2026-07-02T00:00:00Z", home: "USA", away: "BIH", venue: "SFO" },
 
-  { stage: "R32", utc: "2026-07-02T19:00:00Z", home: "POR", away: "CRO", venue: "LAX" },
-  { stage: "R32", utc: "2026-07-02T23:00:00Z", home: "ESP", away: "AUT", venue: "TOR" },
-  { stage: "R32", utc: "2026-07-03T03:00:00Z", home: "SUI", away: "IRN", venue: "VAN" },
+  { stage: "R32", utc: "2026-07-02T19:00:00Z", home: "ESP", away: "AUT", venue: "TOR" },
+  { stage: "R32", utc: "2026-07-02T23:00:00Z", home: "POR", away: "CRO", venue: "LAX" },
+  { stage: "R32", utc: "2026-07-03T03:00:00Z", home: "SUI", away: "ALG", venue: "VAN" },
   { stage: "R32", utc: "2026-07-03T18:00:00Z", home: "AUS", away: "EGY", venue: "DAL" },
   { stage: "R32", utc: "2026-07-03T22:00:00Z", home: "ARG", away: "CPV", venue: "MIA" },
   { stage: "R32", utc: "2026-07-04T01:30:00Z", home: "COL", away: "GHA", venue: "KAN" },
@@ -286,7 +286,7 @@ const KNOCKOUT_FIXTURES: KnockoutFixture[] = [
    *   R32-4=M076 NED/MAR  R32-5=M077 CIV/NOR  R32-6=M078 FRA/SWE
    *   R32-7=M079 MEX/TBD  R32-8=M080 ENG/TBD  R32-9=M081 BEL/TBD
    *   R32-10=M082 USA/BIH R32-11=M083 H1/J2   R32-12=M084 K2/L2
-   *   R32-13=M085 SUI/TBD R32-14=M086 AUS/EGY R32-15=M087 ARG/CPV
+   *   R32-13=M085 SUI/ALG R32-14=M086 AUS/EGY R32-15=M087 ARG/CPV
    *   R32-16=M088 K1/TBD
    *
    * Bracket halves (feeds QF via "W R16-N"):
