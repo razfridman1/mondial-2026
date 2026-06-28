@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuth } from "firebase-admin/auth";
-import { initAdminApp } from "@/lib/firebaseAdmin";
-
-initAdminApp();
+import { verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 
 async function verifyAdmin(req: NextRequest) {
-  const auth = req.headers.get("authorization")?.split(" ")[1];
-  if (!auth) return false;
+  const token = req.headers.get("authorization")?.split(" ")[1];
+  if (!token) return false;
   try {
-    const decoded = await getAuth().verifyIdToken(auth);
-    const adminEmails = (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim());
-    return adminEmails.includes(decoded.email || "");
+    const decoded = await verifyIdToken(token);
+    return isAdminEmail(decoded.email);
   } catch { return false; }
 }
 
