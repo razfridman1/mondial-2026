@@ -46,6 +46,7 @@ interface DeletedGroupRow {
 }
 interface ResultRow {
   id: string; matchId: string; home: number; away: number; sim?: boolean;
+  winner?: string; isKnockout?: boolean;
 }
 
 async function adminAuthHeaders() {
@@ -146,10 +147,10 @@ function ResultsAdmin() {
   }
   useEffect(() => { load(); }, []);
 
-  async function saveResult(matchId: string, home: number, away: number) {
+  async function saveResult(matchId: string, home: number, away: number, winner?: string) {
     await fetch("/api/admin/results", {
       method: "POST", headers: await adminAuthHeaders(),
-      body: JSON.stringify({ matchId, home, away }),
+      body: JSON.stringify({ matchId, home, away, ...(winner ? { winner } : {}) }),
     });
     load();
   }
@@ -195,10 +196,16 @@ function ResultsAdmin() {
 function ResultRowEditor({ match, result, onSave, onDelete, onRestored }: any) {
   const [home, setHome] = useState(result?.home ?? "");
   const [away, setAway] = useState(result?.away ?? "");
+  const [winner, setWinner] = useState(result?.winner ?? "");
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<any[] | null>(null);
   const [historyBusy, setHistoryBusy] = useState(false);
-  useEffect(() => { setHome(result?.home ?? ""); setAway(result?.away ?? ""); }, [result?.home, result?.away]);
+  const isKO = match.stage !== "GROUP";
+  useEffect(() => {
+    setHome(result?.home ?? "");
+    setAway(result?.away ?? "");
+    setWinner(result?.winner ?? "");
+  }, [result?.home, result?.away, result?.winner]);
   const homeTeam = TEAMS[match.home];
   const awayTeam = TEAMS[match.away];
 
@@ -231,22 +238,49 @@ function ResultRowEditor({ match, result, onSave, onDelete, onRestored }: any) {
 
   return (
     <>
+      {/* === ROW 1: Match result (90-min score) === */}
       <tr>
-        <td><small className="muted">{match.id}</small><br />
-            {homeTeam?.flag} {homeTeam?.name || match.home} <span className="muted">נגד</span> {awayTeam?.name || match.away} {awayTeam?.flag}</td>
-        <td className="muted" style={{ fontSize: 11 }}>{formatIsraelDate(match.utc, { short: true })}<br />{formatIsraelTime(match.utc)}</td>
+        <td rowSpan={isKO ? 2 : 1}>
+          <small className="muted">{match.id}</small><br />
+          {homeTeam?.flag} {homeTeam?.name || match.home} <span className="muted">נגד</span> {awayTeam?.name || match.away} {awayTeam?.flag}
+        </td>
+        <td rowSpan={isKO ? 2 : 1} className="muted" style={{ fontSize: 11 }}>
+          {formatIsraelDate(match.utc, { short: true })}<br />{formatIsraelTime(match.utc)}
+        </td>
         <td><input type="number" min={0} max={30} value={home} onChange={e => setHome(e.target.value)} style={{ width: 60 }} /></td>
         <td>:</td>
         <td><input type="number" min={0} max={30} value={away} onChange={e => setAway(e.target.value)} style={{ width: 60 }} /></td>
         <td>
-          <button className="btn btn-small btn-primary"
-                  disabled={home === "" || away === ""}
-                  onClick={() => onSave(match.id, Number(home), Number(away))}>שמור</button>
-          {result && <button className="btn btn-small" onClick={() => onDelete(match.id)} style={{ marginInlineStart: 4, color: "var(--red)" }}>מחק</button>}
-          {result?.sim && <span className="chip" style={{ marginInlineStart: 4 }}>סים</span>}
-          <button className="btn btn-small" onClick={toggleHistory} style={{ marginInlineStart: 4 }} title="גיבויים קודמים">🕘</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+            {isKO && <span className="chip" style={{ fontSize: 10, background: "var(--bg-elev)" }}>תוצאת משחק</span>}
+            <button className="btn btn-small btn-primary"
+                    disabled={home === "" || away === ""}
+                    onClick={() => onSave(match.id, Number(home), Number(away))}>שמור תוצאה</button>
+            {result && <button className="btn btn-small" onClick={() => onDelete(match.id)} style={{ color: "var(--red)" }}>מחק</button>}
+            {result?.sim && <span className="chip">סים</span>}
+            <button className="btn btn-small" onClick={toggleHistory} title="גיבויים קודמים">🕘</button>
+          </div>
         </td>
       </tr>
+      {/* === ROW 2 (KO only): Winner === */}
+      {isKO && (
+        <tr style={{ background: "color-mix(in srgb, var(--accent) 6%, transparent)" }}>
+          <td colSpan={3} style={{ paddingTop: 6, paddingBottom: 6 }}>
+            <span className="chip" style={{ fontSize: 10, background: "var(--accent)", color: "#fff", marginInlineEnd: 6 }}>מנצחת</span>
+            <select value={winner} onChange={e => setWinner(e.target.value)}
+                    style={{ fontSize: 12, padding: "2px 6px", background: "var(--bg-elev)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 4 }}>
+              <option value="">— בחר מנצחת —</option>
+              <option value={match.home}>{homeTeam?.flag} {homeTeam?.name || match.home}</option>
+              <option value={match.away}>{awayTeam?.flag} {awayTeam?.name || match.away}</option>
+            </select>
+          </td>
+          <td style={{ paddingTop: 6, paddingBottom: 6 }}>
+            <button className="btn btn-small btn-primary"
+                    disabled={!winner || home === "" || away === ""}
+                    onClick={() => onSave(match.id, Number(home), Number(away), winner)}>שמור מנצחת</button>
+          </td>
+        </tr>
+      )}
       {showHistory && (
         <tr>
           <td colSpan={6} style={{ background: "var(--bg-elev)" }}>
@@ -496,14 +530,16 @@ function PredictionsAdmin() {
       const e = t[p.uid] || { count: 0, points: 0, exact: 0 };
       e.count++;
       if (r) {
-        const exact = p.homeScore === r.home && p.awayScore === r.away;
-        const sgnP = Math.sign(p.homeScore - p.awayScore);
-        const sgnR = Math.sign(r.home - r.away);
-        const resOk = sgnP === sgnR;
-        const diffOk = (p.homeScore - p.awayScore) === (r.home - r.away);
-        const pts = exact ? 7 : resOk ? (diffOk ? 4 : 3) : 0;
-        e.points += pts;
-        if (exact) e.exact++;
+        const m = MATCHES.find(x => x.id === p.matchId);
+        const sc = scorePrediction({
+          predictedHome: p.homeScore, predictedAway: p.awayScore,
+          actualHome: r.home, actualAway: r.away,
+          predictedWinner: p.predictedWinner ?? null,
+          actualWinner: r.winner ?? null,
+          isKnockout: r.isKnockout ?? (m ? m.stage !== "GROUP" : false),
+        });
+        e.points += sc.points;
+        if (sc.exact) e.exact++;
       }
       t[p.uid] = e;
     }
@@ -640,14 +676,15 @@ function PredictionRowEditor({ pred, profile, result, onPatch, onDelete, onUserC
   let points = "—";
   let pointsColor = "";
   if (result) {
-    const exact = pred.homeScore === result.home && pred.awayScore === result.away;
-    const sgnP = Math.sign(pred.homeScore - pred.awayScore);
-    const sgnR = Math.sign(result.home - result.away);
-    const resOk = sgnP === sgnR;
-    const diffOk = (pred.homeScore - pred.awayScore) === (result.home - result.away);
-    const pts = exact ? 7 : resOk ? (diffOk ? 4 : 3) : 0;
-    points = String(pts);
-    pointsColor = pts >= 7 ? "#22c55e" : pts > 0 ? "var(--accent)" : "var(--red)";
+    const sc = scorePrediction({
+      predictedHome: pred.homeScore, predictedAway: pred.awayScore,
+      actualHome: result.home, actualAway: result.away,
+      predictedWinner: pred.predictedWinner ?? null,
+      actualWinner: result.winner ?? null,
+      isKnockout: result.isKnockout ?? (match ? match.stage !== "GROUP" : false),
+    });
+    points = String(sc.points);
+    pointsColor = sc.points >= 8 ? "#22c55e" : sc.points >= 7 ? "#22c55e" : sc.points > 0 ? "var(--accent)" : "var(--red)";
   }
 
   return (

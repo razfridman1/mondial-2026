@@ -23,19 +23,30 @@ export async function GET(req: Request) {
   return NextResponse.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
 }
 
-/* POST /api/admin/results { matchId, home, away } — upsert */
+/* POST /api/admin/results { matchId, home, away, winner? } — upsert
+ * winner: team code of the advancing team (knockout only, e.g. "FRA").
+ * Set when 90-min score is a draw and the match goes to ET/penalties.
+ * isKnockout is auto-derived from the match stage. */
 export async function POST(req: Request) {
   let decoded;
   try { decoded = await authedAdmin(req); }
   catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.status || 401 }); }
   const body = await req.json();
   if (!body.matchId) return NextResponse.json({ error: "missing matchId" }, { status: 400 });
-  if (!MATCHES.find(m => m.id === body.matchId)) return NextResponse.json({ error: "match not found" }, { status: 404 });
+  const match = MATCHES.find(m => m.id === body.matchId);
+  if (!match) return NextResponse.json({ error: "match not found" }, { status: 404 });
   const home = Number(body.home);
   const away = Number(body.away);
   if (!Number.isFinite(home) || !Number.isFinite(away) || home < 0 || away < 0 || home > 30 || away > 30) {
     return NextResponse.json({ error: "invalid scores" }, { status: 400 });
   }
+  const isKnockout = match.stage !== "GROUP";
+  /* winner: explicit team code (e.g. "FRA") — required for draws in KO;
+   * auto-derived from score when one team leads. */
+  const winner = isKnockout
+    ? (body.winner || (home > away ? match.home : away > home ? match.away : null))
+    : null;
+
   const { db } = getAdmin();
   const ref = db.collection("match_results").doc(body.matchId);
 
@@ -53,13 +64,19 @@ export async function POST(req: Request) {
     });
   }
 
-  await ref.set({
+  const docData: Record<string, any> = {
     matchId: body.matchId, home, away,
     finishedAt: body.finishedAt || Date.now(),
     sim: false,
     source: "admin",
     setByAdmin: true,
-  }, { merge: true });
+  };
+  if (isKnockout) {
+    docData.isKnockout = true;
+    if (winner) docData.winner = winner;
+  }
+
+  await ref.set(docData, { merge: true });
   return NextResponse.json({ ok: true });
 }
 
