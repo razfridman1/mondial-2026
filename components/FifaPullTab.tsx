@@ -10,7 +10,6 @@ async function adminAuthHeaders() {
 
 type PullType = "scorers" | "assists" | "fixtures" | "matchcentre";
 
-// FIFA 3-letter code -> ISO 2-letter for flagcdn.com
 const ISO: Record<string, string> = {
   AFG:"af",ALG:"dz",AND:"ad",ARG:"ar",ARM:"am",AUS:"au",AUT:"at",AZE:"az",
   BEL:"be",BEN:"bj",BFA:"bf",BHR:"bh",BIH:"ba",BLR:"by",BOL:"bo",BOT:"bw",BRA:"br",BUL:"bg",
@@ -33,19 +32,18 @@ const ISO: Record<string, string> = {
   WAL:"gb-wls",YEM:"ye",ZAM:"zm",ZIM:"zw",SVK:"sk",MKD:"mk",
 };
 
-// Hebrew team names
 const HEB: Record<string, string> = {
   ARG:"ארגנטינה",AUS:"אוסטרליה",BEL:"בלגיה",BIH:"בוסניה",BRA:"ברזיל",
-  CAN:"קנדה",CHI:"צ\u0027ילה",CMR:"קמרון",COL:"קולומביה",CRC:"קוסטה ריקה",
-  CRO:"קרואטיה",CZE:"צ\u0027כיה",DEN:"דנמרק",ECU:"אקוודור",EGY:"מצרים",
+  CAN:"קנדה",CHI:"צ'ילה",CMR:"קמרון",COL:"קולומביה",CRC:"קוסטה ריקה",
+  CRO:"קרואטיה",CZE:"צ'כיה",DEN:"דנמרק",ECU:"אקוודור",EGY:"מצרים",
   ENG:"אנגליה",ESP:"ספרד",FRA:"צרפת",GER:"גרמניה",GHA:"גאנה",
   HON:"הונדורס",HUN:"הונגריה",IRN:"איראן",ITA:"איטליה",JPN:"יפן",
   KOR:"קוריאה ד",KSA:"סעודיה",MAR:"מרוקו",MEX:"מקסיקו",NED:"הולנד",
   NGA:"ניגריה",NOR:"נורווגיה",NZL:"ניו זילנד",PAR:"פרגוואי",PER:"פרו",
-  POL:"פולין",POR:"פורטוגל",QAT:"קטר",RSA:"דר\u0022א",SCO:"סקוטלנד",
+  POL:"פולין",POR:"פורטוגל",QAT:"קטר",RSA:"דר''א",SCO:"סקוטלנד",
   SEN:"סנגל",SRB:"סרביה",SUI:"שווייץ",SVK:"סלובקיה",SWE:"שוודיה",
   TUN:"תוניסיה",TUR:"טורקיה",UKR:"אוקראינה",URU:"אורוגוואי",
-  USA:"ארה\u0022ב",WAL:"וויילס",CIV:"חוף השנהב",ALG:"אלג\u0027יריה",
+  USA:"ארה''ב",WAL:"וויילס",CIV:"חוף השנהב",ALG:"אלג'יריה",
   BOL:"בוליביה",GUA:"גואטמלה",PAN:"פנמה",SLO:"סלובניה",HAI:"האיטי",
   TRI:"טרינידד",CUW:"קוראסאו",MLI:"מאלי",JOR:"ירדן",
 };
@@ -181,25 +179,25 @@ function PullSection({ label, hint, children, onPull, busy, error, updatedAt, ha
         <strong style={{ fontSize: 20, fontWeight: 800 }}>{label}</strong>
         <button className="btn btn-primary" onClick={onPull} disabled={busy}
                 style={{ fontSize: 15, padding: "8px 20px" }}>
-          {busy ? "\u23F3 \u05D8\u05D5\u05E2\u05DF..." : "\u2193 \u05DE\u05E9\u05D5\u05DA"}
+          {busy ? "⏳ טוען..." : "↓ משוך"}
         </button>
         {updatedAt && (
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            \u05E2\u05D5\u05D3\u05DB\u05DF: {new Date(updatedAt).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })}
+            עודכן: {new Date(updatedAt).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })}
           </span>
         )}
       </div>
       <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 12px" }}>
-        \u05DC\u05E8\u05E2\u05E0\u05D5\u05DF: <code>{hint}</code>
+        לרענון: <code>{hint}</code>
       </p>
       {error && (
         <div style={{ fontSize: 14, color: "var(--red)", background: "rgba(239,68,68,0.1)",
                       borderRadius: 8, padding: "10px 16px", marginBottom: 10 }}>
-          \u26A0\uFE0F {error}
+          ⚠️ {error}
         </div>
       )}
       {!hasData && !busy && !error && (
-        <p className="muted" style={{ fontSize: 14, margin: 0 }}>\u05DC\u05D7\u05E5 "\u05DE\u05E9\u05D5\u05DA" \u05DC\u05D8\u05E2\u05D9\u05E0\u05EA \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD.</p>
+        <p className="muted" style={{ fontSize: 14, margin: 0 }}>לחץ "משוך" לטעינת נתונים.</p>
       )}
       {hasData && <div>{children}</div>}
     </div>
@@ -225,7 +223,7 @@ export default function FifaPullTab() {
 
   if (!user?.isAdmin) return (
     <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
-      \uD83D\uDD12 \u05D2\u05D9\u05E9\u05D4 \u05DC\u05D0\u05D3\u05DE\u05D9\u05DF \u05D1\u05DC\u05D1\u05D3
+      🔒 גישה לאדמין בלבד
     </div>
   );
 
@@ -242,7 +240,7 @@ export default function FifaPullTab() {
         if (type === "matchcentre")  setMatchResults(json.rows || []);
         if (json.updatedAt) setUpdated(u => ({ ...u, [type]: json.updatedAt }));
       } else if (!silent) {
-        setErrors(e => ({ ...e, [type]: json.error || "\u05E9\u05D2\u05D9\u05D0\u05D4" }));
+        setErrors(e => ({ ...e, [type]: json.error || "שגיאה" }));
       }
     } catch (err: any) {
       if (!silent) setErrors(e => ({ ...e, [type]: err.message }));
@@ -254,31 +252,31 @@ export default function FifaPullTab() {
   return (
     <section style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px", display: "flex", flexDirection: "column", gap: 24 }}>
       <div>
-        <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>\uD83C\uDF10 \u05E0\u05EA\u05D5\u05E0\u05D9 FIFA \u2014 Crawler</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🌐 נתוני FIFA — Crawler</h2>
         <p className="muted" style={{ fontSize: 13 }}>
-          \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05DE-FIFA.com \u05D3\u05E8\u05DA Playwright. \u05D4\u05E8\u05E6\u05D4: <code>node crawl-fifa.mjs</code>
+          נתונים מ-FIFA.com דרך Playwright. הרצה: <code>node crawl-fifa.mjs</code>
         </p>
       </div>
 
-      <PullSection label="\u26BD \u05DE\u05DC\u05DA \u05D4\u05E9\u05E2\u05E8\u05D9\u05DD" hint="node crawl-fifa.mjs --only scorers"
+      <PullSection label="⚽ מלך השערים" hint="node crawl-fifa.mjs --only scorers"
         onPull={() => pull("scorers")} busy={!!busy.scorers}
         error={errors.scorers || ""} updatedAt={updated.scorers} hasData={scorers.length > 0}>
-        <ScorersView data={scorers} label="\u05E9\u05E2\u05E8\u05D9\u05DD" />
+        <ScorersView data={scorers} label="שערים" />
       </PullSection>
 
-      <PullSection label="\uD83C\uDFAF \u05DE\u05DC\u05DA \u05D4\u05D1\u05D9\u05E9\u05D5\u05DC\u05D9\u05DD" hint="node crawl-fifa.mjs --only assists"
+      <PullSection label="🎯 מלך הבישולים" hint="node crawl-fifa.mjs --only assists"
         onPull={() => pull("assists")} busy={!!busy.assists}
         error={errors.assists || ""} updatedAt={updated.assists} hasData={assists.length > 0}>
-        <ScorersView data={assists} label="\u05D1\u05D9\u05E9\u05D5\u05DC\u05D9\u05DD" />
+        <ScorersView data={assists} label="בישולים" />
       </PullSection>
 
-      <PullSection label="\uD83D\uDCC5 \u05DC\u05D5\u05D7 \u05DE\u05E9\u05D7\u05E7\u05D9\u05DD" hint="node crawl-fifa.mjs --only fixtures"
+      <PullSection label="📅 לוח משחקים" hint="node crawl-fifa.mjs --only fixtures"
         onPull={() => pull("fixtures")} busy={!!busy.fixtures}
         error={errors.fixtures || ""} updatedAt={updated.fixtures} hasData={fixtures.length > 0}>
         <FixturesView data={fixtures} />
       </PullSection>
 
-      <PullSection label="\uD83C\uDFDF\uFE0F \u05EA\u05D5\u05E6\u05D0\u05D5\u05EA \u05DE\u05E9\u05D7\u05E7\u05D9\u05DD" hint="node crawl-fifa.mjs --only matchcentre"
+      <PullSection label="🏟️ תוצאות משחקים" hint="node crawl-fifa.mjs --only matchcentre"
         onPull={() => pull("matchcentre")} busy={!!busy.matchcentre}
         error={errors.matchcentre || ""} updatedAt={updated.matchcentre} hasData={matchResults.length > 0}>
         <MatchResultsView data={matchResults} />
