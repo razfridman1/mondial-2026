@@ -369,7 +369,7 @@ export default function Bracket(){
             left:finX,top:LABEL_H+FINY+CH/2+50,
             width:CW,textAlign:"center" as const,
             fontSize:9,fontWeight:700,textTransform:"uppercase" as const,
-            letterSpacing:"0.05em",color:"#3d4f70",fontWeight:700,
+            letterSpacing:"0.05em",color:"#3d4f70",
           }}>מקום שלישי</div>
           {mc(THIRD_ID,finX,FINY+CH+80)}
         </div>
