@@ -43,7 +43,7 @@ function FlagImg({ code }: { code: string }) {
       width={22} height={16}
       alt={code}
       style={{ flexShrink: 0, borderRadius: 2, objectFit: "cover",
-               border: "1px solid rgba(255,255,255,0.15)" }}
+               border: "1px solid rgba(255,255,255,0.2)" }}
     />
   );
 }
@@ -140,6 +140,24 @@ function getDateStr(id:string){
   catch{return"";}
 }
 
+/* Primary kit colours per team code — used for the left-border strip */
+const KIT: Record<string,string> = {
+  GER:"#000000",FRA:"#002395",BRA:"#009c3b",ARG:"#74acdf",
+  ENG:"#cf081f",ESP:"#aa151b",POR:"#006600",NED:"#ff6600",
+  BEL:"#ef2b2d",USA:"#002868",MEX:"#006847",COL:"#fcd116",
+  CRO:"#ff0000",SUI:"#ff0000",AUT:"#ed2939",JPN:"#bc002d",
+  AUS:"#00843d",IRN:"#239f40",MAR:"#c1272d",SEN:"#00853f",
+  GHA:"#006b3f",CIV:"#f77f00",EGY:"#ce1126",NOR:"#ef2b2d",
+  SWE:"#006aa7",RSA:"#007a4d",CAN:"#ff0000",ECU:"#ffd100",
+  PAR:"#d52b1e",COD:"#007fff",BIH:"#002395",CPV:"#003893",
+  SRB:"#c6363c",CMR:"#007a5e",URU:"#5eb6e4",KOR:"#cd2e3a",
+  CHN:"#de2910",SAU:"#006c35",MOR:"#c1272d",ALG:"#006233",
+  TUN:"#e70013",NGR:"#008751",CIV:"#f77f00",HAI:"#00209f",
+  CUW:"#002b7f",SVN:"#003da5",SVK:"#0b4ea2",CZE:"#d7141a",
+  HUN:"#477050",ROU:"#002b7f",UKR:"#005bbb",TUR:"#e30a17",
+  GRE:"#0d5eaf",SCO:"#003380",WAL:"#00a650",NIR:"#cf081f",
+};
+
 /* ================================================================
  * Team row
  * ================================================================ */
@@ -147,31 +165,36 @@ function TeamRow({code,score,isWinner,tbd}:{
   code:string;score:number|null;isWinner:boolean;tbd:boolean;
 }){
   const t=TEAMS[code]??null;
+  const kit=KIT[code]??"#334155";
   return(
     <div style={{
-      display:"flex",alignItems:"center",gap:6,
-      padding:"2px 4px",borderRadius:4,
-      background:isWinner?"rgba(251,191,36,0.18)":"transparent",
-      opacity:tbd?0.4:1,
+      display:"flex",alignItems:"center",gap:5,
+      padding:"3px 4px 3px 0",
+      borderRadius:3,
+      background:isWinner?"rgba(218,165,32,0.18)":"rgba(255,255,255,0.04)",
+      opacity:tbd?0.45:1,
+      borderLeft:`3px solid ${tbd?"#334155":kit}`,
+      paddingLeft:5,
     }}>
       {tbd
-        ? <span style={{fontSize:14,lineHeight:1,flexShrink:0}}>❓</span>
+        ? <span style={{fontSize:13,lineHeight:1,flexShrink:0}}>❓</span>
         : <FlagImg code={code}/>
       }
       <span style={{
-        flex:1,fontSize:12.5,fontWeight:isWinner?700:500,
+        flex:1,fontSize:12,fontWeight:isWinner?800:600,
         overflow:"hidden",textOverflow:"ellipsis",
         whiteSpace:"nowrap" as const,lineHeight:1.2,
-        color:isWinner?"#0f1f3d":"rgba(30,40,70,0.85)",
+        color:isWinner?"#fbbf24":"#e2e8f0",
         fontStyle:tbd?"italic" as const:"normal" as const,
+        letterSpacing:tbd?0:0.2,
       }}>
         {tbd?"?":t?.name??code}
       </span>
       {score!==null&&(
         <span style={{
-          fontSize:14,fontWeight:800,minWidth:18,
+          fontSize:14,fontWeight:800,minWidth:20,
           textAlign:"right" as const,
-          color:isWinner?"#b45309":"rgba(30,40,70,0.8)",
+          color:isWinner?"#fbbf24":"#f1f5f9",
         }}>{score}</span>
       )}
     </div>
@@ -211,37 +234,37 @@ function MatchCard({id,resolved,results,liveScores,x,cy,isFinal}:{
       left:isFinal?x-3:x, top:LABEL_H+cy-cardH/2,
       width:cardW,height:cardH,
       background:isFinal
-        ?"rgba(251,191,36,0.15)"
-        :isDone?"#ffffff":"rgba(255,255,255,0.75)",
-      border:`${isFinal?1.5:1}px solid ${
+        ?"rgba(218,165,32,0.12)"
+        :isDone?"rgba(15,28,55,0.95)":"rgba(10,22,45,0.85)",
+      border:`${isFinal?2:1.5}px solid ${
         isLive?"#22c55e"
-        :isFinal?"rgba(180,130,0,0.5)"
-        :isDone?"rgba(30,40,70,0.22)":"rgba(30,40,70,0.15)"
+        :isFinal?"rgba(218,165,32,0.8)"
+        :isDone?"rgba(218,165,32,0.5)":"rgba(218,165,32,0.25)"
       }`,
       borderRadius:8,
       padding:"5px 7px",
       boxSizing:"border-box" as const,
       display:"flex",flexDirection:"column" as const,gap:2,
-      boxShadow:isLive?"0 0 12px rgba(34,197,94,0.5)"
-        :isFinal?"0 0 16px rgba(180,130,0,0.2)":"0 2px 8px rgba(30,40,70,0.12)",
+      boxShadow:isLive?"0 0 14px rgba(34,197,94,0.6)"
+        :isFinal?"0 0 24px rgba(218,165,32,0.35)":"0 2px 12px rgba(0,0,0,0.5)",
     }}>
       {isLive&&(
         <div style={{
           position:"absolute" as const,top:-11,left:"50%",
           transform:"translateX(-50%)",
           fontSize:9,fontWeight:800,color:"#22c55e",
-          background:"#0f1f3d",padding:"1px 6px",borderRadius:4,
+          background:"#071020",padding:"1px 6px",borderRadius:4,
           whiteSpace:"nowrap" as const,border:"1px solid rgba(34,197,94,0.3)",
         }}>🔴 {live?.minuteLabel}</div>
       )}
       <TeamRow code={homeCode} score={homeScore}
         isWinner={winner?winner===homeCode:homeWins} tbd={homeTbd}/>
-      <div style={{height:1,background:"rgba(30,40,70,0.1)",margin:"0 -3px"}}/>
+      <div style={{height:1,background:"rgba(218,165,32,0.2)",margin:"0 -3px"}}/>
       <TeamRow code={awayCode} score={awayScore}
         isWinner={winner?winner===awayCode:awayWins} tbd={awayTbd}/>
       {dateStr&&(
         <div style={{
-          fontSize:9,color:"rgba(30,40,70,0.45)",
+          fontSize:9,color:"rgba(218,165,32,0.65)",
           textAlign:"center" as const,overflow:"hidden",
           textOverflow:"ellipsis",whiteSpace:"nowrap" as const,marginTop:1,
         }}>{dateStr}</div>
@@ -287,7 +310,7 @@ export default function Bracket(){
       <div style={{
         position:"relative",width:"100%",height:scaledH,
         overflow:"hidden",borderRadius:14,
-        background:"linear-gradient(160deg,#e8edf6 0%,#f2f5fb 50%,#e4eaf4 100%)",
+        background:"linear-gradient(160deg,#071020 0%,#0a1628 50%,#071224 100%)",
       }}>
 
         {/* Bracket canvas */}
@@ -302,17 +325,17 @@ export default function Bracket(){
               position:"absolute" as const,top:7,left:cx-66,width:132,
               textAlign:"center" as const,fontSize:11,fontWeight:800,
               textTransform:"uppercase" as const,letterSpacing:"0.07em",
-              color:"rgba(30,40,70,0.65)",whiteSpace:"nowrap" as const,
+              color:"rgba(218,165,32,0.8)",whiteSpace:"nowrap" as const,
             }}>{label}</div>
           ))}
           <div style={{position:"absolute",top:LABEL_H-5,left:0,right:0,
-            height:1,background:"rgba(30,40,70,0.1)"}}/>
+            height:1,background:"rgba(218,165,32,0.2)"}}/>
 
           {/* SVG connectors */}
           <svg style={{position:"absolute",top:LABEL_H,left:0,overflow:"visible",pointerEvents:"none"}}
             width={TOTAL_W} height={TOTAL_H}>
             {CONNECTORS.map((d,i)=>(
-              <path key={i} d={d} stroke="rgba(30,40,70,0.35)" strokeWidth={1.5} fill="none"/>
+              <path key={i} d={d} stroke="rgba(218,165,32,0.55)" strokeWidth={1.5} fill="none"/>
             ))}
           </svg>
 
@@ -341,7 +364,7 @@ export default function Bracket(){
             left:finX,top:LABEL_H+FINY+CH/2+50,
             width:CW,textAlign:"center" as const,
             fontSize:9,fontWeight:700,textTransform:"uppercase" as const,
-            letterSpacing:"0.05em",color:"rgba(30,40,70,0.45)",
+            letterSpacing:"0.05em",color:"rgba(218,165,32,0.55)",
           }}>מקום שלישי</div>
           {mc(THIRD_ID,finX,FINY+CH+80)}
         </div>
