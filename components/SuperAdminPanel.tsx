@@ -128,6 +128,11 @@ export default function SuperAdminPanel() {
         <BonusAwardsPanel />
       </details>
 
+      <details className="adm-section">
+        <summary>🌐 FIFA — משיכת נתונים חיים</summary>
+        <FifaPullPanel />
+      </details>
+
     </section>
   );
 }
@@ -1971,3 +1976,88 @@ function BonusAwardsPanel() {
   );
 }
 
+/* ============================ FIFA PULL ============================ */
+function FifaPullPanel() {
+  const [standings, setStandings] = useState<any[]>([]);
+  const [scorers, setScorers] = useState<any[]>([]);
+  const [assists, setAssists] = useState<any[]>([]);
+  const [busy, setBusy] = useState<Record<string,boolean>>({});
+  const [errors, setErrors] = useState<Record<string,string>>({});
+
+  const FIFA_URLS: Record<string, string> = {
+    standings: "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/standings",
+    scorers:   "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/statistics/player-statistics",
+    assists:   "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/statistics/player-statistics",
+  };
+
+  async function pull(type: "standings" | "scorers" | "assists") {
+    setBusy(b => ({ ...b, [type]: true }));
+    setErrors(e => ({ ...e, [type]: "" }));
+    try {
+      const hdrs = await adminAuthHeaders();
+      const res = await fetch(`/api/admin/fifa-pull?type=${type}`, { headers: hdrs });
+      const json = await res.json();
+      if (json.ok && json.rows?.length) {
+        if (type === "standings") setStandings(json.rows);
+        if (type === "scorers")   setScorers(json.rows);
+        if (type === "assists")   setAssists(json.rows);
+      } else {
+        setErrors(e => ({ ...e, [type]: json.error || "שגיאה לא ידועה" }));
+      }
+    } catch (err: any) {
+      setErrors(e => ({ ...e, [type]: err.message }));
+    } finally {
+      setBusy(b => ({ ...b, [type]: false }));
+    }
+  }
+
+  const sections: { key: "standings"|"scorers"|"assists"; label: string; data: any[] }[] = [
+    { key: "standings", label: "🏆 טבלאות קבוצות", data: standings },
+    { key: "scorers",   label: "⚽ מלך השערים",     data: scorers },
+    { key: "assists",   label: "🎯 מלך הבישולים",   data: assists },
+  ];
+
+  return (
+    <div className="adm-body">
+      <p className="muted" style={{ fontSize: 12, marginBottom: 14 }}>
+        לחץ על כפתור המשיכה לכל קטגוריה. הנתונים מגיעים מ-FIFA.com — אם האתר מרונדר בדפדפן בלבד, תוצג הודעת שגיאה עם הקישור לפתיחה ידנית.
+      </p>
+
+      {sections.map(({ key, label, data }) => (
+        <div key={key} style={{ marginBottom: 24, background: "var(--bg-elev)", borderRadius: 10, padding: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <strong style={{ fontSize: 14 }}>{label}</strong>
+            <button className="btn btn-small btn-primary" onClick={() => pull(key)} disabled={busy[key]}>
+              {busy[key] ? "⏳ מושך..." : "↓ משוך"}
+            </button>
+            <a href={FIFA_URLS[key]} target="_blank" rel="noreferrer"
+               style={{ fontSize: 11, color: "var(--accent)", marginInlineStart: "auto" }}>
+              פתח ב-FIFA.com ↗
+            </a>
+          </div>
+
+          {errors[key] && (
+            <div style={{ fontSize: 12, color: "var(--red)", background: "rgba(239,68,68,0.1)",
+                          borderRadius: 6, padding: "8px 12px", marginBottom: 8 }}>
+              ⚠️ {errors[key]}
+            </div>
+          )}
+
+          {data.length > 0 && (
+            <div style={{ maxHeight: 320, overflowY: "auto" }}>
+              <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-all",
+                            background: "var(--bg)", borderRadius: 6, padding: 10,
+                            color: "var(--text-muted)", margin: 0 }}>
+                {JSON.stringify(data, null, 2)}
+              </pre>
+            </div>
+          )}
+
+          {data.length === 0 && !busy[key] && !errors[key] && (
+            <p className="muted" style={{ fontSize: 12, margin: 0 }}>לחץ על "משוך" כדי לטעון נתונים.</p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
