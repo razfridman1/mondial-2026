@@ -23,7 +23,7 @@ interface Prefs {
   selectedChannel: string | null;
   selectedTeam: string | null;
   statusFilter: "all" | "live" | "upcoming";
-  tab: "schedule" | "weekpredictions" | "openpredictions" | "mypredictions" | "topscorers" | "ranking" | "friendspredictions" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin" | "matchlist";
+  tab: "schedule" | "weekpredictions" | "openpredictions" | "mypredictions" | "topscorers" | "ranking" | "friendspredictions" | "standings" | "broadcasts" | "teams" | "myteams" | "bracket" | "mygroups" | "ai" | "profile" | "admin" | "simulation" | "superadmin" | "matchlist" | "fifapull";
 }
 
 export type MatchResult = { home: number; away: number; finishedAt: number; winner?: string };

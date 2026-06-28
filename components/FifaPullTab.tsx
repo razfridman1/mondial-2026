@@ -8,7 +8,7 @@ async function adminAuthHeaders() {
   return { "content-type": "application/json", authorization: `Bearer ${token}` };
 }
 
-type PullType = "standings" | "scorers" | "assists" | "fixtures";
+type PullType = "scorers" | "assists" | "fixtures";
 
 function StandingsView({ data }: { data: any[] }) {
   return (
@@ -139,7 +139,6 @@ function PullSection({ k, label, children, onPull, busy, error, hasData }:
 
 export default function FifaPullTab() {
   const user = useStore(s => s.user);
-  const [standings, setStandings] = useState<any[]>([]);
   const [scorers, setScorers] = useState<any[]>([]);
   const [assists, setAssists] = useState<any[]>([]);
   const [fixtures, setFixtures] = useState<any[]>([]);
@@ -159,7 +158,6 @@ export default function FifaPullTab() {
       const res = await fetch(`/api/admin/fifa-pull?type=${type}`, { headers: await adminAuthHeaders() });
       const json = await res.json();
       if (json.ok) {
-        if (type === "standings") setStandings(json.rows || []);
         if (type === "scorers")   setScorers(json.rows || []);
         if (type === "assists")   setAssists(json.rows || []);
         if (type === "fixtures")  setFixtures(json.rows || []);
@@ -179,12 +177,6 @@ export default function FifaPullTab() {
         <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🌐 ESPN / FIFA — נתונים חיים</h2>
         <p className="muted" style={{ fontSize: 13 }}>נתונים מ-ESPN API (ציבורי, ללא מפתח)</p>
       </div>
-
-      <PullSection k="standings" label="🏆 טבלאות קבוצות"
-        onPull={() => pull("standings")} busy={!!busy.standings}
-        error={errors.standings || ""} hasData={standings.length > 0}>
-        <StandingsView data={standings} />
-      </PullSection>
 
       <PullSection k="scorers" label="⚽ מלך השערים"
         onPull={() => pull("scorers")} busy={!!busy.scorers}
