@@ -51,10 +51,10 @@ function FlagImg({ code }: { code: string }) {
 /* ================================================================
  * Layout constants
  * ================================================================ */
-const CW = 152;  // card width
-const CH = 70;   // card height
-const SH = 86;   // slot height
-const CG = 14;   // column gap
+const CW = 155;  // card width
+const CH = 92;   // card height — fits 2 team rows + date without clipping
+const SH = 110;  // slot height (CH + 18px vertical margin)
+const CG = 12;   // column gap
 
 const r32L = 0;
 const r16L = r32L + CW + CG;
@@ -169,28 +169,28 @@ function TeamRow({code,score,isWinner,tbd}:{
   return(
     <div style={{
       display:"flex",alignItems:"center",gap:5,
-      padding:"3px 5px",
+      padding:"4px 6px",
       borderRadius:3,
-      background:isWinner?"rgba(96,165,250,0.15)":"transparent",
-      opacity:tbd?0.45:1,
+      background:isWinner?"rgba(96,165,250,0.18)":"transparent",
+      opacity:tbd?0.6:1,
       borderLeft:`3px solid ${tbd?"#3a4a65":kit}`,
     }}>
       {tbd
-        ? <span style={{fontSize:12,lineHeight:1,flexShrink:0,color:"#4a5a78"}}>?</span>
+        ? <span style={{fontSize:14,lineHeight:1,flexShrink:0,color:"#5a6a88",fontWeight:700}}>?</span>
         : <FlagImg code={code}/>
       }
       <span style={{
-        flex:1,fontSize:13,fontWeight:isWinner?800:600,
+        flex:1,fontSize:14,fontWeight:isWinner?800:600,
         overflow:"hidden",textOverflow:"ellipsis",
-        whiteSpace:"nowrap" as const,lineHeight:1.2,
-        color:isWinner?"#93c5fd":tbd?"#4a5a78":"#e2e8f0",
+        whiteSpace:"nowrap" as const,lineHeight:1.3,
+        color:isWinner?"#93c5fd":tbd?"#6a7a98":"#e8edf8",
         fontStyle:tbd?"italic" as const:"normal" as const,
       }}>
-        {tbd?"?":t?.name??code}
+        {tbd?"TBD":t?.name??code}
       </span>
       {score!==null&&(
         <span style={{
-          fontSize:15,fontWeight:800,minWidth:22,
+          fontSize:16,fontWeight:800,minWidth:24,
           textAlign:"right" as const,
           color:isWinner?"#93c5fd":"#ffffff",
         }}>{score}</span>
@@ -240,9 +240,9 @@ function MatchCard({id,resolved,results,liveScores,x,cy,isFinal}:{
         :isDone?"#3b5280":"#2a3a5a"
       }`,
       borderRadius:8,
-      padding:"5px 7px",
+      padding:"6px 7px",
       boxSizing:"border-box" as const,
-      display:"flex",flexDirection:"column" as const,gap:2,
+      display:"flex",flexDirection:"column" as const,gap:3,
       boxShadow:isLive?"0 0 12px rgba(34,197,94,0.5)"
         :isFinal?"0 2px 16px rgba(212,160,23,0.5)"
         :isDone?"0 2px 8px rgba(0,0,0,0.4)":"0 1px 4px rgba(0,0,0,0.3)",
@@ -263,9 +263,11 @@ function MatchCard({id,resolved,results,liveScores,x,cy,isFinal}:{
         isWinner={winner?winner===awayCode:awayWins} tbd={awayTbd}/>
       {dateStr&&(
         <div style={{
-          fontSize:11,color:"#ffffff",fontWeight:600,
-          textAlign:"center" as const,overflow:"hidden",
-          textOverflow:"ellipsis",whiteSpace:"nowrap" as const,marginTop:2,
+          fontSize:12,color:"#ffffff",fontWeight:700,
+          textAlign:"center" as const,
+          whiteSpace:"nowrap" as const,
+          letterSpacing:"0.01em",
+          marginTop:1,flexShrink:0,
         }}>{dateStr}</div>
       )}
     </div>
