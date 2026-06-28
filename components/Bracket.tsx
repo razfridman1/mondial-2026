@@ -169,24 +169,22 @@ function TeamRow({code,score,isWinner,tbd}:{
   return(
     <div style={{
       display:"flex",alignItems:"center",gap:5,
-      padding:"3px 4px 3px 0",
+      padding:"3px 4px",
       borderRadius:3,
-      background:isWinner?"rgba(218,165,32,0.18)":"rgba(255,255,255,0.04)",
-      opacity:tbd?0.45:1,
-      borderLeft:`3px solid ${tbd?"#334155":kit}`,
-      paddingLeft:5,
+      background:isWinner?"rgba(59,130,246,0.1)":"transparent",
+      opacity:tbd?0.5:1,
+      borderLeft:`3px solid ${tbd?"#c8d0df":kit}`,
     }}>
       {tbd
-        ? <span style={{fontSize:13,lineHeight:1,flexShrink:0}}>❓</span>
+        ? <span style={{fontSize:12,lineHeight:1,flexShrink:0,color:"#8a96ad"}}>?</span>
         : <FlagImg code={code}/>
       }
       <span style={{
         flex:1,fontSize:12,fontWeight:isWinner?800:600,
         overflow:"hidden",textOverflow:"ellipsis",
         whiteSpace:"nowrap" as const,lineHeight:1.2,
-        color:isWinner?"#fbbf24":"#e2e8f0",
+        color:isWinner?"#1e3a8a":tbd?"#8a96ad":"#1e2840",
         fontStyle:tbd?"italic" as const:"normal" as const,
-        letterSpacing:tbd?0:0.2,
       }}>
         {tbd?"?":t?.name??code}
       </span>
@@ -194,7 +192,7 @@ function TeamRow({code,score,isWinner,tbd}:{
         <span style={{
           fontSize:14,fontWeight:800,minWidth:20,
           textAlign:"right" as const,
-          color:isWinner?"#fbbf24":"#f1f5f9",
+          color:isWinner?"#1e3a8a":"#2d3a55",
         }}>{score}</span>
       )}
     </div>
@@ -234,37 +232,37 @@ function MatchCard({id,resolved,results,liveScores,x,cy,isFinal}:{
       left:isFinal?x-3:x, top:LABEL_H+cy-cardH/2,
       width:cardW,height:cardH,
       background:isFinal
-        ?"rgba(218,165,32,0.12)"
-        :isDone?"rgba(15,28,55,0.95)":"rgba(10,22,45,0.85)",
-      border:`${isFinal?2:1.5}px solid ${
+        ?"rgba(255,243,205,0.8)"
+        :isDone?"#ffffff":"rgba(255,255,255,0.6)",
+      border:`${isFinal?2:1}px solid ${
         isLive?"#22c55e"
-        :isFinal?"rgba(218,165,32,0.8)"
-        :isDone?"rgba(218,165,32,0.5)":"rgba(218,165,32,0.25)"
+        :isFinal?"#d4a017"
+        :isDone?"#b8c2d4":"#c8d0df"
       }`,
       borderRadius:8,
       padding:"5px 7px",
       boxSizing:"border-box" as const,
       display:"flex",flexDirection:"column" as const,gap:2,
-      boxShadow:isLive?"0 0 14px rgba(34,197,94,0.6)"
-        :isFinal?"0 0 24px rgba(218,165,32,0.35)":"0 2px 12px rgba(0,0,0,0.5)",
+      boxShadow:isLive?"0 0 10px rgba(34,197,94,0.4)"
+        :isFinal?"0 2px 12px rgba(212,160,23,0.3)":"0 1px 4px rgba(30,40,80,0.1)",
     }}>
       {isLive&&(
         <div style={{
           position:"absolute" as const,top:-11,left:"50%",
           transform:"translateX(-50%)",
           fontSize:9,fontWeight:800,color:"#22c55e",
-          background:"#071020",padding:"1px 6px",borderRadius:4,
+          background:"#052e16",padding:"1px 6px",borderRadius:4,
           whiteSpace:"nowrap" as const,border:"1px solid rgba(34,197,94,0.3)",
         }}>🔴 {live?.minuteLabel}</div>
       )}
       <TeamRow code={homeCode} score={homeScore}
         isWinner={winner?winner===homeCode:homeWins} tbd={homeTbd}/>
-      <div style={{height:1,background:"rgba(218,165,32,0.2)",margin:"0 -3px"}}/>
+      <div style={{height:1,background:"#e2e8f4",margin:"0 -3px"}}/>
       <TeamRow code={awayCode} score={awayScore}
         isWinner={winner?winner===awayCode:awayWins} tbd={awayTbd}/>
       {dateStr&&(
         <div style={{
-          fontSize:9,color:"rgba(218,165,32,0.65)",
+          fontSize:9,color:"#6b7a9a",
           textAlign:"center" as const,overflow:"hidden",
           textOverflow:"ellipsis",whiteSpace:"nowrap" as const,marginTop:1,
         }}>{dateStr}</div>
@@ -310,7 +308,7 @@ export default function Bracket(){
       <div style={{
         position:"relative",width:"100%",height:scaledH,
         overflow:"hidden",borderRadius:14,
-        background:"linear-gradient(160deg,#071020 0%,#0a1628 50%,#071224 100%)",
+        background:"linear-gradient(160deg,#dde3ee 0%,#e8ecf5 60%,#dce2ed 100%)",
       }}>
 
         {/* Bracket canvas */}
@@ -325,17 +323,17 @@ export default function Bracket(){
               position:"absolute" as const,top:7,left:cx-66,width:132,
               textAlign:"center" as const,fontSize:11,fontWeight:800,
               textTransform:"uppercase" as const,letterSpacing:"0.07em",
-              color:"rgba(218,165,32,0.8)",whiteSpace:"nowrap" as const,
+              color:"#3d5080",whiteSpace:"nowrap" as const,
             }}>{label}</div>
           ))}
           <div style={{position:"absolute",top:LABEL_H-5,left:0,right:0,
-            height:1,background:"rgba(218,165,32,0.2)"}}/>
+            height:1,background:"rgba(30,40,80,0.1)"}}/>
 
           {/* SVG connectors */}
           <svg style={{position:"absolute",top:LABEL_H,left:0,overflow:"visible",pointerEvents:"none"}}
             width={TOTAL_W} height={TOTAL_H}>
             {CONNECTORS.map((d,i)=>(
-              <path key={i} d={d} stroke="rgba(218,165,32,0.55)" strokeWidth={1.5} fill="none"/>
+              <path key={i} d={d} stroke="rgba(100,120,170,0.5)" strokeWidth={1.5} fill="none"/>
             ))}
           </svg>
 
@@ -364,7 +362,7 @@ export default function Bracket(){
             left:finX,top:LABEL_H+FINY+CH/2+50,
             width:CW,textAlign:"center" as const,
             fontSize:9,fontWeight:700,textTransform:"uppercase" as const,
-            letterSpacing:"0.05em",color:"rgba(218,165,32,0.55)",
+            letterSpacing:"0.05em",color:"#6b7a9a",
           }}>מקום שלישי</div>
           {mc(THIRD_ID,finX,FINY+CH+80)}
         </div>
