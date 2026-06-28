@@ -126,22 +126,18 @@ export function resolvePlaceholder(
   return null;
 }
 
-/** Resolve every match in stage order, building up the resolved table as we go.
+/** Resolve every match progressively — each match is resolved as soon as its
+ * prerequisite data is available, without waiting for the full previous stage.
  *
- * STRICT GATING: A stage's placeholders are only resolved when the FULL
- * previous stage is completed. This matches FIFA: R32 brackets are only
- * determined once all 72 group games are played; R16 only after all 16
- * R32 games; and so on.
- *
- * If a stage is not yet unlocked, its entries are simply absent from the
- * returned table, so callers fall back to the placeholder string ("1A").
+ * e.g. once groups A and B finish, the R32 match "1A vs 2B" shows the real
+ * teams immediately; we don't wait for all 72 group matches to complete.
  */
 export function resolveAllStages(
   results: Record<string, MatchResult>
 ): Record<string, { home: string; away: string; winner: string; loser: string }> {
   const out: Record<string, { home: string; away: string; winner: string; loser: string }> = {};
 
-  /* Group matches: home/away are already real codes; winner determined by result. */
+  /* Group matches: straightforward — real codes, winner from score. */
   for (const m of MATCHES.filter(m => m.stage === "GROUP")) {
     const r = results[m.id];
     if (!r) continue;
@@ -150,74 +146,50 @@ export function resolveAllStages(
     out[m.id] = { home: m.home, away: m.away, winner, loser };
   }
 
-  /* Knockouts must wait for the FULL previous stage to be complete.
-   * Each iteration of this loop is gated on the previous stage. */
+  /* Knockouts: process stage by stage so that each stage can reference the
+   * winners already placed in `out` from the previous stage. No global gate —
+   * each match resolves independently as soon as its inputs are known. */
   const ORDER: StageId[] = ["R32", "R16", "QF", "SF", "THIRD", "FINAL"];
-  const PREV: Record<StageId, StageId | "GROUP"> = {
-    GROUP: "GROUP",
-    R32:   "GROUP",
-    R16:   "R32",
-    QF:    "R16",
-    SF:    "QF",
-    THIRD: "SF",
-    FINAL: "SF",
-  };
 
   for (const stage of ORDER) {
-    /* Gate: must have ALL results of the previous stage. */
-    const prev = PREV[stage];
-    if (!stageComplete(prev as StageId, results)) {
-      /* Previous stage isn't fully done — leave this stage's placeholders unresolved. */
-      continue;
-    }
-    /* Track teams already assigned in this stage so we don't reuse the same
-     * 3rd-placed team across multiple R32 slots. New Set per stage so QF/SF
-     * can reuse the same winners as needed. */
+    /* For R32 we pre-compute the 8 best 3rd-placed teams once per stage pass
+     * so slots don't clash. We still do this even if the group stage isn't
+     * 100% complete — partial standings are used, giving the best available guess. */
     const usedTeams = new Set<string>();
-    /* Pre-pass for R32 (and any stage with 3rd-place slots) — find ANY
-     * unused team from the qualifying-8 pool if the strict slot constraint
-     * can't be satisfied. Guarantees all 8 best-3rds end up in R32. */
     const eightThirds = stage === "R32" ? bestEightThirdPlaced(results).map(t => t.teamCode) : [];
     function relaxedThird(): string | null {
       for (const code of eightThirds) {
-        if (!usedTeams.has(code)) {
-          usedTeams.add(code);
-          return code;
-        }
+        if (!usedTeams.has(code)) { usedTeams.add(code); return code; }
       }
       return null;
     }
+
     for (const m of listStageMatchesOrdered(stage)) {
       let homeCode = resolvePlaceholder(m.home, results, out, usedTeams) || "";
       let awayCode = resolvePlaceholder(m.away, results, out, usedTeams) || "";
-      /* Relaxation: if home or away is a 3rd-place placeholder that didn't
-       * resolve (no qualifying team from allowed groups), fall back to ANY
-       * unused team from the 8 best 3rd-placed pool. */
       if (!homeCode && /^3[A-Z\/]+$/.test(m.home)) homeCode = relaxedThird() || "";
       if (!awayCode && /^3[A-Z\/]+$/.test(m.away)) awayCode = relaxedThird() || "";
-      /* Only use literal fallback if it's an actual team code — prevents "TBD"
-       * from leaking into resolved matches and appearing in prediction tabs. */
       if (!homeCode && TEAMS[m.home]) homeCode = m.home;
       if (!awayCode && TEAMS[m.away]) awayCode = m.away;
+
       const r = results[m.id];
       if (r) {
         let winner = "", loser = "";
-        /* Preferred: use explicit winner stored on the result doc (KO).
-         * This handles the case where 90-min was a tie and ET/penalties
-         * decided. Falls back to score-based winner if not present. */
         if (r.winner && (r.winner === homeCode || r.winner === awayCode)) {
           winner = r.winner;
           loser = winner === homeCode ? awayCode : homeCode;
         } else if (r.home > r.away) { winner = homeCode; loser = awayCode; }
         else if (r.home < r.away)   { winner = awayCode; loser = homeCode; }
         else {
-          /* Tie at 90 with no explicit winner — pick deterministically. */
           if (homeCode < awayCode) { winner = homeCode; loser = awayCode; }
           else                     { winner = awayCode; loser = homeCode; }
         }
         out[m.id] = { home: homeCode, away: awayCode, winner, loser };
       } else {
-        out[m.id] = { home: homeCode, away: awayCode, winner: "", loser: "" };
+        /* Match not yet played — store teams if known so the card shows them */
+        if (homeCode || awayCode) {
+          out[m.id] = { home: homeCode, away: awayCode, winner: "", loser: "" };
+        }
       }
     }
   }
