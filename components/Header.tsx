@@ -173,4 +173,11 @@ export default function Header() {
                 window.scrollTo({ top: 0, behavior: "auto" });
               }
             }}
-       
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+    </header>
+  );
+}
