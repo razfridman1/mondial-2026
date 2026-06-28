@@ -10,75 +10,114 @@ async function verifyAdmin(req: NextRequest) {
   } catch { return false; }
 }
 
-const HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Cache-Control": "no-cache",
-};
+const ESPN_BASE = "https://sports.core.api.espn.com/v2/sports/soccer/leagues/fifa.world";
+const ESPN_SITE = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world";
 
-const BASE = "https://www.fifa.com";
+/* Fetch all 12 group standings from ESPN */
+async function fetchStandings() {
+  const groups = [];
+  for (let g = 1; g <= 12; g++) {
+    const url = `${ESPN_BASE}/seasons/2026/types/1/groups/${g}/standings/0?lang=en`;
+    const res = await fetch(url);
+    if (!res.ok) continue;
+    const data = await res.json();
 
-// Try to extract JSON-LD or __NEXT_DATA__ from HTML
-function extractData(html: string, type: string): any[] {
-  // Try JSON-LD
-  const ldMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
-  if (ldMatch) {
-    try { return [JSON.parse(ldMatch[1])]; } catch {}
+    // Resolve team refs (each has a $ref — extract team id from URL)
+    const rows = (data.standings || []).map((s: any) => {
+      const teamUrl: string = s.team?.$ref || "";
+      const teamId = teamUrl.match(/teams\/(\d+)/)?.[1] || "?";
+      const rec = s.records?.[0];
+      const stat = (name: string) =>
+        rec?.stats?.find((x: any) => x.name === name)?.displayValue ?? "-";
+      return {
+        teamId,
+        rank: stat("rank"),
+        gp: stat("gamesPlayed"),
+        w: stat("wins"),
+        d: stat("ties"),
+        l: stat("losses"),
+        gf: stat("pointsFor"),
+        ga: stat("pointsAgainst"),
+        gd: stat("pointDifferential"),
+        pts: stat("points"),
+        note: s.note?.description || "",
+      };
+    });
+    groups.push({ group: g, rows });
   }
-  // Try __NEXT_DATA__
-  const ndMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-  if (ndMatch) {
-    try {
-      const data = JSON.parse(ndMatch[1]);
-      // Navigate to relevant data based on type
-      const props = data?.props?.pageProps;
-      if (type === "standings") return props?.standings || props?.groups || [];
-      if (type === "scorers") return props?.topScorers || props?.scorers || props?.players || [];
-      if (type === "assists") return props?.topAssists || props?.assists || props?.players || [];
-      return props ? [props] : [];
-    } catch {}
-  }
-  return [];
+  return groups;
 }
 
-async function fetchFifaPage(url: string, type: string) {
-  const res = await fetch(url, { headers: HEADERS, redirect: "follow" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const html = await res.text();
-  // Check if we got real content or just meta shell
-  if (html.length < 5000) throw new Error("Page returned empty shell (client-rendered only)");
-  const rows = extractData(html, type);
-  return { rows, htmlLength: html.length };
+/* Fetch scoreboard — current day events */
+async function fetchFixtures(dateStr?: string) {
+  const url = dateStr
+    ? `${ESPN_SITE}/scoreboard?dates=${dateStr}`
+    : `${ESPN_SITE}/scoreboard`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`ESPN scoreboard HTTP ${res.status}`);
+  const data = await res.json();
+
+  return (data.events || []).map((e: any) => {
+    const comp = e.competitions?.[0];
+    const home = comp?.competitors?.find((c: any) => c.homeAway === "home");
+    const away = comp?.competitors?.find((c: any) => c.homeAway === "away");
+    return {
+      id: e.id,
+      name: e.name,
+      date: e.date,
+      status: comp?.status?.type?.description,
+      homeTeam: home?.team?.abbreviation,
+      homeScore: home?.score,
+      awayTeam: away?.team?.abbreviation,
+      awayScore: away?.score,
+      venue: comp?.venue?.displayName,
+    };
+  });
 }
 
 export async function GET(req: NextRequest) {
   if (!(await verifyAdmin(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const type = req.nextUrl.searchParams.get("type") || "scorers";
-
-  const urls: Record<string, string> = {
-    standings: `${BASE}/en/tournaments/mens/worldcup/canadamexicousa2026/standings`,
-    scorers:   `${BASE}/en/tournaments/mens/worldcup/canadamexicousa2026/statistics/player-statistics`,
-    assists:   `${BASE}/en/tournaments/mens/worldcup/canadamexicousa2026/statistics/player-statistics?statType=goal_assist`,
-    fixtures:  `${BASE}/en/tournaments/mens/worldcup/canadamexicousa2026/scores-fixtures?country=IL&wtw-filter=ALL`,
-  };
-
-  const url = urls[type];
-  if (!url) return NextResponse.json({ error: "Unknown type" }, { status: 400 });
+  const type = req.nextUrl.searchParams.get("type") || "fixtures";
+  const date = req.nextUrl.searchParams.get("date") || undefined;
 
   try {
-    const { rows, htmlLength } = await fetchFifaPage(url, type);
-    if (rows.length === 0) {
-      return NextResponse.json({
-        ok: false,
-        error: "לא נמצאו נתונים — האתר של FIFA מרונדר בדפדפן בלבד. פתח את הכתובת ידנית.",
-        url,
-        htmlLength,
-      });
+    if (type === "standings") {
+      const rows = await fetchStandings();
+      return NextResponse.json({ ok: true, type, rows });
     }
-    return NextResponse.json({ ok: true, type, rows, url });
+
+    if (type === "fixtures") {
+      const rows = await fetchFixtures(date);
+      return NextResponse.json({ ok: true, type, rows });
+    }
+
+    // scorers / assists — ESPN leaders endpoint
+    if (type === "scorers" || type === "assists") {
+      const category = type === "scorers" ? "goals" : "goalAssists";
+      const url = `${ESPN_BASE}/seasons/2026/leaders?limit=20&lang=en`;
+      const res = await fetch(url);
+      if (!res.ok) return NextResponse.json({ ok: false, error: `ESPN leaders HTTP ${res.status}` });
+      const data = await res.json();
+      // Try to find the right category
+      const cats = data.categories || [];
+      const cat = cats.find((c: any) =>
+        c.name?.toLowerCase().includes(category === "goals" ? "goal" : "assist") &&
+        !c.name?.toLowerCase().includes("assist") === (category === "goals")
+      ) || cats[0];
+      const leaders = cat?.leaders?.map((l: any) => ({
+        rank: l.rank,
+        name: l.athlete?.displayName || l.athlete?.$ref,
+        team: l.team?.abbreviation || l.team?.$ref,
+        value: l.value,
+        displayValue: l.displayValue,
+      })) || [];
+      return NextResponse.json({ ok: leaders.length > 0, type, rows: leaders,
+        error: leaders.length === 0 ? "ESPN leaders endpoint returned no data" : undefined });
+    }
+
+    return NextResponse.json({ error: "Unknown type" }, { status: 400 });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message, url });
+    return NextResponse.json({ ok: false, error: e.message });
   }
 }

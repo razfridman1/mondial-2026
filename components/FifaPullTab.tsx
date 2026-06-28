@@ -10,82 +10,131 @@ async function adminAuthHeaders() {
 
 type PullType = "standings" | "scorers" | "assists" | "fixtures";
 
-const FIFA_URLS: Record<PullType, string> = {
-  standings: "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/standings",
-  scorers:   "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/statistics/player-statistics",
-  assists:   "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/statistics/player-statistics",
-  fixtures:  "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/scores-fixtures?country=IL&wtw-filter=ALL",
-};
+function StandingsView({ data }: { data: any[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {data.map((group: any) => (
+        <div key={group.group}>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 4, color: "var(--accent)" }}>
+            קבוצה {group.group}
+          </div>
+          <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ color: "var(--text-muted)" }}>
+                <th style={{ textAlign: "left", padding: "2px 4px" }}>#</th>
+                <th style={{ textAlign: "left", padding: "2px 4px" }}>קבוצה</th>
+                <th style={{ padding: "2px 4px" }}>מ</th>
+                <th style={{ padding: "2px 4px" }}>נ</th>
+                <th style={{ padding: "2px 4px" }}>ת</th>
+                <th style={{ padding: "2px 4px" }}>ה</th>
+                <th style={{ padding: "2px 4px" }}>+/-</th>
+                <th style={{ padding: "2px 4px", fontWeight: 700 }}>נק</th>
+              </tr>
+            </thead>
+            <tbody>
+              {group.rows.map((r: any, i: number) => (
+                <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
+                  <td style={{ padding: "2px 4px", color: "var(--text-muted)" }}>{r.rank}</td>
+                  <td style={{ padding: "2px 4px" }}>{r.teamId}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "center" }}>{r.gp}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "center" }}>{r.w}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "center" }}>{r.d}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "center" }}>{r.l}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "center" }}>{r.gd}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "center", fontWeight: 700 }}>{r.pts}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-const SECTIONS: { key: PullType; label: string }[] = [
-  { key: "standings", label: "🏆 טבלאות קבוצות" },
-  { key: "scorers",   label: "⚽ מלך השערים" },
-  { key: "assists",   label: "🎯 מלך הבישולים" },
-];
+function FixturesView({ data }: { data: any[] }) {
+  return (
+    <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse" }}>
+      <thead>
+        <tr style={{ color: "var(--text-muted)" }}>
+          <th style={{ textAlign: "left", padding: "3px 6px" }}>תאריך</th>
+          <th style={{ padding: "3px 6px" }}>בית</th>
+          <th style={{ padding: "3px 6px" }}>תוצאה</th>
+          <th style={{ padding: "3px 6px" }}>חוץ</th>
+          <th style={{ textAlign: "left", padding: "3px 6px" }}>סטטוס</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((e: any) => (
+          <tr key={e.id} style={{ borderTop: "1px solid var(--border)" }}>
+            <td style={{ padding: "3px 6px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+              {new Date(e.date).toLocaleDateString("he-IL", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" })}
+            </td>
+            <td style={{ padding: "3px 6px", textAlign: "center", fontWeight: 600 }}>{e.homeTeam}</td>
+            <td style={{ padding: "3px 6px", textAlign: "center", fontWeight: 700 }}>
+              {e.homeScore !== undefined ? `${e.homeScore}–${e.awayScore}` : "vs"}
+            </td>
+            <td style={{ padding: "3px 6px", textAlign: "center", fontWeight: 600 }}>{e.awayTeam}</td>
+            <td style={{ padding: "3px 6px", color: "var(--text-muted)", fontSize: 10 }}>{e.status}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
-function PullSection({ k, label, onData }: {
-  k: PullType; label: string;
-  onData: (type: PullType, rows: any[]) => void;
-}) {
-  const [data, setData] = useState<any[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+function ScorersView({ data, label }: { data: any[]; label: string }) {
+  return (
+    <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse" }}>
+      <thead>
+        <tr style={{ color: "var(--text-muted)" }}>
+          <th style={{ textAlign: "left", padding: "3px 6px" }}>#</th>
+          <th style={{ textAlign: "left", padding: "3px 6px" }}>שחקן</th>
+          <th style={{ padding: "3px 6px" }}>קבוצה</th>
+          <th style={{ padding: "3px 6px", fontWeight: 700 }}>{label}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((r: any, i: number) => (
+          <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
+            <td style={{ padding: "3px 6px", color: "var(--text-muted)" }}>{r.rank ?? i + 1}</td>
+            <td style={{ padding: "3px 6px" }}>{r.name}</td>
+            <td style={{ padding: "3px 6px", textAlign: "center" }}>{r.team}</td>
+            <td style={{ padding: "3px 6px", textAlign: "center", fontWeight: 700 }}>{r.displayValue ?? r.value}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
-  async function pull() {
-    setBusy(true); setError("");
-    try {
-      const res = await fetch(`/api/admin/fifa-pull?type=${k}`, { headers: await adminAuthHeaders() });
-      const json = await res.json();
-      if (json.ok && json.rows?.length) {
-        setData(json.rows);
-        onData(k, json.rows);
-      } else {
-        setError(json.error || "שגיאה");
-      }
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
+function PullSection({ k, label, statLabel, children, onPull, busy, error, hasData }:
+  { k: PullType; label: string; statLabel?: string; children?: React.ReactNode;
+    onPull: () => void; busy: boolean; error: string; hasData: boolean }) {
   return (
     <div style={{ background: "var(--bg-elev)", borderRadius: 10, padding: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <strong style={{ fontSize: 14 }}>{label}</strong>
-        <button className="btn btn-small btn-primary" onClick={pull} disabled={busy}>
+        <button className="btn btn-small btn-primary" onClick={onPull} disabled={busy}>
           {busy ? "⏳ מושך..." : "↓ משוך"}
         </button>
-        <a href={FIFA_URLS[k]} target="_blank" rel="noreferrer"
-           style={{ fontSize: 11, color: "var(--accent)", marginInlineStart: "auto" }}>
-          פתח ב-FIFA.com ↗
-        </a>
       </div>
 
       {error && (
         <div style={{ fontSize: 12, color: "var(--red)", background: "rgba(239,68,68,0.1)",
                       borderRadius: 6, padding: "8px 12px", marginBottom: 8 }}>
           ⚠️ {error}
-          <br />
-          <a href={FIFA_URLS[k]} target="_blank" rel="noreferrer"
-             style={{ color: "var(--accent)", fontSize: 11 }}>
-            לחץ כאן לפתיחה ידנית ↗
-          </a>
         </div>
       )}
 
-      {data.length > 0 && (
-        <div style={{ maxHeight: 300, overflowY: "auto" }}>
-          <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-all",
-                        background: "var(--bg)", borderRadius: 6, padding: 10,
-                        color: "var(--text-muted)", margin: 0 }}>
-            {JSON.stringify(data, null, 2)}
-          </pre>
-        </div>
-      )}
-
-      {data.length === 0 && !busy && !error && (
+      {!hasData && !busy && !error && (
         <p className="muted" style={{ fontSize: 12, margin: 0 }}>לחץ "משוך" לטעינת נתונים.</p>
+      )}
+
+      {hasData && (
+        <div style={{ maxHeight: 340, overflowY: "auto" }}>
+          {children}
+        </div>
       )}
     </div>
   );
@@ -93,34 +142,75 @@ function PullSection({ k, label, onData }: {
 
 export default function FifaPullTab() {
   const user = useStore(s => s.user);
+  const [standings, setStandings] = useState<any[]>([]);
+  const [scorers, setScorers] = useState<any[]>([]);
+  const [assists, setAssists] = useState<any[]>([]);
+  const [fixtures, setFixtures] = useState<any[]>([]);
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   if (!user?.isAdmin) return (
     <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
       🔒 גישה לאדמין בלבד
     </div>
   );
 
-  function handleData(type: PullType, rows: any[]) {
-    console.log(`[FIFA] ${type}:`, rows);
+  async function pull(type: PullType) {
+    setBusy(b => ({ ...b, [type]: true }));
+    setErrors(e => ({ ...e, [type]: "" }));
+    try {
+      const res = await fetch(`/api/admin/fifa-pull?type=${type}`, { headers: await adminAuthHeaders() });
+      const json = await res.json();
+      if (json.ok) {
+        if (type === "standings") setStandings(json.rows || []);
+        if (type === "scorers")   setScorers(json.rows || []);
+        if (type === "assists")   setAssists(json.rows || []);
+        if (type === "fixtures")  setFixtures(json.rows || []);
+      } else {
+        setErrors(e => ({ ...e, [type]: json.error || "שגיאה" }));
+      }
+    } catch (err: any) {
+      setErrors(e => ({ ...e, [type]: err.message }));
+    } finally {
+      setBusy(b => ({ ...b, [type]: false }));
+    }
   }
 
   return (
-    <section style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 16px" }}>
-      <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>🌐 FIFA — משיכת נתונים חיים</h2>
+    <section style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 16px" }}>
+      <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>🌐 ESPN / FIFA — נתונים חיים</h2>
       <p className="muted" style={{ fontSize: 12, marginBottom: 20 }}>
-        FIFA.com מרונדר בדפדפן בלבד — המשיכה השרת-סיידית לרוב תחזיר שגיאה.
-        לחץ "פתח ב-FIFA.com" לצפייה ישירה.
+        נתונים ממשק ESPN API (ללא API key).
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" }}>
-        {/* Left: standings + scorers + assists */}
+        {/* Left column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {SECTIONS.map(({ key, label }) => (
-            <PullSection key={key} k={key} label={label} onData={handleData} />
-          ))}
+          <PullSection k="standings" label="🏆 טבלאות קבוצות"
+            onPull={() => pull("standings")} busy={!!busy.standings}
+            error={errors.standings || ""} hasData={standings.length > 0}>
+            <StandingsView data={standings} />
+          </PullSection>
+
+          <PullSection k="scorers" label="⚽ מלך השערים" statLabel="שערים"
+            onPull={() => pull("scorers")} busy={!!busy.scorers}
+            error={errors.scorers || ""} hasData={scorers.length > 0}>
+            <ScorersView data={scorers} label="שערים" />
+          </PullSection>
+
+          <PullSection k="assists" label="🎯 מלך הבישולים" statLabel="בישולים"
+            onPull={() => pull("assists")} busy={!!busy.assists}
+            error={errors.assists || ""} hasData={assists.length > 0}>
+            <ScorersView data={assists} label="בישולים" />
+          </PullSection>
         </div>
 
-        {/* Right: fixtures */}
-        <PullSection k="fixtures" label="📅 לוח משחקים (IL)" onData={handleData} />
+        {/* Right column */}
+        <PullSection k="fixtures" label="📅 לוח משחקים"
+          onPull={() => pull("fixtures")} busy={!!busy.fixtures}
+          error={errors.fixtures || ""} hasData={fixtures.length > 0}>
+          <FixturesView data={fixtures} />
+        </PullSection>
       </div>
     </section>
   );
