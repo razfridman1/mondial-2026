@@ -233,14 +233,182 @@ async function extractAllMatches() {
 }
 
 // ── FIXTURES ──────────────────────────────────────────────────────────────────
+// Upcoming matches don't have match-row_score spans (only a kickoff time),
+// so we can't use extractAllMatches(). Instead, use match-row containers directly.
 async function scrapeFixtures() {
   console.log("📅 Scraping fixtures...");
-  const data = await extractAllMatches();
-  // Fixtures = upcoming matches (not FT, not started)
-  const upcoming = (data.matches || []).filter(function(m) {
-    return !m.status || (m.status !== "FT" && !m.status.match(/^\d+'/));
+  const url = BASE + "/scores-fixtures";
+  await page.goto(url, { waitUntil: "load", timeout: 60000 });
+  await page.waitForTimeout(6000);
+  await page.evaluate(function() {
+    var sdk = document.getElementById("onetrust-consent-sdk");
+    if (sdk) sdk.remove();
+    var f = document.querySelector(".onetrust-pc-dark-filter");
+    if (f) f.remove();
   });
-  console.log("  fixtures: " + upcoming.length + " upcoming (of " + (data.matches||[]).length + " total)");
+  // Wait for either score spans (completed) or time spans (upcoming)
+  await waitFor("[class*=match-row], [class*=matchRow], [class*=MatchRow]", 15000);
+
+  const data = await page.evaluate(function() {
+    function txt(el) { return el ? el.textContent.trim().replace(/\s+/g, " ") : ""; }
+
+    var MONTHS = { january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12 };
+    function parseDate(text) {
+      var m = (text||"").toLowerCase().match(/(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)(?:\s+(\d{4}))?/);
+      if (!m) return null;
+      var mo = MONTHS[m[2]], yr = m[3] ? parseInt(m[3]) : 2026;
+      return yr + "-" + String(mo).padStart(2,"0") + "-" + String(parseInt(m[1])).padStart(2,"0");
+    }
+
+    // Collect date header nodes
+    var dateNodes = [];
+    Array.from(document.querySelectorAll("*")).forEach(function(el) {
+      if (el.children.length > 0) return;
+      var t = txt(el);
+      if (t.length < 5 || t.length > 60) return;
+      var d = parseDate(t);
+      if (d) dateNodes.push({ date: d, node: el });
+    });
+
+    // Strategy: find elements with "match-row" in their class (the row containers)
+    // that have exactly 2 team-name-like children
+    // We look for rows that contain team names on both sides
+    var allEls = Array.from(document.querySelectorAll("[class*=match-row]"));
+    // Also try broader approach: look for elements containing 2 team spans
+    // near a score or time display
+    var seen = new Set();
+    var matches = [];
+
+    // Approach 1: score-based (completed matches)
+    var scoreSpans = Array.from(document.querySelectorAll("[class*=match-row_score]"));
+    var scoreContainers = new Map();
+    scoreSpans.forEach(function(span) {
+      var cur = span;
+      for (var i = 0; i < 5 && cur; i++) {
+        cur = cur.parentElement;
+        if (!cur) break;
+        if (Array.from(cur.querySelectorAll("[class*=match-row_score]")).length === 2) {
+          if (!scoreContainers.has(cur)) scoreContainers.set(cur, cur);
+          break;
+        }
+      }
+    });
+
+    // Helper: extract home/away/matchDate from a match container
+    function extractFromContainer(scoreBox, homeScore, awayScore, status) {
+      var matchContainer = scoreBox;
+      var home = "", away = "";
+      for (var depth = 1; depth <= 8; depth++) {
+        matchContainer = matchContainer.parentElement;
+        if (!matchContainer) break;
+        var teamEls = Array.from(matchContainer.querySelectorAll("[class*=team], [class*=Team], [class*=club], [class*=Club]"));
+        var nameEls = teamEls.filter(function(el) {
+          var t = txt(el);
+          return t.length >= 2 && t.length <= 40 && !el.querySelector("[class*=team]");
+        });
+        if (nameEls.length >= 2) {
+          home = txt(nameEls[0]);
+          away = txt(nameEls[nameEls.length - 1]);
+          break;
+        }
+      }
+      if (!home && matchContainer) {
+        var texts = Array.from((matchContainer || scoreBox).children || [])
+          .filter(function(ch) { return ch !== scoreBox && ch.querySelectorAll("[class*=match-row_score]").length === 0; })
+          .map(function(ch) { return txt(ch); })
+          .filter(function(t) { return t.length >= 2 && t.length <= 50; });
+        if (texts.length >= 2) { home = texts[0]; away = texts[texts.length - 1]; }
+      }
+      var matchDate = "";
+      for (var i = dateNodes.length - 1; i >= 0; i--) {
+        var pos = dateNodes[i].node.compareDocumentPosition(scoreBox);
+        if (pos & 4) { matchDate = dateNodes[i].date; break; }
+      }
+      return { home: home || "?", away: away || "?", homeScore: homeScore, awayScore: awayScore, status: status, matchDate: matchDate };
+    }
+
+    scoreContainers.forEach(function(scoreBox) {
+      var scores = Array.from(scoreBox.querySelectorAll("[class*=match-row_score]"));
+      var homeScore = txt(scores[0]);
+      var awayScore = txt(scores[1]);
+      // Get status
+      var statusEl = null;
+      var cur = scoreBox;
+      for (var i = 0; i < 5 && cur; i++) {
+        cur = cur.parentElement;
+        if (!cur) break;
+        statusEl = cur.querySelector("[class*=status], [class*=Status]");
+        if (statusEl) break;
+      }
+      var status = "";
+      if (statusEl) {
+        var clone = statusEl.cloneNode(true);
+        Array.from(clone.querySelectorAll("[class*=score]")).forEach(function(n) { n.remove(); });
+        status = clone.textContent.trim().replace(/\s+/g, " ");
+      }
+      var m = extractFromContainer(scoreBox, homeScore, awayScore, status);
+      var key = m.home + "|" + m.away;
+      if (!seen.has(key) && m.home !== "?") { seen.add(key); matches.push(m); }
+    });
+
+    // Approach 2: time-based (upcoming matches — no score spans)
+    // Look for time elements: "HH:MM" pattern near team names
+    var timeEls = Array.from(document.querySelectorAll("[class*=match-row_time], [class*=matchRow_time], [class*=kickoff], [class*=Kickoff], time"));
+    var timeContainers = new Map();
+    timeEls.forEach(function(el) {
+      var t = txt(el);
+      if (!/^\d{1,2}:\d{2}$/.test(t)) return; // only HH:MM
+      var cur = el;
+      for (var i = 0; i < 8 && cur; i++) {
+        cur = cur.parentElement;
+        if (!cur) break;
+        var teamEls = Array.from(cur.querySelectorAll("[class*=team], [class*=Team]"));
+        var nameEls = teamEls.filter(function(ne) {
+          var nt = txt(ne);
+          return nt.length >= 2 && nt.length <= 40 && !ne.querySelector("[class*=team]");
+        });
+        if (nameEls.length >= 2) {
+          if (!timeContainers.has(cur)) timeContainers.set(cur, { container: cur, timeEl: el, time: t });
+          break;
+        }
+      }
+    });
+
+    timeContainers.forEach(function(info) {
+      var container = info.container;
+      var teamEls = Array.from(container.querySelectorAll("[class*=team], [class*=Team]"));
+      var nameEls = teamEls.filter(function(el) {
+        var t = txt(el);
+        return t.length >= 2 && t.length <= 40 && !el.querySelector("[class*=team]");
+      });
+      if (nameEls.length < 2) return;
+      var home = txt(nameEls[0]);
+      var away = txt(nameEls[nameEls.length - 1]);
+      var matchDate = "";
+      for (var i = dateNodes.length - 1; i >= 0; i--) {
+        var pos = dateNodes[i].node.compareDocumentPosition(info.timeEl);
+        if (pos & 4) { matchDate = dateNodes[i].date; break; }
+      }
+      var key = home + "|" + away;
+      if (!seen.has(key) && home !== "?") {
+        seen.add(key);
+        matches.push({ home: home, away: away, homeScore: "", awayScore: "", status: info.time, matchDate: matchDate });
+      }
+    });
+
+    return { matches: matches, dateNodeCount: dateNodes.length, scoreContainerCount: scoreContainers.size, timeContainerCount: timeContainers.size };
+  });
+
+  // Fixtures = upcoming (no FT status, no live minutes)
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = (data.matches || []).filter(function(m) {
+    const isFT = m.status === "FT";
+    const isLive = m.status && /^\d+['']/.test(m.status);
+    const isPast = m.matchDate && m.matchDate < today;
+    return !isFT && !isLive && !isPast;
+  });
+  console.log("  fixtures: " + upcoming.length + " upcoming (total=" + (data.matches||[]).length + ", dateNodes=" + data.dateNodeCount + ", scoreContainers=" + data.scoreContainerCount + ", timeContainers=" + data.timeContainerCount + ")");
+  if (upcoming.length > 0) console.log("  Sample:", JSON.stringify(upcoming.slice(0, 3), null, 2));
   return { matches: upcoming };
 }
 

@@ -268,11 +268,7 @@ export default function FriendsRanking() {
         </div>
       </div>
 
-      {selectedLb === "__global__" ? (
-        <div style={{ marginTop: 12 }}>
-          <GlobalLeaderboardCard myUid={user.uid} />
-        </div>
-      ) : leaderboardGroups.length === 0 ? (
+      {leaderboardGroups.length === 0 ? (
         <div className="empty-state" style={{ marginTop: 12 }}>
           עוד לא הצטרפת לקבוצה. צור קבוצה חדשה או הצטרף עם קוד הזמנה כדי לראות
           את לוח התוצאות ואת הניחושים של חברי הקבוצה שלך.
@@ -396,7 +392,7 @@ function GroupsSelect({
   const [coords, setCoords] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 260 });
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const current = selectedId === "__global__" ? { name: "כל משתמשי FC26" } : groups.find(g => g.id === selectedId);
+  const current = groups.find(g => g.id === selectedId);
 
   function reposition() {
     const r = btnRef.current?.getBoundingClientRect();
@@ -444,18 +440,6 @@ function GroupsSelect({
               עוד לא הצטרפת לקבוצה. צור קבוצה חדשה או הצטרף עם קוד הזמנה.
             </div>
           )}
-
-          <button
-            role="menuitemradio"
-            aria-checked={selectedId === "__global__"}
-            className={`groups-dd-item ${selectedId === "__global__" ? "on" : ""}`}
-            onClick={() => { onSelect("__global__"); setOpen(false); }}
-          >
-            <span className="groups-dd-item-name">🌍 כל משתמשי FC26</span>
-            {selectedId === "__global__" && <span className="groups-dd-check">✓</span>}
-          </button>
-
-          {groups.length > 0 && <div className="groups-dd-sep">הקבוצות שלי</div>}
 
           {groups.map(g => (
             <button
@@ -540,49 +524,6 @@ function JoinGroupBtn({ onJoined }: { onJoined: () => void }) {
     } finally { setBusy(false); }
   }
   return <button className="btn" onClick={join} disabled={busy}>🔑 הצטרף עם קוד</button>;
-}
-
-/* ===================================================================
- * GlobalLeaderboardCard — leaderboard for ALL users across all groups
- * =================================================================== */
-function GlobalLeaderboardCard({ myUid }: { myUid: string }) {
-  const [rows, setRows] = useState<LeaderRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const fb = getFirebase();
-      const tok = fb.auth?.currentUser ? await fb.auth.currentUser.getIdToken() : null;
-      if (!tok) return;
-      const r = await fetch("/api/leaderboard/global", { headers: { authorization: `Bearer ${tok}` } });
-      if (r.ok) setRows(await r.json());
-    } finally { setLoading(false); }
-  }
-  useEffect(() => { load(); }, []);
-
-  return (
-    <div style={{
-      background: "var(--bg-card)",
-      border: "1px solid var(--border-soft)",
-      borderRadius: 12,
-      padding: 12,
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <span style={{ fontWeight: 800, fontSize: 15 }}>🌍 כל משתמשי FC26</span>
-        {rows.length > 0 && (
-          <button
-            className="btn btn-small wa-btn"
-            onClick={() => openLeaderboardShareCard(rows, "כל משתמשי FC26")}
-          >💬 שתף טבלה</button>
-        )}
-      </div>
-      {loading && !rows.length
-        ? <div className="muted">…טוען</div>
-        : <Leaderboard rows={rows} myUid={myUid} predictionRows={[]} />
-      }
-    </div>
-  );
 }
 
 /* ===================================================================

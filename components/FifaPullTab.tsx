@@ -156,13 +156,15 @@ function FixturesView({ data }: { data: any[] }) {
             <td style={{ padding: "4px 8px", fontWeight: 600, textAlign: "right" }}>
               {teamName(e.home || e.homeTeam)} <FlagImg code={e.home || e.homeTeam} />
             </td>
-            <td style={{ padding: "4px 8px", textAlign: "center", fontWeight: 700 }}>
-              {e.score ?? (e.homeScore !== undefined ? e.homeScore + "-" + e.awayScore : "נגד")}
+            <td style={{ padding: "4px 8px", textAlign: "center", fontWeight: 700, color: "var(--text-muted)", fontSize: 13 }}>
+              {e.status || "נגד"}
             </td>
             <td style={{ padding: "4px 8px", fontWeight: 600 }}>
               <FlagImg code={e.away || e.awayTeam} /> {teamName(e.away || e.awayTeam)}
             </td>
-            <td style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 12, textAlign: "center" }}>{e.date}</td>
+            <td style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 12, textAlign: "center" }}>
+              {e.matchDate ? formatDate(e.matchDate) : (e.date || "")}
+            </td>
           </tr>
         ))}
       </tbody>
