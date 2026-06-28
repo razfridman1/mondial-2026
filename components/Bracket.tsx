@@ -152,7 +152,7 @@ const KIT: Record<string,string> = {
   PAR:"#d52b1e",COD:"#007fff",BIH:"#002395",CPV:"#003893",
   SRB:"#c6363c",CMR:"#007a5e",URU:"#5eb6e4",KOR:"#cd2e3a",
   CHN:"#de2910",SAU:"#006c35",MOR:"#c1272d",ALG:"#006233",
-  TUN:"#e70013",NGR:"#008751",CIV:"#f77f00",HAI:"#00209f",
+  TUN:"#e70013",NGR:"#008751",HAI:"#00209f",
   CUW:"#002b7f",SVN:"#003da5",SVK:"#0b4ea2",CZE:"#d7141a",
   HUN:"#477050",ROU:"#002b7f",UKR:"#005bbb",TUR:"#e30a17",
   GRE:"#0d5eaf",SCO:"#003380",WAL:"#00a650",NIR:"#cf081f",
