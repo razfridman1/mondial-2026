@@ -431,7 +431,7 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks, topAssists }: {
     <div className="topscorers-pick-panel">
       <h3>🔮 הניחוש שלי</h3>
       <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
-        ניתן לבחור ולהחליף את הבחירה כל עוד שלב הבתים לא הסתיים. לאחר סיום שלב הבתים הבחירה תינעל.
+        ניתן לבחור עד מחר
       </p>
       <div className="topscorers-pick-form">
         <div className="topscorers-pick-row">
