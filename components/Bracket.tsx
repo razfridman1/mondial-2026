@@ -176,14 +176,14 @@ function TeamRow({code,score,isWinner,tbd}:{
       borderLeft:`3px solid ${tbd?"#c8d0df":kit}`,
     }}>
       {tbd
-        ? <span style={{fontSize:12,lineHeight:1,flexShrink:0,color:"#8a96ad"}}>?</span>
+        ? <span style={{fontSize:12,lineHeight:1,flexShrink:0,color:"#5a6a88"}}>?</span>
         : <FlagImg code={code}/>
       }
       <span style={{
         flex:1,fontSize:12,fontWeight:isWinner?800:600,
         overflow:"hidden",textOverflow:"ellipsis",
         whiteSpace:"nowrap" as const,lineHeight:1.2,
-        color:isWinner?"#1e3a8a":tbd?"#8a96ad":"#1e2840",
+        color:isWinner?"#0f2060":tbd?"#6b7a9a":"#0d1830",
         fontStyle:tbd?"italic" as const:"normal" as const,
       }}>
         {tbd?"?":t?.name??code}
@@ -192,7 +192,7 @@ function TeamRow({code,score,isWinner,tbd}:{
         <span style={{
           fontSize:14,fontWeight:800,minWidth:20,
           textAlign:"right" as const,
-          color:isWinner?"#1e3a8a":"#2d3a55",
+          color:isWinner?"#0f2060":"#1a2540",
         }}>{score}</span>
       )}
     </div>
@@ -262,7 +262,7 @@ function MatchCard({id,resolved,results,liveScores,x,cy,isFinal}:{
         isWinner={winner?winner===awayCode:awayWins} tbd={awayTbd}/>
       {dateStr&&(
         <div style={{
-          fontSize:9,color:"#6b7a9a",
+          fontSize:9,color:"#3d4f70",fontWeight:600,
           textAlign:"center" as const,overflow:"hidden",
           textOverflow:"ellipsis",whiteSpace:"nowrap" as const,marginTop:1,
         }}>{dateStr}</div>
@@ -323,7 +323,7 @@ export default function Bracket(){
               position:"absolute" as const,top:7,left:cx-66,width:132,
               textAlign:"center" as const,fontSize:11,fontWeight:800,
               textTransform:"uppercase" as const,letterSpacing:"0.07em",
-              color:"#3d5080",whiteSpace:"nowrap" as const,
+              color:"#1e2d50",fontWeight:800,whiteSpace:"nowrap" as const,
             }}>{label}</div>
           ))}
           <div style={{position:"absolute",top:LABEL_H-5,left:0,right:0,
@@ -348,12 +348,19 @@ export default function Bracket(){
           {RIGHT_R16.map((id,i)=>mc(id,r16R,R16Y[i]))}
           {RIGHT_R32.map((id,i)=>mc(id,r32R,R32Y[i]))}
 
-          {/* Trophy */}
+          {/* Winner label + Trophy */}
           <div style={{
             position:"absolute" as const,
-            left:finX+CW/2-15,top:LABEL_H+FINY+CH/2+10,
-            fontSize:28,lineHeight:1,textAlign:"center" as const,
-            filter:"drop-shadow(0 0 10px rgba(251,191,36,0.7))",
+            left:finX,top:LABEL_H+FINY+CH/2+6,
+            width:CW,textAlign:"center" as const,
+            fontSize:11,fontWeight:900,color:"#b45309",
+            letterSpacing:"0.05em",textTransform:"uppercase" as const,
+          }}>מנצחת</div>
+          <div style={{
+            position:"absolute" as const,
+            left:finX+CW/2-15,top:LABEL_H+FINY+CH/2+22,
+            fontSize:26,lineHeight:1,textAlign:"center" as const,
+            filter:"drop-shadow(0 0 8px rgba(180,83,9,0.5))",
           }}>🏆</div>
 
           {/* 3rd place */}
@@ -362,7 +369,7 @@ export default function Bracket(){
             left:finX,top:LABEL_H+FINY+CH/2+50,
             width:CW,textAlign:"center" as const,
             fontSize:9,fontWeight:700,textTransform:"uppercase" as const,
-            letterSpacing:"0.05em",color:"#6b7a9a",
+            letterSpacing:"0.05em",color:"#3d4f70",fontWeight:700,
           }}>מקום שלישי</div>
           {mc(THIRD_ID,finX,FINY+CH+80)}
         </div>

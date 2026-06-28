@@ -107,70 +107,84 @@ export default function PredictionForm({ match, onClose }: { match: Match; onClo
     await shareToWhatsApp(predictionShareText(match, h, a));
   }
 
+  const h = parseInt(home, 10);
+  const a = parseInt(away, 10);
+  const scoreEntered = !Number.isNaN(h) && !Number.isNaN(a);
+  const isTied = scoreEntered && h === a;
+  const winnerRequired = isKnockout && scoreEntered && isTied && !winner;
+  const canSave = !locked && !!user && scoreEntered && (!isKnockout || !!winner || !isTied);
+
   return (
     <div className="prediction-box">
       <h4>🔮 הניחוש שלך</h4>
-      <div className="pred-form">
-        <div className="pred-team">{homeTeam.flag} {homeTeam.name}</div>
-        <input
-          className="pred-input"
-          type="number" inputMode="numeric" min={0} max={20}
-          value={home}
-          disabled={locked}
-          onChange={e => setHome(e.target.value)}
-          aria-label={`שערי ${homeTeam.name}`}
-        />
-        <span className="pred-dash">:</span>
-        <input
-          className="pred-input"
-          type="number" inputMode="numeric" min={0} max={20}
-          value={away}
-          disabled={locked}
-          onChange={e => setAway(e.target.value)}
-          aria-label={`שערי ${awayTeam.name}`}
-        />
-        <div className="pred-team">{awayTeam.name} {awayTeam.flag}</div>
+
+      {/* --- Section 1: Score (90 min) --- */}
+      <div style={{ marginBottom: isKnockout ? 12 : 0 }}>
+        {isKnockout && (
+          <div className="muted" style={{ fontSize: 11, marginBottom: 6, fontWeight: 700 }}>
+            חלק א׳ — תוצאת 90 דקות
+          </div>
+        )}
+        <div className="pred-form">
+          <div className="pred-team">{homeTeam.flag} {homeTeam.name}</div>
+          <input
+            className="pred-input"
+            type="number" inputMode="numeric" min={0} max={20}
+            value={home}
+            disabled={locked}
+            onChange={e => setHome(e.target.value)}
+            aria-label={`שערי ${homeTeam.name}`}
+          />
+          <span className="pred-dash">:</span>
+          <input
+            className="pred-input"
+            type="number" inputMode="numeric" min={0} max={20}
+            value={away}
+            disabled={locked}
+            onChange={e => setAway(e.target.value)}
+            aria-label={`שערי ${awayTeam.name}`}
+          />
+          <div className="pred-team">{awayTeam.name} {awayTeam.flag}</div>
+        </div>
       </div>
 
-      {/* KO-only: explicit winner picker for tied 90-min predictions */}
-      {isKnockout && (() => {
-        const h = parseInt(home, 10);
-        const a = parseInt(away, 10);
-        const isTied = !Number.isNaN(h) && !Number.isNaN(a) && h === a;
-        return (
-          <div className="pred-winner-block" style={{ marginTop: 10 }}>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-              ⚽ נוקאאוט — אין תיקו. בחר מי תעלה (אם 90 דק׳ הסתיימו בתיקו: הארכה/פנדלים יכריעו):
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className={`btn btn-small ${winner === match.home ? "btn-primary" : ""}`}
-                onClick={() => setWinner(match.home)}
-                disabled={locked}
-                style={{ fontWeight: winner === match.home ? 800 : 500 }}>
-                {homeTeam.flag} {homeTeam.name}
-              </button>
-              <button
-                type="button"
-                className={`btn btn-small ${winner === match.away ? "btn-primary" : ""}`}
-                onClick={() => setWinner(match.away)}
-                disabled={locked}
-                style={{ fontWeight: winner === match.away ? 800 : 500 }}>
-                {awayTeam.flag} {awayTeam.name}
-              </button>
-            </div>
-            {isTied && !winner && (
-              <div className="pred-msg is-locked" style={{ marginTop: 6, fontSize: 12 }}>
-                ⚠ ניחוש 90 דק׳ בתיקו — חובה לבחור מנצחת
-              </div>
-            )}
+      {/* --- Section 2 (KO only): Winner --- */}
+      {isKnockout && (
+        <div style={{
+          borderTop: "1px solid var(--border)",
+          paddingTop: 10, marginTop: 2,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6, color: "var(--accent)" }}>
+            חלק ב׳ — מי תעלה? {isTied ? "(90 דק׳ בתיקו — חובה לבחור)" : winner ? "" : "(אוטומטי לפי התוצאה)"}
           </div>
-        );
-      })()}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className={`btn btn-small ${winner === match.home ? "btn-primary" : ""}`}
+              onClick={() => setWinner(match.home)}
+              disabled={locked}
+              style={{ fontWeight: winner === match.home ? 800 : 500 }}>
+              {homeTeam.flag} {homeTeam.name}
+            </button>
+            <button
+              type="button"
+              className={`btn btn-small ${winner === match.away ? "btn-primary" : ""}`}
+              onClick={() => setWinner(match.away)}
+              disabled={locked}
+              style={{ fontWeight: winner === match.away ? 800 : 500 }}>
+              {awayTeam.flag} {awayTeam.name}
+            </button>
+          </div>
+          {winnerRequired && (
+            <div className="pred-msg is-locked" style={{ marginTop: 6, fontSize: 12 }}>
+              ⚠ ניחוש תיקו — חובה לבחור מי תעלה (הארכה/פנדלים)
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mc-actions" style={{ marginTop: 8 }}>
-        <button className="btn btn-primary" onClick={save} disabled={locked || !user}>
+        <button className="btn btn-primary" onClick={save} disabled={!canSave}>
           {existing ? "💾 עדכן ניחוש" : "💾 שמור ניחוש"}
         </button>
         {existing && !locked && (
