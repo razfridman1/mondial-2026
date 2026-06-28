@@ -128,10 +128,6 @@ export default function SuperAdminPanel() {
         <BonusAwardsPanel />
       </details>
 
-      <details className="adm-section">
-        <summary>🌐 FIFA — משיכת נתונים חיים</summary>
-        <FifaPullPanel />
-      </details>
 
     </section>
   );

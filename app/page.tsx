@@ -20,6 +20,7 @@ import FriendsPredictionsTab from "@/components/FriendsPredictionsTab";
 import SimulationBanner from "@/components/SimulationBanner";
 import SimulationPanel from "@/components/SimulationPanel";
 import SuperAdminPanel from "@/components/SuperAdminPanel";
+import FifaPullTab from "@/components/FifaPullTab";
 
 function HomeInner() {
   const tab = useStore(s => s.prefs.tab);
@@ -44,6 +45,7 @@ function HomeInner() {
         {tab === "admin"      && <AdminPanel />}
         {tab === "simulation" && <SimulationPanel />}
         {tab === "superadmin" && <SuperAdminPanel />}
+        {tab === "fifapull"   && <FifaPullTab />}
       </main>
       <ChatAssistant />
       <footer style={{ textAlign: "center", padding: "30px 16px", color: "#6b7396", fontSize: 12 }}>
