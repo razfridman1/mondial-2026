@@ -1009,7 +1009,7 @@ export async function runResultsSync(opts: { force?: boolean; debug?: boolean } 
  * the caller can still proceed with the secondary source. */
 async function fetchFootballDataOrgMatches(baseUrl: string, apiKey: string): Promise<{ matches: any[]; error?: string } | null> {
   try {
-    const r = await fetch(`${baseUrl}/competitions/WC/matches?season=2026`, {
+    const r = await fetch(`${baseUrl}/competitions/WC/matches?status=FINISHED`, {
       headers: { "X-Auth-Token": apiKey },
     });
     if (!r.ok) {
