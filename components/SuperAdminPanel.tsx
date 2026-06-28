@@ -1992,7 +1992,7 @@ function FifaPullPanel() {
     fixtures:  "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/scores-fixtures?country=IL&wtw-filter=ALL",
   };
 
-  async function pull(type: "standings" | "scorers" | "assists") {
+  async function pull(type: "standings" | "scorers" | "assists" | "fixtures") {
     setBusy(b => ({ ...b, [type]: true }));
     setErrors(e => ({ ...e, [type]: "" }));
     try {
