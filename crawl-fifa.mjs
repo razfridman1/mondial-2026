@@ -70,10 +70,22 @@ async function scrapePlayerStats(type) {
   await page.waitForTimeout(5000);
 
   if (type === "assists") {
-    try {
-      const tab = await page.$("button:has-text('Assists'), [role='tab']:has-text('Assists'), a:has-text('Assists')");
-      if (tab) { await tab.click(); await page.waitForTimeout(3000); }
-    } catch (e) {}
+    // Try JS click on any element whose exact text is "Assists"
+    const clicked = await page.evaluate(function() {
+      var all = Array.from(document.querySelectorAll("button, [role='tab'], a, li, span"));
+      var el = all.find(function(e) {
+        return e.children.length === 0 && e.textContent.trim() === "Assists";
+      });
+      if (el) { el.click(); return true; }
+      return false;
+    });
+    console.log("  Assists tab JS click:", clicked);
+    if (clicked) {
+      await page.waitForTimeout(4000);
+    } else {
+      // Playwright fallback
+      try { await page.locator("text=Assists").first().click({ timeout: 3000 }); await page.waitForTimeout(3000); } catch (e) {}
+    }
   }
 
   await waitFor("tr td.rank-column, tr td.list-cell-column", 15000);
@@ -90,11 +102,9 @@ async function scrapePlayerStats(type) {
       var tm      = after.match(/^([A-Z]{3})/);
       var team    = tm ? tm[1] : after.slice(0, 3);
       var vals    = Array.from(tr.querySelectorAll("td.scrollable-column span.value"));
-      // After clicking Assists tab, the primary stat moves to index 0
-      var primaryVal   = vals[0] ? vals[0].textContent.trim() : "0";
-      var secondaryVal = vals[1] ? vals[1].textContent.trim() : "0";
-      var goals   = statType === "assists" ? secondaryVal : primaryVal;
-      var assists = statType === "assists" ? primaryVal   : secondaryVal;
+      // vals[0] = Goals (always), vals[1] = Assists (always)
+      var goals   = vals[0] ? vals[0].textContent.trim() : "0";
+      var assists = vals[1] ? vals[1].textContent.trim() : "0";
       var value   = statType === "assists" ? assists : goals;
       return { rank: Number(rank)||0, name: name, team: team, goals: Number(goals)||0, assists: Number(assists)||0, value: Number(value)||0, displayValue: value||"0" };
     }).filter(function(r) { return r.name && r.rank > 0; });
@@ -298,7 +308,10 @@ try {
     } else if (task === "assists") {
       const rows = await scrapePlayerStats("assists");
       if (rows && rows.length) {
-        const top10 = rows.filter(function(r) { return r.assists > 0; }).slice(0, 10);
+        // Sort by assists descending (works even if tab click failed — uses vals[1] for all 50 rows)
+        const sorted = rows.slice().sort(function(a, b) { return b.assists - a.assists; });
+        console.log("  Top 3 by assists:", sorted.slice(0, 3).map(function(r) { return r.name + ":" + r.assists; }));
+        const top10 = sorted.filter(function(r) { return r.assists > 0; }).slice(0, 10);
         await push("fifa_assists", { assists: top10.map(function(r) { return { name: r.name, teamCode: r.team, count: r.assists }; }) });
         await push("cached_assists_raw_fifa", { rows: rows });
       }

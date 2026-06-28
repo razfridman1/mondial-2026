@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
       if (!doc.exists) return NextResponse.json({ ok: false, error: "No data - run: node crawl-fifa.mjs --only matchcentre" });
       const data = doc.data()!;
       const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      const recent = (data.matches || []).filter((m: any) => !m.scrapedAt || m.scrapedAt >= twoDaysAgo);
+      const recent = (data.matches || []).filter((m: any) => m.scrapedAt && m.scrapedAt >= twoDaysAgo);
       return NextResponse.json({ ok: true, type, rows: recent, updatedAt: data.updatedAt });
     }
     return NextResponse.json({ error: "Unknown type" }, { status: 400 });

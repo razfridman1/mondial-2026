@@ -10,36 +10,66 @@ async function adminAuthHeaders() {
 
 type PullType = "scorers" | "assists" | "fixtures" | "matchcentre";
 
-// Map 3-letter FIFA team codes to flag emojis
-const FLAG: Record<string, string> = {
-  ARG:"🇦🇷",AUS:"🇦🇺",BEL:"🇧🇪",BIH:"🇧🇦",BRA:"🇧🇷",CAN:"🇨🇦",CHI:"🇨🇱",CMR:"🇨🇲",
-  COL:"🇨🇴",CRC:"🇨🇷",CRO:"🇭🇷",CZE:"🇨🇿",DEN:"🇩🇰",ECU:"🇪🇨",EGY:"🇪🇬",ENG:"🏴󠁧󠁢󠁥󠁮󠁧󠁿",
-  ESP:"🇪🇸",FRA:"🇫🇷",GER:"🇩🇪",GHA:"🇬🇭",GRE:"🇬🇷",HON:"🇭🇳",HUN:"🇭🇺",IND:"🇮🇳",
-  IRN:"🇮🇷",ITA:"🇮🇹",JAM:"🇯🇲",JPN:"🇯🇵",KOR:"🇰🇷",KSA:"🇸🇦",MAR:"🇲🇦",MEX:"🇲🇽",
-  MLI:"🇲🇱",NED:"🇳🇱",NGA:"🇳🇬",NOR:"🇳🇴",NZL:"🇳🇿",PAR:"🇵🇾",PER:"🇵🇪",POL:"🇵🇱",
-  POR:"🇵🇹",QAT:"🇶🇦",RSA:"🇿🇦",RUS:"🇷🇺",SCO:"🏴󠁧󠁢󠁳󠁣󠁴󠁿",SEN:"🇸🇳",SRB:"🇷🇸",SUI:"🇨🇭",
-  SVK:"🇸🇰",SWE:"🇸🇪",TUN:"🇹🇳",TUR:"🇹🇷",UKR:"🇺🇦",URU:"🇺🇾",USA:"🇺🇸",VEN:"🇻🇪",
-  WAL:"🏴󠁧󠁢󠁷󠁬󠁳󠁿",CMB:"🇨🇲",CIV:"🇨🇮",ALG:"🇩🇿",BOL:"🇧🇴",GUA:"🇬🇹",PAN:"🇵🇦",
-  SLO:"🇸🇮",NMI:"🇲🇵",CPV:"🇨🇻",CUB:"🇨🇺",HAI:"🇭🇹",TRI:"🇹🇹",
+// FIFA 3-letter code -> ISO 2-letter for flagcdn.com
+const ISO: Record<string, string> = {
+  AFG:"af",ALG:"dz",AND:"ad",ARG:"ar",ARM:"am",AUS:"au",AUT:"at",AZE:"az",
+  BEL:"be",BEN:"bj",BFA:"bf",BHR:"bh",BIH:"ba",BLR:"by",BOL:"bo",BOT:"bw",BRA:"br",BUL:"bg",
+  CMR:"cm",CAN:"ca",CAF:"cf",CHA:"td",CHI:"cl",CHN:"cn",CIV:"ci",COD:"cd",COG:"cg",
+  COL:"co",COM:"km",CRC:"cr",CRO:"hr",CUB:"cu",CUW:"cw",CYP:"cy",CZE:"cz",
+  DEN:"dk",DJI:"dj",DOM:"do",ECU:"ec",EGY:"eg",ENG:"gb-eng",EQG:"gq",ERI:"er",ESP:"es",EST:"ee",
+  ETH:"et",FIJ:"fj",FIN:"fi",FRA:"fr",GAB:"ga",GAM:"gm",GEO:"ge",GER:"de",GHA:"gh",
+  GRE:"gr",GUA:"gt",GUI:"gn",GUY:"gy",HAI:"ht",HON:"hn",HUN:"hu",
+  IDN:"id",IND:"in",IRL:"ie",IRN:"ir",IRQ:"iq",ISL:"is",ISR:"il",ITA:"it",
+  JAM:"jm",JOR:"jo",JPN:"jp",KAZ:"kz",KEN:"ke",KOR:"kr",KSA:"sa",KUW:"kw",
+  LBN:"lb",LES:"ls",LBR:"lr",LBA:"ly",LIE:"li",LTU:"lt",LUX:"lu",
+  MAD:"mg",MAR:"ma",MAS:"my",MDV:"mv",MEX:"mx",MDA:"md",MLI:"ml",MLT:"mt",
+  MNG:"mn",MNE:"me",MOZ:"mz",MTN:"mr",MRI:"mu",MWI:"mw",MYA:"mm",
+  NAM:"na",NCA:"ni",NED:"nl",NEP:"np",NGA:"ng",NIG:"ne",NOR:"no",NZL:"nz",
+  OMA:"om",PAK:"pk",PAN:"pa",PAR:"py",PER:"pe",PHI:"ph",POL:"pl",POR:"pt",QAT:"qa",
+  ROU:"ro",RSA:"za",RUS:"ru",RWA:"rw",SCO:"gb-sct",SEN:"sn",
+  SLE:"sl",SLO:"si",SVN:"si",SIN:"sg",SRB:"rs",SRI:"lk",SUD:"sd",SUI:"ch",SWE:"se",
+  SYR:"sy",TAN:"tz",THA:"th",TLS:"tl",TOG:"tg",TRI:"tt",TUN:"tn",TUR:"tr",
+  UGA:"ug",UKR:"ua",UAE:"ae",URU:"uy",USA:"us",UZB:"uz",VEN:"ve",VIE:"vn",
+  WAL:"gb-wls",YEM:"ye",ZAM:"zm",ZIM:"zw",SVK:"sk",MKD:"mk",
 };
-function flag(code: string) { return FLAG[code] || ""; }
 
-// Map full team name to 3-letter code for flag lookup
-const NAME_TO_CODE: Record<string, string> = {
-  "Mexico":"MEX","South Africa":"RSA","Korea Republic":"KOR","Czech Republic":"CZE",
-  "Canada":"CAN","Bosnia and Herzegovina":"BIH","France":"FRA","Germany":"GER",
-  "Brazil":"BRA","Japan":"JPN","Argentina":"ARG","Paraguay":"PAR","Spain":"ESP",
-  "England":"ENG","Portugal":"POR","Netherlands":"NED","Sweden":"SWE","Switzerland":"SUI",
-  "Norway":"NOR","Denmark":"DEN","Belgium":"BEL","Croatia":"CRO","Uruguay":"URU",
-  "Colombia":"COL","Australia":"AUS","New Zealand":"NZL","USA":"USA","Italy":"ITA",
+// Hebrew team names
+const HEB: Record<string, string> = {
+  ARG:"ארגנטינה",AUS:"אוסטרליה",BEL:"בלגיה",BIH:"בוסניה",BRA:"ברזיל",
+  CAN:"קנדה",CHI:"צ\u0027ילה",CMR:"קמרון",COL:"קולומביה",CRC:"קוסטה ריקה",
+  CRO:"קרואטיה",CZE:"צ\u0027כיה",DEN:"דנמרק",ECU:"אקוודור",EGY:"מצרים",
+  ENG:"אנגליה",ESP:"ספרד",FRA:"צרפת",GER:"גרמניה",GHA:"גאנה",
+  HON:"הונדורס",HUN:"הונגריה",IRN:"איראן",ITA:"איטליה",JPN:"יפן",
+  KOR:"קוריאה ד",KSA:"סעודיה",MAR:"מרוקו",MEX:"מקסיקו",NED:"הולנד",
+  NGA:"ניגריה",NOR:"נורווגיה",NZL:"ניו זילנד",PAR:"פרגוואי",PER:"פרו",
+  POL:"פולין",POR:"פורטוגל",QAT:"קטר",RSA:"דר\u0022א",SCO:"סקוטלנד",
+  SEN:"סנגל",SRB:"סרביה",SUI:"שווייץ",SVK:"סלובקיה",SWE:"שוודיה",
+  TUN:"תוניסיה",TUR:"טורקיה",UKR:"אוקראינה",URU:"אורוגוואי",
+  USA:"ארה\u0022ב",WAL:"וויילס",CIV:"חוף השנהב",ALG:"אלג\u0027יריה",
+  BOL:"בוליביה",GUA:"גואטמלה",PAN:"פנמה",SLO:"סלובניה",HAI:"האיטי",
+  TRI:"טרינידד",CUW:"קוראסאו",MLI:"מאלי",JOR:"ירדן",
 };
-function teamFlag(nameOrCode: string) {
-  if (!nameOrCode) return "";
-  const direct = flag(nameOrCode);
-  if (direct) return direct;
-  // Try as full name
-  const code = NAME_TO_CODE[nameOrCode];
-  return code ? flag(code) : "";
+
+function FlagImg({ code }: { code: string }) {
+  const iso = ISO[code];
+  if (!iso) return <span style={{ fontSize: 10, opacity: 0.5 }}>{code}</span>;
+  return (
+    <img
+      src={"https://flagcdn.com/20x15/" + iso + ".png"}
+      width={20} height={15}
+      style={{ verticalAlign: "middle", borderRadius: 2, marginLeft: 4 }}
+      alt={code}
+      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+    />
+  );
+}
+
+function teamName(code: string) { return HEB[code] || code; }
+
+function formatDate(iso: string) {
+  if (!iso) return "";
+  const d = new Date(iso + "T12:00:00Z");
+  return d.toLocaleDateString("he-IL", { day: "numeric", month: "numeric", timeZone: "UTC" });
 }
 
 function ScorersView({ data, label }: { data: any[]; label: string }) {
@@ -47,19 +77,22 @@ function ScorersView({ data, label }: { data: any[]; label: string }) {
     <table style={{ width: "100%", fontSize: 14, borderCollapse: "collapse" }}>
       <thead>
         <tr style={{ color: "var(--text-muted)" }}>
-          <th style={{ textAlign: "left", padding: "4px 8px" }}>#</th>
-          <th style={{ textAlign: "left", padding: "4px 8px" }}>שחקן</th>
-          <th style={{ padding: "4px 8px" }}>קבוצה</th>
+          <th style={{ textAlign: "right", padding: "4px 8px" }}>#</th>
+          <th style={{ textAlign: "right", padding: "4px 8px" }}>שחקן</th>
+          <th style={{ textAlign: "right", padding: "4px 8px" }}>קבוצה</th>
           <th style={{ padding: "4px 8px", fontWeight: 700 }}>{label}</th>
         </tr>
       </thead>
       <tbody>
         {data.map((r: any, i: number) => (
           <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
-            <td style={{ padding: "4px 8px", color: "var(--text-muted)" }}>{r.rank ?? i + 1}</td>
-            <td style={{ padding: "4px 8px" }}>{r.name}</td>
-            <td style={{ padding: "4px 8px", textAlign: "center" }}>
-              {teamFlag(r.teamCode || r.team)} {r.teamCode || r.team}
+            <td style={{ padding: "4px 8px", color: "var(--text-muted)", textAlign: "right" }}>{r.rank ?? i + 1}</td>
+            <td style={{ padding: "4px 8px", textAlign: "right" }}>{r.name}</td>
+            <td style={{ padding: "4px 8px", textAlign: "right" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {teamName(r.teamCode || r.team)}
+                <FlagImg code={r.teamCode || r.team} />
+              </span>
             </td>
             <td style={{ padding: "4px 8px", textAlign: "center", fontWeight: 700 }}>{r.count ?? r.value ?? r.displayValue}</td>
           </tr>
@@ -70,7 +103,7 @@ function ScorersView({ data, label }: { data: any[]; label: string }) {
 }
 
 function MatchResultsView({ data }: { data: any[] }) {
-  if (!data.length) return <p className="muted" style={{ fontSize: 14 }}>אין תוצאות</p>;
+  if (!data.length) return <p className="muted" style={{ fontSize: 14 }}>אין תוצאות (הרץ: node crawl-fifa.mjs --only matchcentre)</p>;
   return (
     <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
       <thead>
@@ -78,22 +111,28 @@ function MatchResultsView({ data }: { data: any[] }) {
           <th style={{ textAlign: "right", padding: "4px 8px" }}>בית</th>
           <th style={{ padding: "4px 8px" }}>תוצאה</th>
           <th style={{ textAlign: "left", padding: "4px 8px" }}>חוץ</th>
-          <th style={{ textAlign: "left", padding: "4px 8px", fontSize: 11 }}>סטטוס</th>
+          <th style={{ padding: "4px 8px", fontSize: 11 }}>תאריך</th>
+          <th style={{ padding: "4px 8px", fontSize: 11 }}>סטטוס</th>
         </tr>
       </thead>
       <tbody>
         {data.map((m: any, i: number) => (
           <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
             <td style={{ padding: "4px 8px", fontWeight: 600, textAlign: "right" }}>
-              {teamFlag(m.home)} {m.home}
+              {teamName(m.home)} <FlagImg code={m.home} />
             </td>
             <td style={{ padding: "4px 8px", textAlign: "center", fontWeight: 800, fontSize: 16 }}>
               {m.homeScore ?? "?"} - {m.awayScore ?? "?"}
             </td>
             <td style={{ padding: "4px 8px", fontWeight: 600 }}>
-              {teamFlag(m.away)} {m.away}
+              <FlagImg code={m.away} /> {teamName(m.away)}
             </td>
-            <td style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 11 }}>{m.date || m.status || ""}</td>
+            <td style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 11, textAlign: "center" }}>
+              {m.scrapedAt ? formatDate(m.scrapedAt) : ""}
+            </td>
+            <td style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 11, textAlign: "center" }}>
+              {m.date || m.status || ""}
+            </td>
           </tr>
         ))}
       </tbody>
@@ -102,29 +141,30 @@ function MatchResultsView({ data }: { data: any[] }) {
 }
 
 function FixturesView({ data }: { data: any[] }) {
+  if (!data.length) return <p className="muted" style={{ fontSize: 14 }}>אין נתונים (הרץ: node crawl-fifa.mjs --only fixtures)</p>;
   return (
     <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
       <thead>
         <tr style={{ color: "var(--text-muted)" }}>
-          <th style={{ textAlign: "left", padding: "4px 8px" }}>בית</th>
+          <th style={{ textAlign: "right", padding: "4px 8px" }}>בית</th>
           <th style={{ padding: "4px 8px" }}>תוצאה</th>
           <th style={{ textAlign: "left", padding: "4px 8px" }}>חוץ</th>
-          <th style={{ textAlign: "left", padding: "4px 8px" }}>תאריך</th>
+          <th style={{ padding: "4px 8px" }}>תאריך</th>
         </tr>
       </thead>
       <tbody>
         {data.map((e: any, i: number) => (
           <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
-            <td style={{ padding: "4px 8px", fontWeight: 600 }}>
-              {teamFlag(e.home || e.homeTeam)} {e.home || e.homeTeam}
+            <td style={{ padding: "4px 8px", fontWeight: 600, textAlign: "right" }}>
+              {teamName(e.home || e.homeTeam)} <FlagImg code={e.home || e.homeTeam} />
             </td>
             <td style={{ padding: "4px 8px", textAlign: "center", fontWeight: 700 }}>
-              {e.score ?? (e.homeScore !== undefined ? `${e.homeScore}-${e.awayScore}` : "נגד")}
+              {e.score ?? (e.homeScore !== undefined ? e.homeScore + "-" + e.awayScore : "נגד")}
             </td>
             <td style={{ padding: "4px 8px", fontWeight: 600 }}>
-              {teamFlag(e.away || e.awayTeam)} {e.away || e.awayTeam}
+              <FlagImg code={e.away || e.awayTeam} /> {teamName(e.away || e.awayTeam)}
             </td>
-            <td style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 12 }}>{e.date}</td>
+            <td style={{ padding: "4px 8px", color: "var(--text-muted)", fontSize: 12, textAlign: "center" }}>{e.date}</td>
           </tr>
         ))}
       </tbody>
@@ -141,29 +181,26 @@ function PullSection({ label, hint, children, onPull, busy, error, updatedAt, ha
         <strong style={{ fontSize: 20, fontWeight: 800 }}>{label}</strong>
         <button className="btn btn-primary" onClick={onPull} disabled={busy}
                 style={{ fontSize: 15, padding: "8px 20px" }}>
-          {busy ? "⏳ טוען..." : "↓ משוך"}
+          {busy ? "\u23F3 \u05D8\u05D5\u05E2\u05DF..." : "\u2193 \u05DE\u05E9\u05D5\u05DA"}
         </button>
         {updatedAt && (
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            עודכן: {new Date(updatedAt).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })}
+            \u05E2\u05D5\u05D3\u05DB\u05DF: {new Date(updatedAt).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })}
           </span>
         )}
       </div>
       <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 12px" }}>
-        לרענון: <code>{hint}</code>
+        \u05DC\u05E8\u05E2\u05E0\u05D5\u05DF: <code>{hint}</code>
       </p>
-
       {error && (
         <div style={{ fontSize: 14, color: "var(--red)", background: "rgba(239,68,68,0.1)",
                       borderRadius: 8, padding: "10px 16px", marginBottom: 10 }}>
-          ⚠️ {error}
+          \u26A0\uFE0F {error}
         </div>
       )}
-
       {!hasData && !busy && !error && (
-        <p className="muted" style={{ fontSize: 14, margin: 0 }}>לחץ "משוך" לטעינת נתונים מ-Firestore.</p>
+        <p className="muted" style={{ fontSize: 14, margin: 0 }}>\u05DC\u05D7\u05E5 "\u05DE\u05E9\u05D5\u05DA" \u05DC\u05D8\u05E2\u05D9\u05E0\u05EA \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD.</p>
       )}
-
       {hasData && <div>{children}</div>}
     </div>
   );
@@ -188,7 +225,7 @@ export default function FifaPullTab() {
 
   if (!user?.isAdmin) return (
     <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
-      🔒 גישה לאדמין בלבד
+      \uD83D\uDD12 \u05D2\u05D9\u05E9\u05D4 \u05DC\u05D0\u05D3\u05DE\u05D9\u05DF \u05D1\u05DC\u05D1\u05D3
     </div>
   );
 
@@ -205,7 +242,7 @@ export default function FifaPullTab() {
         if (type === "matchcentre")  setMatchResults(json.rows || []);
         if (json.updatedAt) setUpdated(u => ({ ...u, [type]: json.updatedAt }));
       } else if (!silent) {
-        setErrors(e => ({ ...e, [type]: json.error || "שגיאה" }));
+        setErrors(e => ({ ...e, [type]: json.error || "\u05E9\u05D2\u05D9\u05D0\u05D4" }));
       }
     } catch (err: any) {
       if (!silent) setErrors(e => ({ ...e, [type]: err.message }));
@@ -217,31 +254,31 @@ export default function FifaPullTab() {
   return (
     <section style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px", display: "flex", flexDirection: "column", gap: 24 }}>
       <div>
-        <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🌐 נתוני FIFA — Crawler</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>\uD83C\uDF10 \u05E0\u05EA\u05D5\u05E0\u05D9 FIFA \u2014 Crawler</h2>
         <p className="muted" style={{ fontSize: 13 }}>
-          נתונים מ-FIFA.com דרך Playwright. הרצה: <code>node crawl-fifa.mjs</code>
+          \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05DE-FIFA.com \u05D3\u05E8\u05DA Playwright. \u05D4\u05E8\u05E6\u05D4: <code>node crawl-fifa.mjs</code>
         </p>
       </div>
 
-      <PullSection label="⚽ מלך השערים" hint="node crawl-fifa.mjs --only scorers"
+      <PullSection label="\u26BD \u05DE\u05DC\u05DA \u05D4\u05E9\u05E2\u05E8\u05D9\u05DD" hint="node crawl-fifa.mjs --only scorers"
         onPull={() => pull("scorers")} busy={!!busy.scorers}
         error={errors.scorers || ""} updatedAt={updated.scorers} hasData={scorers.length > 0}>
-        <ScorersView data={scorers} label="שערים" />
+        <ScorersView data={scorers} label="\u05E9\u05E2\u05E8\u05D9\u05DD" />
       </PullSection>
 
-      <PullSection label="🎯 מלך הבישולים" hint="node crawl-fifa.mjs --only assists"
+      <PullSection label="\uD83C\uDFAF \u05DE\u05DC\u05DA \u05D4\u05D1\u05D9\u05E9\u05D5\u05DC\u05D9\u05DD" hint="node crawl-fifa.mjs --only assists"
         onPull={() => pull("assists")} busy={!!busy.assists}
         error={errors.assists || ""} updatedAt={updated.assists} hasData={assists.length > 0}>
-        <ScorersView data={assists} label="בישולים" />
+        <ScorersView data={assists} label="\u05D1\u05D9\u05E9\u05D5\u05DC\u05D9\u05DD" />
       </PullSection>
 
-      <PullSection label="📅 לוח משחקים" hint="node crawl-fifa.mjs --only fixtures"
+      <PullSection label="\uD83D\uDCC5 \u05DC\u05D5\u05D7 \u05DE\u05E9\u05D7\u05E7\u05D9\u05DD" hint="node crawl-fifa.mjs --only fixtures"
         onPull={() => pull("fixtures")} busy={!!busy.fixtures}
         error={errors.fixtures || ""} updatedAt={updated.fixtures} hasData={fixtures.length > 0}>
         <FixturesView data={fixtures} />
       </PullSection>
 
-      <PullSection label="🏟️ תוצאות משחקים" hint="node crawl-fifa.mjs --only matchcentre"
+      <PullSection label="\uD83C\uDFDF\uFE0F \u05EA\u05D5\u05E6\u05D0\u05D5\u05EA \u05DE\u05E9\u05D7\u05E7\u05D9\u05DD" hint="node crawl-fifa.mjs --only matchcentre"
         onPull={() => pull("matchcentre")} busy={!!busy.matchcentre}
         error={errors.matchcentre || ""} updatedAt={updated.matchcentre} hasData={matchResults.length > 0}>
         <MatchResultsView data={matchResults} />
