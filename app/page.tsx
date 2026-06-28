@@ -54,4 +54,10 @@ function HomeInner() {
   );
 }
 
-export d
+export default function Home() {
+  return (
+    <AuthProvider>
+      <HomeInner />
+    </AuthProvider>
+  );
+}
