@@ -310,17 +310,20 @@ try {
     } else if (task === "matchcentre") {
       const data = await scrapeMatchCentre();
       if (data && data.matches && data.matches.length > 0) {
+        const today = new Date().toISOString().slice(0, 10); // "2026-06-28"
+        // Tag each match with the date it was scraped
+        const tagged = data.matches.map(function(m) { return Object.assign({}, m, { scrapedAt: today }); });
         // Merge with existing history (deduplicate by home+away key)
         const existingDoc = await db.collection("live_data").doc("fifa_match_results").get();
         const existingMatches = existingDoc.exists ? (existingDoc.data().matches || []) : [];
         const existingKeys = new Set(existingMatches.map(function(m) { return m.home + "|" + m.away; }));
-        // Update scores for existing matches, add new ones
+        // Update scores/date for existing matches, add new ones
         const updated = existingMatches.map(function(m) {
           const key = m.home + "|" + m.away;
-          const fresh = data.matches.find(function(n) { return n.home + "|" + n.away === key; });
+          const fresh = tagged.find(function(n) { return n.home + "|" + n.away === key; });
           return fresh ? Object.assign({}, m, fresh) : m;
         });
-        const newMatches = data.matches.filter(function(m) { return !existingKeys.has(m.home + "|" + m.away); });
+        const newMatches = tagged.filter(function(m) { return !existingKeys.has(m.home + "|" + m.away); });
         const allMatches = updated.concat(newMatches);
         console.log("  Saving " + allMatches.length + " matches total (" + newMatches.length + " new)");
         await push("fifa_match_results", { matches: allMatches });
