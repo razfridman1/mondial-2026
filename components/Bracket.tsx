@@ -151,7 +151,7 @@ function TeamRow({code,score,isWinner,tbd}:{
     <div style={{
       display:"flex",alignItems:"center",gap:6,
       padding:"2px 4px",borderRadius:4,
-      background:isWinner?"rgba(255,255,255,0.11)":"transparent",
+      background:isWinner?"rgba(251,191,36,0.18)":"transparent",
       opacity:tbd?0.4:1,
     }}>
       {tbd
@@ -162,7 +162,7 @@ function TeamRow({code,score,isWinner,tbd}:{
         flex:1,fontSize:12.5,fontWeight:isWinner?700:500,
         overflow:"hidden",textOverflow:"ellipsis",
         whiteSpace:"nowrap" as const,lineHeight:1.2,
-        color:isWinner?"#ffffff":"rgba(255,255,255,0.88)",
+        color:isWinner?"#0f1f3d":"rgba(30,40,70,0.85)",
         fontStyle:tbd?"italic" as const:"normal" as const,
       }}>
         {tbd?"?":t?.name??code}
@@ -171,7 +171,7 @@ function TeamRow({code,score,isWinner,tbd}:{
         <span style={{
           fontSize:14,fontWeight:800,minWidth:18,
           textAlign:"right" as const,
-          color:isWinner?"#fbbf24":"rgba(255,255,255,0.9)",
+          color:isWinner?"#b45309":"rgba(30,40,70,0.8)",
         }}>{score}</span>
       )}
     </div>
@@ -211,37 +211,37 @@ function MatchCard({id,resolved,results,liveScores,x,cy,isFinal}:{
       left:isFinal?x-3:x, top:LABEL_H+cy-cardH/2,
       width:cardW,height:cardH,
       background:isFinal
-        ?"rgba(251,191,36,0.08)"
-        :isDone?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.05)",
+        ?"rgba(251,191,36,0.15)"
+        :isDone?"#ffffff":"rgba(255,255,255,0.75)",
       border:`${isFinal?1.5:1}px solid ${
         isLive?"#22c55e"
-        :isFinal?"rgba(251,191,36,0.35)"
-        :isDone?"rgba(255,255,255,0.22)":"rgba(255,255,255,0.13)"
+        :isFinal?"rgba(180,130,0,0.5)"
+        :isDone?"rgba(30,40,70,0.22)":"rgba(30,40,70,0.15)"
       }`,
       borderRadius:8,
       padding:"5px 7px",
       boxSizing:"border-box" as const,
       display:"flex",flexDirection:"column" as const,gap:2,
       boxShadow:isLive?"0 0 12px rgba(34,197,94,0.5)"
-        :isFinal?"0 0 20px rgba(251,191,36,0.15)":"0 2px 8px rgba(0,0,0,0.35)",
+        :isFinal?"0 0 16px rgba(180,130,0,0.2)":"0 2px 8px rgba(30,40,70,0.12)",
     }}>
       {isLive&&(
         <div style={{
           position:"absolute" as const,top:-11,left:"50%",
           transform:"translateX(-50%)",
           fontSize:9,fontWeight:800,color:"#22c55e",
-          background:"#070f1e",padding:"1px 6px",borderRadius:4,
+          background:"#0f1f3d",padding:"1px 6px",borderRadius:4,
           whiteSpace:"nowrap" as const,border:"1px solid rgba(34,197,94,0.3)",
         }}>🔴 {live?.minuteLabel}</div>
       )}
       <TeamRow code={homeCode} score={homeScore}
         isWinner={winner?winner===homeCode:homeWins} tbd={homeTbd}/>
-      <div style={{height:1,background:"rgba(255,255,255,0.08)",margin:"0 -3px"}}/>
+      <div style={{height:1,background:"rgba(30,40,70,0.1)",margin:"0 -3px"}}/>
       <TeamRow code={awayCode} score={awayScore}
         isWinner={winner?winner===awayCode:awayWins} tbd={awayTbd}/>
       {dateStr&&(
         <div style={{
-          fontSize:9,color:"rgba(255,255,255,0.38)",
+          fontSize:9,color:"rgba(30,40,70,0.45)",
           textAlign:"center" as const,overflow:"hidden",
           textOverflow:"ellipsis",whiteSpace:"nowrap" as const,marginTop:1,
         }}>{dateStr}</div>
@@ -287,54 +287,8 @@ export default function Bracket(){
       <div style={{
         position:"relative",width:"100%",height:scaledH,
         overflow:"hidden",borderRadius:14,
-        background:"linear-gradient(160deg,#060e1c 0%,#08132a 50%,#060d1a 100%)",
+        background:"linear-gradient(160deg,#e8edf6 0%,#f2f5fb 50%,#e4eaf4 100%)",
       }}>
-
-        {/* Background SVG */}
-        <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}
-          viewBox={`0 0 ${TOTAL_W} ${CONT_H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-          <defs>
-            <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.05"/>
-              <stop offset="100%" stopColor="transparent" stopOpacity="0"/>
-            </radialGradient>
-          </defs>
-          <rect width={TOTAL_W} height={CONT_H} fill="url(#glow)"/>
-          {/* Pitch lines */}
-          <circle cx={TOTAL_W/2} cy={CONT_H/2-10} r="140" stroke="white" strokeWidth="1.5" fill="none" opacity="0.04"/>
-          <line x1={TOTAL_W/2} y1="0" x2={TOTAL_W/2} y2={CONT_H} stroke="white" strokeWidth="1.5" opacity="0.03"/>
-          <rect x="0" y={CONT_H*0.28} width="120" height={CONT_H*0.44} stroke="white" strokeWidth="1.5" fill="none" opacity="0.035"/>
-          <rect x={TOTAL_W-120} y={CONT_H*0.28} width="120" height={CONT_H*0.44} stroke="white" strokeWidth="1.5" fill="none" opacity="0.035"/>
-          {/* Footballs */}
-          <circle cx="170" cy="170" r="24" stroke="white" strokeWidth="2" fill="none" opacity="0.055"/>
-          <circle cx={TOTAL_W-170} cy={CONT_H-150} r="20" stroke="white" strokeWidth="2" fill="none" opacity="0.05"/>
-          <circle cx={TOTAL_W/2} cy={CONT_H-55} r="16" stroke="white" strokeWidth="2" fill="none" opacity="0.045"/>
-          {/* Player silhouettes */}
-          <g stroke="white" strokeWidth="3.5" strokeLinecap="round" fill="none" opacity="0.065" transform="translate(72,85) scale(1.4)">
-            <ellipse cx="0" cy="0" rx="9" ry="10" fill="white" stroke="none" opacity="0.065"/>
-            <line x1="0" y1="10" x2="0" y2="46"/><line x1="0" y1="25" x2="-18" y2="40"/>
-            <line x1="0" y1="25" x2="20" y2="36"/><line x1="0" y1="46" x2="-14" y2="75"/>
-            <line x1="0" y1="46" x2="16" y2="66"/><line x1="16" y1="66" x2="34" y2="58"/>
-          </g>
-          <g stroke="white" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.055" transform="translate(1350,440) scale(1.25)">
-            <ellipse cx="0" cy="0" rx="9" ry="10" fill="white" stroke="none" opacity="0.055"/>
-            <line x1="0" y1="10" x2="-4" y2="44"/><line x1="-2" y1="26" x2="-22" y2="36"/>
-            <line x1="-2" y1="26" x2="18" y2="32"/><line x1="-4" y1="44" x2="-18" y2="70"/>
-            <line x1="-4" y1="44" x2="12" y2="66"/>
-          </g>
-          <g stroke="white" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.05" transform="translate(210,390) scale(1.15)">
-            <ellipse cx="0" cy="0" rx="8" ry="9" fill="white" stroke="none" opacity="0.05"/>
-            <line x1="0" y1="9" x2="5" y2="42"/><line x1="2" y1="24" x2="-20" y2="18"/>
-            <line x1="2" y1="24" x2="20" y2="18"/><line x1="5" y1="42" x2="-10" y2="68"/>
-            <line x1="5" y1="42" x2="20" y2="62"/>
-          </g>
-          <g stroke="white" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.05" transform="translate(1250,135) scale(1.15)">
-            <ellipse cx="0" cy="0" rx="8" ry="9" fill="white" stroke="none" opacity="0.05"/>
-            <line x1="0" y1="9" x2="0" y2="40"/><line x1="0" y1="22" x2="-24" y2="10"/>
-            <line x1="0" y1="22" x2="24" y2="10"/><line x1="0" y1="40" x2="-12" y2="64"/>
-            <line x1="0" y1="40" x2="14" y2="62"/>
-          </g>
-        </svg>
 
         {/* Bracket canvas */}
         <div style={{
@@ -348,17 +302,17 @@ export default function Bracket(){
               position:"absolute" as const,top:7,left:cx-66,width:132,
               textAlign:"center" as const,fontSize:11,fontWeight:800,
               textTransform:"uppercase" as const,letterSpacing:"0.07em",
-              color:"rgba(255,255,255,0.42)",whiteSpace:"nowrap" as const,
+              color:"rgba(30,40,70,0.65)",whiteSpace:"nowrap" as const,
             }}>{label}</div>
           ))}
           <div style={{position:"absolute",top:LABEL_H-5,left:0,right:0,
-            height:1,background:"rgba(255,255,255,0.07)"}}/>
+            height:1,background:"rgba(30,40,70,0.1)"}}/>
 
           {/* SVG connectors */}
           <svg style={{position:"absolute",top:LABEL_H,left:0,overflow:"visible",pointerEvents:"none"}}
             width={TOTAL_W} height={TOTAL_H}>
             {CONNECTORS.map((d,i)=>(
-              <path key={i} d={d} stroke="rgba(255,255,255,0.2)" strokeWidth={1.5} fill="none"/>
+              <path key={i} d={d} stroke="rgba(30,40,70,0.35)" strokeWidth={1.5} fill="none"/>
             ))}
           </svg>
 
@@ -387,7 +341,7 @@ export default function Bracket(){
             left:finX,top:LABEL_H+FINY+CH/2+50,
             width:CW,textAlign:"center" as const,
             fontSize:9,fontWeight:700,textTransform:"uppercase" as const,
-            letterSpacing:"0.05em",color:"rgba(255,255,255,0.32)",
+            letterSpacing:"0.05em",color:"rgba(30,40,70,0.45)",
           }}>מקום שלישי</div>
           {mc(THIRD_ID,finX,FINY+CH+80)}
         </div>
