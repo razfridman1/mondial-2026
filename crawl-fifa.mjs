@@ -237,17 +237,37 @@ async function extractAllMatches() {
 // so we can't use extractAllMatches(). Instead, use match-row containers directly.
 async function scrapeFixtures() {
   console.log("📅 Scraping fixtures...");
-  const url = BASE + "/scores-fixtures";
+  // Use country=&wtw-filter=ALL to get all matches (not filtered by region)
+  const url = BASE + "/scores-fixtures?country=&wtw-filter=ALL";
   await page.goto(url, { waitUntil: "load", timeout: 60000 });
-  await page.waitForTimeout(6000);
+  await page.waitForTimeout(8000);
   await page.evaluate(function() {
     var sdk = document.getElementById("onetrust-consent-sdk");
     if (sdk) sdk.remove();
     var f = document.querySelector(".onetrust-pc-dark-filter");
     if (f) f.remove();
   });
-  // Wait for either score spans (completed) or time spans (upcoming)
-  await waitFor("[class*=match-row], [class*=matchRow], [class*=MatchRow]", 15000);
+
+  // Debug: log unique class substrings that contain "match" or "row"
+  const debugClasses = await page.evaluate(function() {
+    var classes = new Set();
+    document.querySelectorAll("*").forEach(function(el) {
+      (el.className || "").toString().split(/\s+/).forEach(function(c) {
+        if (c && (c.toLowerCase().includes("match") || c.toLowerCase().includes("fixture"))) classes.add(c.slice(0, 60));
+      });
+    });
+    return Array.from(classes).slice(0, 30);
+  });
+  console.log("  DEBUG classes with 'match'/'fixture':", debugClasses.join(", ") || "NONE");
+
+  // Wait for match content — try multiple selectors
+  const loaded = await Promise.race([
+    waitFor("[class*=match-row]", 12000).then(() => "match-row"),
+    waitFor("[class*=fixture]", 12000).then(() => "fixture"),
+    waitFor("[class*=MatchRow]", 12000).then(() => "MatchRow"),
+    new Promise(r => setTimeout(() => r("timeout"), 13000)),
+  ]);
+  console.log("  waitFor result:", loaded);
 
   const data = await page.evaluate(function() {
     function txt(el) { return el ? el.textContent.trim().replace(/\s+/g, " ") : ""; }
@@ -352,8 +372,8 @@ async function scrapeFixtures() {
     });
 
     // Approach 2: time-based (upcoming matches — no score spans)
-    // Look for time elements: "HH:MM" pattern near team names
-    var timeEls = Array.from(document.querySelectorAll("[class*=match-row_time], [class*=matchRow_time], [class*=kickoff], [class*=Kickoff], time"));
+    // Actual class on FIFA: match-row_matchTime__xxxx
+    var timeEls = Array.from(document.querySelectorAll("[class*=matchTime], [class*=match-row_matchTime]"));
     var timeContainers = new Map();
     timeEls.forEach(function(el) {
       var t = txt(el);
@@ -396,8 +416,29 @@ async function scrapeFixtures() {
       }
     });
 
-    return { matches: matches, dateNodeCount: dateNodes.length, scoreContainerCount: scoreContainers.size, timeContainerCount: timeContainers.size };
+    // DEBUG: dump first 20 unique class tokens that contain "time" or "kick"
+    var timeClasses = new Set();
+    document.querySelectorAll("*").forEach(function(el) {
+      (el.className || "").toString().split(/\s+/).forEach(function(c) {
+        if (c && (c.toLowerCase().includes("time") || c.toLowerCase().includes("kick") || c.toLowerCase().includes("hour"))) timeClasses.add(c.slice(0, 60));
+      });
+    });
+
+    return {
+      matches: matches,
+      dateNodeCount: dateNodes.length,
+      scoreContainerCount: scoreContainers.size,
+      timeContainerCount: timeContainers.size,
+      timeClasses: Array.from(timeClasses).slice(0, 20),
+      bodySnippet: document.body ? document.body.innerHTML.slice(0, 500) : "no body",
+    };
   });
+
+  console.log("  timeContainers=" + data.timeContainerCount + " scoreContainers=" + data.scoreContainerCount + " dateNodes=" + data.dateNodeCount);
+  console.log("  timeClasses:", (data.timeClasses || []).join(", ") || "NONE");
+  if (!data.timeContainerCount && !data.scoreContainerCount) {
+    console.log("  bodySnippet:", data.bodySnippet);
+  }
 
   // Fixtures = upcoming (no FT status, no live minutes)
   const today = new Date().toISOString().slice(0, 10);
@@ -407,7 +448,7 @@ async function scrapeFixtures() {
     const isPast = m.matchDate && m.matchDate < today;
     return !isFT && !isLive && !isPast;
   });
-  console.log("  fixtures: " + upcoming.length + " upcoming (total=" + (data.matches||[]).length + ", dateNodes=" + data.dateNodeCount + ", scoreContainers=" + data.scoreContainerCount + ", timeContainers=" + data.timeContainerCount + ")");
+  console.log("  fixtures: " + upcoming.length + " upcoming");
   if (upcoming.length > 0) console.log("  Sample:", JSON.stringify(upcoming.slice(0, 3), null, 2));
   return { matches: upcoming };
 }

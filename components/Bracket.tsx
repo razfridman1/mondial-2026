@@ -165,25 +165,25 @@ function TeamRow({code,score,isWinner,tbd}:{
   code:string;score:number|null;isWinner:boolean;tbd:boolean;
 }){
   const t=TEAMS[code]??null;
-  const kit=KIT[code]??"#334155";
+  const kit=KIT[code]??"#475569";
   return(
     <div style={{
       display:"flex",alignItems:"center",gap:5,
-      padding:"3px 4px",
+      padding:"3px 5px",
       borderRadius:3,
-      background:isWinner?"rgba(59,130,246,0.1)":"transparent",
-      opacity:tbd?0.5:1,
-      borderLeft:`3px solid ${tbd?"#c8d0df":kit}`,
+      background:isWinner?"rgba(96,165,250,0.15)":"transparent",
+      opacity:tbd?0.45:1,
+      borderLeft:`3px solid ${tbd?"#3a4a65":kit}`,
     }}>
       {tbd
-        ? <span style={{fontSize:12,lineHeight:1,flexShrink:0,color:"#5a6a88"}}>?</span>
+        ? <span style={{fontSize:12,lineHeight:1,flexShrink:0,color:"#4a5a78"}}>?</span>
         : <FlagImg code={code}/>
       }
       <span style={{
-        flex:1,fontSize:12,fontWeight:isWinner?800:600,
+        flex:1,fontSize:12,fontWeight:isWinner?800:500,
         overflow:"hidden",textOverflow:"ellipsis",
         whiteSpace:"nowrap" as const,lineHeight:1.2,
-        color:isWinner?"#0f2060":tbd?"#6b7a9a":"#0d1830",
+        color:isWinner?"#93c5fd":tbd?"#4a5a78":"#cbd5e1",
         fontStyle:tbd?"italic" as const:"normal" as const,
       }}>
         {tbd?"?":t?.name??code}
@@ -192,7 +192,7 @@ function TeamRow({code,score,isWinner,tbd}:{
         <span style={{
           fontSize:14,fontWeight:800,minWidth:20,
           textAlign:"right" as const,
-          color:isWinner?"#0f2060":"#1a2540",
+          color:isWinner?"#93c5fd":"#e2e8f0",
         }}>{score}</span>
       )}
     </div>
@@ -232,19 +232,20 @@ function MatchCard({id,resolved,results,liveScores,x,cy,isFinal}:{
       left:isFinal?x-3:x, top:LABEL_H+cy-cardH/2,
       width:cardW,height:cardH,
       background:isFinal
-        ?"rgba(255,243,205,0.8)"
-        :isDone?"#ffffff":"rgba(255,255,255,0.6)",
+        ?"rgba(120,80,10,0.55)"
+        :isDone?"rgba(30,42,65,0.95)":"rgba(20,30,50,0.7)",
       border:`${isFinal?2:1}px solid ${
         isLive?"#22c55e"
         :isFinal?"#d4a017"
-        :isDone?"#b8c2d4":"#c8d0df"
+        :isDone?"#3b5280":"#2a3a5a"
       }`,
       borderRadius:8,
       padding:"5px 7px",
       boxSizing:"border-box" as const,
       display:"flex",flexDirection:"column" as const,gap:2,
-      boxShadow:isLive?"0 0 10px rgba(34,197,94,0.4)"
-        :isFinal?"0 2px 12px rgba(212,160,23,0.3)":"0 1px 4px rgba(30,40,80,0.1)",
+      boxShadow:isLive?"0 0 12px rgba(34,197,94,0.5)"
+        :isFinal?"0 2px 16px rgba(212,160,23,0.5)"
+        :isDone?"0 2px 8px rgba(0,0,0,0.4)":"0 1px 4px rgba(0,0,0,0.3)",
     }}>
       {isLive&&(
         <div style={{
@@ -252,17 +253,17 @@ function MatchCard({id,resolved,results,liveScores,x,cy,isFinal}:{
           transform:"translateX(-50%)",
           fontSize:9,fontWeight:800,color:"#22c55e",
           background:"#052e16",padding:"1px 6px",borderRadius:4,
-          whiteSpace:"nowrap" as const,border:"1px solid rgba(34,197,94,0.3)",
+          whiteSpace:"nowrap" as const,border:"1px solid rgba(34,197,94,0.4)",
         }}>🔴 {live?.minuteLabel}</div>
       )}
       <TeamRow code={homeCode} score={homeScore}
         isWinner={winner?winner===homeCode:homeWins} tbd={homeTbd}/>
-      <div style={{height:1,background:"#e2e8f4",margin:"0 -3px"}}/>
+      <div style={{height:1,background:"rgba(255,255,255,0.08)",margin:"0 -3px"}}/>
       <TeamRow code={awayCode} score={awayScore}
         isWinner={winner?winner===awayCode:awayWins} tbd={awayTbd}/>
       {dateStr&&(
         <div style={{
-          fontSize:9,color:"#3d4f70",fontWeight:600,
+          fontSize:9,color:"#7a90b8",fontWeight:600,
           textAlign:"center" as const,overflow:"hidden",
           textOverflow:"ellipsis",whiteSpace:"nowrap" as const,marginTop:1,
         }}>{dateStr}</div>
@@ -308,7 +309,7 @@ export default function Bracket(){
       <div style={{
         position:"relative",width:"100%",height:scaledH,
         overflow:"hidden",borderRadius:14,
-        background:"linear-gradient(160deg,#dde3ee 0%,#e8ecf5 60%,#dce2ed 100%)",
+        background:"linear-gradient(160deg,#0a1628 0%,#0d1e3a 50%,#091524 100%)",
       }}>
 
         {/* Bracket canvas */}
@@ -323,17 +324,17 @@ export default function Bracket(){
               position:"absolute" as const,top:7,left:cx-66,width:132,
               textAlign:"center" as const,fontSize:11,fontWeight:800,
               textTransform:"uppercase" as const,letterSpacing:"0.07em",
-              color:"#1e2d50",whiteSpace:"nowrap" as const,
+              color:"#7a98cc",whiteSpace:"nowrap" as const,
             }}>{label}</div>
           ))}
           <div style={{position:"absolute",top:LABEL_H-5,left:0,right:0,
-            height:1,background:"rgba(30,40,80,0.1)"}}/>
+            height:1,background:"rgba(100,140,220,0.2)"}}/>
 
           {/* SVG connectors */}
           <svg style={{position:"absolute",top:LABEL_H,left:0,overflow:"visible",pointerEvents:"none"}}
             width={TOTAL_W} height={TOTAL_H}>
             {CONNECTORS.map((d,i)=>(
-              <path key={i} d={d} stroke="rgba(100,120,170,0.5)" strokeWidth={1.5} fill="none"/>
+              <path key={i} d={d} stroke="rgba(100,140,220,0.45)" strokeWidth={1.5} fill="none"/>
             ))}
           </svg>
 
@@ -353,7 +354,7 @@ export default function Bracket(){
             position:"absolute" as const,
             left:finX,top:LABEL_H+FINY+CH/2+6,
             width:CW,textAlign:"center" as const,
-            fontSize:11,fontWeight:900,color:"#b45309",
+            fontSize:11,fontWeight:900,color:"#fbbf24",
             letterSpacing:"0.05em",textTransform:"uppercase" as const,
           }}>מנצחת</div>
           <div style={{
@@ -369,7 +370,7 @@ export default function Bracket(){
             left:finX,top:LABEL_H+FINY+CH/2+50,
             width:CW,textAlign:"center" as const,
             fontSize:9,fontWeight:700,textTransform:"uppercase" as const,
-            letterSpacing:"0.05em",color:"#3d4f70",
+            letterSpacing:"0.05em",color:"#7a98cc",
           }}>מקום שלישי</div>
           {mc(THIRD_ID,finX,FINY+CH+80)}
         </div>
