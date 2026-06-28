@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
     standings: `${BASE}/en/tournaments/mens/worldcup/canadamexicousa2026/standings`,
     scorers:   `${BASE}/en/tournaments/mens/worldcup/canadamexicousa2026/statistics/player-statistics`,
     assists:   `${BASE}/en/tournaments/mens/worldcup/canadamexicousa2026/statistics/player-statistics?statType=goal_assist`,
+    fixtures:  `${BASE}/en/tournaments/mens/worldcup/canadamexicousa2026/scores-fixtures?country=IL&wtw-filter=ALL`,
   };
 
   const url = urls[type];
