@@ -51,10 +51,10 @@ function FlagImg({ code }: { code: string }) {
 /* ================================================================
  * Layout constants
  * ================================================================ */
-const CW = 148;  // card width
-const CH = 64;   // card height
-const SH = 82;   // slot height
-const CG = 24;   // column gap
+const CW = 152;  // card width
+const CH = 70;   // card height
+const SH = 86;   // slot height
+const CG = 14;   // column gap
 
 const r32L = 0;
 const r16L = r32L + CW + CG;
@@ -180,19 +180,19 @@ function TeamRow({code,score,isWinner,tbd}:{
         : <FlagImg code={code}/>
       }
       <span style={{
-        flex:1,fontSize:12,fontWeight:isWinner?800:500,
+        flex:1,fontSize:13,fontWeight:isWinner?800:600,
         overflow:"hidden",textOverflow:"ellipsis",
         whiteSpace:"nowrap" as const,lineHeight:1.2,
-        color:isWinner?"#93c5fd":tbd?"#4a5a78":"#cbd5e1",
+        color:isWinner?"#93c5fd":tbd?"#4a5a78":"#e2e8f0",
         fontStyle:tbd?"italic" as const:"normal" as const,
       }}>
         {tbd?"?":t?.name??code}
       </span>
       {score!==null&&(
         <span style={{
-          fontSize:14,fontWeight:800,minWidth:20,
+          fontSize:15,fontWeight:800,minWidth:22,
           textAlign:"right" as const,
-          color:isWinner?"#93c5fd":"#e2e8f0",
+          color:isWinner?"#93c5fd":"#ffffff",
         }}>{score}</span>
       )}
     </div>
@@ -263,9 +263,9 @@ function MatchCard({id,resolved,results,liveScores,x,cy,isFinal}:{
         isWinner={winner?winner===awayCode:awayWins} tbd={awayTbd}/>
       {dateStr&&(
         <div style={{
-          fontSize:9,color:"#7a90b8",fontWeight:600,
+          fontSize:11,color:"#ffffff",fontWeight:600,
           textAlign:"center" as const,overflow:"hidden",
-          textOverflow:"ellipsis",whiteSpace:"nowrap" as const,marginTop:1,
+          textOverflow:"ellipsis",whiteSpace:"nowrap" as const,marginTop:2,
         }}>{dateStr}</div>
       )}
     </div>
@@ -322,9 +322,9 @@ export default function Bracket(){
           {ROUND_LABELS.map(({label,cx},i)=>(
             <div key={i} style={{
               position:"absolute" as const,top:7,left:cx-66,width:132,
-              textAlign:"center" as const,fontSize:11,fontWeight:800,
+              textAlign:"center" as const,fontSize:12,fontWeight:800,
               textTransform:"uppercase" as const,letterSpacing:"0.07em",
-              color:"#7a98cc",whiteSpace:"nowrap" as const,
+              color:"#94b4e8",whiteSpace:"nowrap" as const,
             }}>{label}</div>
           ))}
           <div style={{position:"absolute",top:LABEL_H-5,left:0,right:0,
