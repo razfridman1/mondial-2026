@@ -108,34 +108,31 @@ function ScorersView({ data, label }: { data: any[]; label: string }) {
   );
 }
 
-function PullSection({ k, label, statLabel, children, onPull, busy, error, hasData }:
-  { k: PullType; label: string; statLabel?: string; children?: React.ReactNode;
+function PullSection({ k, label, children, onPull, busy, error, hasData }:
+  { k: PullType; label: string; children?: React.ReactNode;
     onPull: () => void; busy: boolean; error: string; hasData: boolean }) {
   return (
-    <div style={{ background: "var(--bg-elev)", borderRadius: 10, padding: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <strong style={{ fontSize: 14 }}>{label}</strong>
-        <button className="btn btn-small btn-primary" onClick={onPull} disabled={busy}>
+    <div style={{ background: "var(--bg-elev)", borderRadius: 14, padding: "20px 24px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+        <strong style={{ fontSize: 20, fontWeight: 800 }}>{label}</strong>
+        <button className="btn btn-primary" onClick={onPull} disabled={busy}
+                style={{ fontSize: 15, padding: "8px 20px" }}>
           {busy ? "⏳ מושך..." : "↓ משוך"}
         </button>
       </div>
 
       {error && (
-        <div style={{ fontSize: 12, color: "var(--red)", background: "rgba(239,68,68,0.1)",
-                      borderRadius: 6, padding: "8px 12px", marginBottom: 8 }}>
+        <div style={{ fontSize: 14, color: "var(--red)", background: "rgba(239,68,68,0.1)",
+                      borderRadius: 8, padding: "10px 16px", marginBottom: 10 }}>
           ⚠️ {error}
         </div>
       )}
 
       {!hasData && !busy && !error && (
-        <p className="muted" style={{ fontSize: 12, margin: 0 }}>לחץ "משוך" לטעינת נתונים.</p>
+        <p className="muted" style={{ fontSize: 14, margin: 0 }}>לחץ "משוך" לטעינת נתונים.</p>
       )}
 
-      {hasData && (
-        <div style={{ maxHeight: 340, overflowY: "auto" }}>
-          {children}
-        </div>
-      )}
+      {hasData && <div>{children}</div>}
     </div>
   );
 }
@@ -177,41 +174,35 @@ export default function FifaPullTab() {
   }
 
   return (
-    <section style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 16px" }}>
-      <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>🌐 ESPN / FIFA — נתונים חיים</h2>
-      <p className="muted" style={{ fontSize: 12, marginBottom: 20 }}>
-        נתונים ממשק ESPN API (ללא API key).
-      </p>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" }}>
-        {/* Left column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <PullSection k="standings" label="🏆 טבלאות קבוצות"
-            onPull={() => pull("standings")} busy={!!busy.standings}
-            error={errors.standings || ""} hasData={standings.length > 0}>
-            <StandingsView data={standings} />
-          </PullSection>
-
-          <PullSection k="scorers" label="⚽ מלך השערים" statLabel="שערים"
-            onPull={() => pull("scorers")} busy={!!busy.scorers}
-            error={errors.scorers || ""} hasData={scorers.length > 0}>
-            <ScorersView data={scorers} label="שערים" />
-          </PullSection>
-
-          <PullSection k="assists" label="🎯 מלך הבישולים" statLabel="בישולים"
-            onPull={() => pull("assists")} busy={!!busy.assists}
-            error={errors.assists || ""} hasData={assists.length > 0}>
-            <ScorersView data={assists} label="בישולים" />
-          </PullSection>
-        </div>
-
-        {/* Right column */}
-        <PullSection k="fixtures" label="📅 לוח משחקים"
-          onPull={() => pull("fixtures")} busy={!!busy.fixtures}
-          error={errors.fixtures || ""} hasData={fixtures.length > 0}>
-          <FixturesView data={fixtures} />
-        </PullSection>
+    <section style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px", display: "flex", flexDirection: "column", gap: 24 }}>
+      <div>
+        <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🌐 ESPN / FIFA — נתונים חיים</h2>
+        <p className="muted" style={{ fontSize: 13 }}>נתונים מ-ESPN API (ציבורי, ללא מפתח)</p>
       </div>
+
+      <PullSection k="standings" label="🏆 טבלאות קבוצות"
+        onPull={() => pull("standings")} busy={!!busy.standings}
+        error={errors.standings || ""} hasData={standings.length > 0}>
+        <StandingsView data={standings} />
+      </PullSection>
+
+      <PullSection k="scorers" label="⚽ מלך השערים"
+        onPull={() => pull("scorers")} busy={!!busy.scorers}
+        error={errors.scorers || ""} hasData={scorers.length > 0}>
+        <ScorersView data={scorers} label="שערים" />
+      </PullSection>
+
+      <PullSection k="assists" label="🎯 מלך הבישולים"
+        onPull={() => pull("assists")} busy={!!busy.assists}
+        error={errors.assists || ""} hasData={assists.length > 0}>
+        <ScorersView data={assists} label="בישולים" />
+      </PullSection>
+
+      <PullSection k="fixtures" label="📅 לוח משחקים"
+        onPull={() => pull("fixtures")} busy={!!busy.fixtures}
+        error={errors.fixtures || ""} hasData={fixtures.length > 0}>
+        <FixturesView data={fixtures} />
+      </PullSection>
     </section>
   );
 }
