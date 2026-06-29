@@ -225,7 +225,8 @@ export default function MatchesTab() {
         };
       })
       .filter(m => {
-        if (m.stage === "GROUP") return true;
+        /* Hide group stage — it's over. */
+        if (m.stage === "GROUP") return false;
         /* Knockout: only show once both teams are resolved (real, not placeholder). */
         return !m.homeIsPlaceholder && !m.awayIsPlaceholder;
       })
