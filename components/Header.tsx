@@ -21,7 +21,7 @@ const NAV: { id: Tab; label: string; adminOnly?: boolean; hideOnMobile?: boolean
   { id: "friendspredictions", label: "🔮 ניחושי חברים" },
   { id: "mypredictions",    label: "🔮 הניחושים שלי" },
   { id: "topscorers",    label: "⚽🎯 מלך השערים והבישולים" },
-  { id: "standings",     label: "📊 טבלאות",        hideOnMobile: true },
+  // { id: "standings",     label: "📊 טבלאות",        hideOnMobile: true },
   { id: "bracket",       label: "🏆 שלב הנוקאאוט" },
   /* Profile tab removed from nav — accessed via username click in header */
   { id: "matchlist",     label: "📋 רשימת משחקים",  adminOnly: true },
