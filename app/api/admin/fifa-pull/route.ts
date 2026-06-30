@@ -39,9 +39,10 @@ export async function GET(req: NextRequest) {
       const doc = await db.collection("live_data").doc("fifa_match_results").get();
       if (!doc.exists) return NextResponse.json({ ok: false, error: "No data - run: node crawl-fifa.mjs --only matchcentre" });
       const data = doc.data()!;
-      const today = new Date().toISOString().slice(0, 10);
-      const recent = (data.matches || []).filter((m: any) => m.matchDate && m.matchDate >= today);
-      return NextResponse.json({ ok: true, type, rows: recent, updatedAt: data.updatedAt });
+      const rows = (data.matches || []).sort((a: any, b: any) =>
+        (b.matchDate || "").localeCompare(a.matchDate || "")
+      );
+      return NextResponse.json({ ok: true, type, rows, updatedAt: data.updatedAt });
     }
     return NextResponse.json({ error: "Unknown type" }, { status: 400 });
   } catch (e: any) {
