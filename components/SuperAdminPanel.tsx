@@ -7,6 +7,9 @@ import { getFirebase } from "@/lib/firebase";
 import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { AVATARS } from "@/lib/avatars";
 import { scorePrediction, userTotals } from "@/lib/scoring";
+import { squadFor } from "@/lib/players";
+
+const ALL_TEAMS_SORTED = Object.values(TEAMS).sort((a, b) => a.name.localeCompare(b.name, "he"));
 
 /* God-mode admin panel — full control over every piece of user data.
  * Sections (collapsible):
@@ -28,6 +31,8 @@ interface ProfileRow {
   lastLoginAt?: string;
   aiBlocked?: boolean;
   topPicksUnlocked?: boolean;
+  topScorerPick?: { teamCode: string; playerName: string } | null;
+  topAssistPick?: { teamCode: string; playerName: string } | null;
 }
 interface PredictionRow {
   id: string; uid: string; matchId: string;
@@ -87,6 +92,11 @@ export default function SuperAdminPanel() {
       <details className="adm-section" open>
         <summary>🏁 תוצאות משחקים — עריכה ידנית</summary>
         <ResultsAdmin />
+      </details>
+
+      <details className="adm-section">
+        <summary>⚽ מלך שערים / מלך בישולים — עריכה ידנית לכל משתמש</summary>
+        <TopPicksAdmin />
       </details>
 
       <details className="adm-section">
@@ -311,6 +321,136 @@ function ResultRowEditor({ match, result, onSave, onDelete, onRestored }: any) {
         </tr>
       )}
     </>
+  );
+}
+
+/* ============================ 1b. TOP PICKS (SCORER / ASSIST) ============================ */
+function TopPicksAdmin() {
+  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const liveSquads = useStore(s => s.liveSquads);
+  const loadLiveSquads = useStore(s => s.loadLiveSquads);
+
+  async function load() {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/profiles", { headers: await adminAuthHeaders() });
+      if (r.ok) setProfiles(await r.json());
+    } finally { setBusy(false); }
+  }
+  useEffect(() => { load(); loadLiveSquads(); }, []);
+
+  async function save(uid: string, topScorerPick?: { teamCode: string; playerName: string }, topAssistPick?: { teamCode: string; playerName: string }) {
+    await fetch("/api/admin/profiles", {
+      method: "PATCH", headers: await adminAuthHeaders(),
+      body: JSON.stringify({ uid, ...(topScorerPick ? { topScorerPick } : {}), ...(topAssistPick ? { topAssistPick } : {}) }),
+    });
+    load();
+  }
+  async function clearPick(uid: string, field: "topScorerPick" | "topAssistPick") {
+    if (!confirm("לנקות את הניחוש?")) return;
+    await fetch("/api/admin/profiles", {
+      method: "PATCH", headers: await adminAuthHeaders(),
+      body: JSON.stringify({ uid, [field]: null }),
+    });
+    load();
+  }
+
+  const filtered = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    if (!s) return profiles;
+    return profiles.filter(p => (p.displayName || "").toLowerCase().includes(s) || (p.email || "").toLowerCase().includes(s));
+  }, [profiles, search]);
+
+  return (
+    <div className="adm-body">
+      <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+        💡 קביעה/עריכה ידנית של ניחוש מלך השערים ומלך הבישולים לכל משתמש — עוקפת את הדדליין הרגיל, פועלת גם אחרי שנעל למשתמשים רגילים.
+      </p>
+      <input className="flt-input" placeholder="חפש משתמש (שם / אימייל)..." value={search} onChange={e => setSearch(e.target.value)}
+             style={{ width: "100%", padding: 8, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", marginBottom: 10 }} />
+      <div className="adm-table-wrap" style={{ maxHeight: 480, overflowY: "auto" }}>
+        <table className="admin-table">
+          <thead><tr><th>משתמש</th><th>מלך שערים</th><th>מלך בישולים</th></tr></thead>
+          <tbody>
+            {filtered.map(p => (
+              <TopPicksRowEditor key={p.uid} profile={p} liveSquads={liveSquads} onSave={save} onClear={clearPick} />
+            ))}
+            {!filtered.length && !busy && <tr><td colSpan={3} className="muted" style={{ textAlign: "center", padding: 20 }}>אין משתמשים תואמים.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {busy && <div className="muted">טוען…</div>}
+    </div>
+  );
+}
+
+function TopPicksRowEditor({ profile, liveSquads, onSave, onClear }: any) {
+  const existingScorer = profile.topScorerPick;
+  const existingAssist = profile.topAssistPick;
+  const [scorerTeam, setScorerTeam] = useState(existingScorer?.teamCode || "");
+  const [scorerPlayer, setScorerPlayer] = useState(existingScorer?.playerName || "");
+  const [assistTeam, setAssistTeam] = useState(existingAssist?.teamCode || "");
+  const [assistPlayer, setAssistPlayer] = useState(existingAssist?.playerName || "");
+  const [savingScorer, setSavingScorer] = useState(false);
+  const [savingAssist, setSavingAssist] = useState(false);
+
+  const scorerSquad = useMemo(() => scorerTeam ? squadFor(scorerTeam, liveSquads) : [], [scorerTeam, liveSquads]);
+  const assistSquad = useMemo(() => assistTeam ? squadFor(assistTeam, liveSquads) : [], [assistTeam, liveSquads]);
+
+  async function saveScorer() {
+    if (!scorerTeam || !scorerPlayer) return;
+    setSavingScorer(true);
+    try { await onSave(profile.uid, { teamCode: scorerTeam, playerName: scorerPlayer }, undefined); }
+    finally { setSavingScorer(false); }
+  }
+  async function saveAssist() {
+    if (!assistTeam || !assistPlayer) return;
+    setSavingAssist(true);
+    try { await onSave(profile.uid, undefined, { teamCode: assistTeam, playerName: assistPlayer }); }
+    finally { setSavingAssist(false); }
+  }
+
+  return (
+    <tr>
+      <td>
+        <strong style={{ fontSize: 13 }}>{profile.displayName || "—"}</strong><br />
+        <span className="muted" style={{ fontSize: 11 }}>{profile.email || profile.uid}</span>
+      </td>
+      <td>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+          <select value={scorerTeam} onChange={e => { setScorerTeam(e.target.value); setScorerPlayer(""); }}
+                  style={{ maxWidth: 110, fontSize: 12, background: "var(--bg-elev)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 4 }}>
+            <option value="">קבוצה</option>
+            {ALL_TEAMS_SORTED.map(t => <option key={t.code} value={t.code}>{t.flag} {t.name}</option>)}
+          </select>
+          <select value={scorerPlayer} onChange={e => setScorerPlayer(e.target.value)} disabled={!scorerTeam}
+                  style={{ maxWidth: 140, fontSize: 12, background: "var(--bg-elev)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 4 }}>
+            <option value="">שחקן</option>
+            {scorerSquad.map((pl: any) => <option key={pl.id} value={pl.name}>{pl.name}</option>)}
+          </select>
+          <button className="btn btn-small btn-primary" disabled={!scorerTeam || !scorerPlayer || savingScorer} onClick={saveScorer}>💾</button>
+          {existingScorer && <button className="btn btn-small" onClick={() => onClear(profile.uid, "topScorerPick")} style={{ color: "var(--red)" }}>🗑️</button>}
+        </div>
+      </td>
+      <td>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+          <select value={assistTeam} onChange={e => { setAssistTeam(e.target.value); setAssistPlayer(""); }}
+                  style={{ maxWidth: 110, fontSize: 12, background: "var(--bg-elev)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 4 }}>
+            <option value="">קבוצה</option>
+            {ALL_TEAMS_SORTED.map(t => <option key={t.code} value={t.code}>{t.flag} {t.name}</option>)}
+          </select>
+          <select value={assistPlayer} onChange={e => setAssistPlayer(e.target.value)} disabled={!assistTeam}
+                  style={{ maxWidth: 140, fontSize: 12, background: "var(--bg-elev)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 4 }}>
+            <option value="">שחקן</option>
+            {assistSquad.map((pl: any) => <option key={pl.id} value={pl.name}>{pl.name}</option>)}
+          </select>
+          <button className="btn btn-small btn-primary" disabled={!assistTeam || !assistPlayer || savingAssist} onClick={saveAssist}>💾</button>
+          {existingAssist && <button className="btn btn-small" onClick={() => onClear(profile.uid, "topAssistPick")} style={{ color: "var(--red)" }}>🗑️</button>}
+        </div>
+      </td>
+    </tr>
   );
 }
 

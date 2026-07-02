@@ -160,6 +160,18 @@ export async function PATCH(req: Request) {
   /* Per-user override: lets a specific user submit/change their top scorer +
    * top assist picks even after the global deadline has passed. */
   if (typeof body.topPicksUnlocked === "boolean") patch.topPicksUnlocked = body.topPicksUnlocked;
+  /* Admin can set (or clear, with null) any user's top-scorer / top-assist
+   * pick directly — bypasses the deadline/lock entirely. */
+  if (body.topScorerPick === null) {
+    patch.topScorerPick = null;
+  } else if (body.topScorerPick && typeof body.topScorerPick.teamCode === "string" && typeof body.topScorerPick.playerName === "string") {
+    patch.topScorerPick = { teamCode: body.topScorerPick.teamCode, playerName: body.topScorerPick.playerName.slice(0, 80), setAt: Date.now(), setByAdmin: true };
+  }
+  if (body.topAssistPick === null) {
+    patch.topAssistPick = null;
+  } else if (body.topAssistPick && typeof body.topAssistPick.teamCode === "string" && typeof body.topAssistPick.playerName === "string") {
+    patch.topAssistPick = { teamCode: body.topAssistPick.teamCode, playerName: body.topAssistPick.playerName.slice(0, 80), setAt: Date.now(), setByAdmin: true };
+  }
 
   await db.collection("profiles").doc(body.uid).set(patch, { merge: true });
 
