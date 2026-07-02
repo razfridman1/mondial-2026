@@ -183,7 +183,7 @@ function ResultsAdmin() {
         <table className="admin-table">
           <thead><tr><th>משחק</th><th>תאריך</th><th>בית</th><th></th><th>חוץ</th><th>פעולות</th></tr></thead>
           <tbody>
-            {matchesFiltered.slice(0, 80).map(m => {
+            {matchesFiltered.map(m => {
               const r = byMatchId[m.id];
               return <ResultRowEditor key={m.id} match={m} result={r} onSave={saveResult} onDelete={deleteResult} onRestored={load} />;
             })}
