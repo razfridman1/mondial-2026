@@ -2,11 +2,17 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
+import { getFirebase } from "@/lib/firebase";
 import { MATCHES, TEAMS } from "@/lib/data";
 import { applyOverride, israelDateKey, HEB_MONTHS } from "@/lib/utils";
 import { effectiveUtc } from "@/lib/sim";
 import { resolveAllStages } from "@/lib/bracket";
 import { PredictionRow, type MatchResult } from "./PredictionRow";
+
+async function adminAuthHeaders() {
+  const token = await getFirebase().auth!.currentUser!.getIdToken();
+  return { "content-type": "application/json", authorization: `Bearer ${token}` };
+}
 
 const NEXT_WEEK_REMIND_KEY = "mondial26.weekpred.remind_dismissed";
 
@@ -56,12 +62,71 @@ export default function WeeklyPredictionsTab() {
   const overrides = useStore(s => s.overrides);
   const simConfig = useStore(s => s.simConfig);
 
+  const isAdmin = !!(user as any)?.isAdmin;
+
   const [weekOffset, setWeekOffset] = useState(0);
   const [results, setResults] = useState<Record<string, MatchResult>>({});
   const [now, setNow] = useState(Date.now());
   const [reminderDismissed, setReminderDismissed] = useState(() => {
     try { return localStorage.getItem(NEXT_WEEK_REMIND_KEY) === "1"; } catch { return false; }
   });
+
+  /* ---------------- Super-admin: bypass lock + edit any user's week ---------------- */
+  const [allProfiles, setAllProfiles] = useState<{ uid: string; displayName?: string; email?: string }[]>([]);
+  const [targetUid, setTargetUid] = useState<string>("");
+  const [adminPreds, setAdminPreds] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    if (isAdmin && user?.uid && !targetUid) setTargetUid(user.uid);
+  }, [isAdmin, user?.uid]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      try {
+        const r = await fetch("/api/admin/profiles", { headers: await adminAuthHeaders() });
+        if (r.ok) setAllProfiles(await r.json());
+      } catch {}
+    })();
+  }, [isAdmin]);
+
+  async function loadAdminPreds(uid: string) {
+    if (!isAdmin || !uid) return;
+    try {
+      const r = await fetch(`/api/admin/predictions?uid=${encodeURIComponent(uid)}`, { headers: await adminAuthHeaders() });
+      if (r.ok) {
+        const arr = await r.json();
+        const map: Record<string, any> = {};
+        for (const p of arr) map[p.matchId] = p;
+        setAdminPreds(map);
+      }
+    } catch {}
+  }
+  useEffect(() => { if (isAdmin && targetUid) loadAdminPreds(targetUid); }, [isAdmin, targetUid]);
+
+  async function saveAdminPrediction(matchId: string, home: number, away: number, winner?: string) {
+    const r = await fetch("/api/admin/predictions", {
+      method: "POST", headers: await adminAuthHeaders(),
+      body: JSON.stringify({ uid: targetUid, matchId, homeScore: home, awayScore: away, ...(winner ? { predictedWinner: winner } : {}) }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.message || d.error || "שגיאה בשמירה");
+    }
+    await loadAdminPreds(targetUid);
+  }
+  async function clearAdminPrediction(matchId: string) {
+    await fetch("/api/admin/predictions", {
+      method: "DELETE", headers: await adminAuthHeaders(),
+      body: JSON.stringify({ id: `${targetUid}_${matchId}` }),
+    });
+    await loadAdminPreds(targetUid);
+  }
+
+  /* Effective predictions map used for rendering: admins view/edit
+   * `targetUid`'s picks (defaults to themselves); everyone else sees their
+   * own live-synced store predictions as before. */
+  const effectivePredictions = isAdmin ? adminPreds : predictions;
 
   const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
   const weekLabel = useMemo(() => formatWeekLabel(weekDates), [weekDates]);
@@ -129,8 +194,8 @@ export default function WeeklyPredictionsTab() {
 
   /* Count how many matches in week have predictions filled */
   const filledCount = useMemo(
-    () => weekMatches.filter(m => predictions[m.id]).length,
-    [weekMatches, predictions]
+    () => weekMatches.filter(m => effectivePredictions[m.id]).length,
+    [weekMatches, effectivePredictions]
   );
   const lockMs = 3 * 60 * 1000;
   const openCount = useMemo(
@@ -190,6 +255,25 @@ export default function WeeklyPredictionsTab() {
 
   return (
     <section className="mypred">
+      {/* ============ SUPER-ADMIN: pick whose week to view/edit ============ */}
+      {isAdmin && (
+        <div className="chip chip-soft" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, padding: "8px 10px", width: "fit-content" }}>
+          <span>🛡️ מצב אדמין — עריכה עבור:</span>
+          <select
+            value={targetUid}
+            onChange={e => setTargetUid(e.target.value)}
+            style={{ padding: 4, background: "var(--bg-elev)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
+          >
+            {user?.uid && (
+              <option value={user.uid}>עצמי ({user.email || user.uid.slice(0, 8)})</option>
+            )}
+            {allProfiles
+              .filter(p => p.uid !== user?.uid)
+              .map(p => <option key={p.uid} value={p.uid}>{p.displayName || p.email || p.uid.slice(0, 8)}</option>)}
+          </select>
+        </div>
+      )}
+
       {/* ============ NEXT WEEK REMINDER BANNER ============ */}
       {showNextWeekReminder && (
         <div className="weekly-reminder-banner">
@@ -275,10 +359,13 @@ export default function WeeklyPredictionsTab() {
             <PredictionRow
               key={m.id}
               match={m}
-              prediction={predictions[m.id]}
+              prediction={effectivePredictions[m.id]}
               result={results[m.id]}
               now={now}
               onSaved={load}
+              adminMode={isAdmin}
+              onAdminSave={isAdmin ? saveAdminPrediction : undefined}
+              onAdminClear={isAdmin ? clearAdminPrediction : undefined}
             />
           ))
         )}

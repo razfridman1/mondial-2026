@@ -28,6 +28,37 @@ export async function GET(req: Request) {
   return NextResponse.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
 }
 
+/* POST /api/admin/predictions { uid, matchId, homeScore, awayScore, predictedWinner? }
+ * Upsert — creates the prediction if it doesn't exist yet, or updates it if
+ * it does. Bypasses the normal 3-minute-before-kickoff lock entirely (and
+ * works even after the match has finished) — used by the super-admin
+ * bypass/impersonation controls in "ניחושי השבוע". */
+export async function POST(req: Request) {
+  try { await authedAdmin(req); }
+  catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.status || 401 }); }
+  const body = await req.json().catch(() => ({}));
+  const { uid, matchId, homeScore, awayScore, predictedWinner } = body;
+  if (!uid || !matchId) return NextResponse.json({ error: "missing uid/matchId" }, { status: 400 });
+  const h = Number(homeScore);
+  const a = Number(awayScore);
+  if (!Number.isFinite(h) || !Number.isFinite(a) || h < 0 || a < 0 || h > 20 || a > 20) {
+    return NextResponse.json({ error: "invalid scores" }, { status: 400 });
+  }
+  const { db } = getAdmin();
+  const docId = `${uid}_${matchId}`;
+  const payload: any = {
+    uid, matchId,
+    homeScore: h, awayScore: a,
+    joker: false,
+    auto: false,
+    editedByAdmin: true,
+    updatedAt: Date.now(),
+  };
+  if (typeof predictedWinner === "string" && predictedWinner.trim()) payload.predictedWinner = predictedWinner.trim();
+  await db.collection("predictions").doc(docId).set(payload, { merge: true });
+  return NextResponse.json({ ok: true, id: docId, ...payload });
+}
+
 /* PATCH /api/admin/predictions { id, homeScore?, awayScore?, joker? } — edit */
 export async function PATCH(req: Request) {
   try { await authedAdmin(req); }

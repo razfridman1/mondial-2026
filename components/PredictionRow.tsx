@@ -11,13 +11,20 @@ export const LOCK_MIN = 3;
 export type MatchResult = { home: number; away: number; finishedAt: number };
 
 export function PredictionRow({
-  match, prediction, result, now, onSaved,
+  match, prediction, result, now, onSaved, adminMode, onAdminSave, onAdminClear,
 }: {
   match: Match;
   prediction: any;
   result: MatchResult | undefined;
   now: number;
   onSaved: () => void;
+  /** Super-admin bypass: when true, editing is allowed regardless of the
+   *  3-min lock and even after the match has finished, and saves/clears go
+   *  through onAdminSave/onAdminClear instead of the caller's own store
+   *  actions (so an admin can fix/fill any user's prediction). */
+  adminMode?: boolean;
+  onAdminSave?: (matchId: string, home: number, away: number, winner?: string) => Promise<void>;
+  onAdminClear?: (matchId: string) => Promise<void>;
 }) {
   const setPrediction = useStore(s => s.setPrediction);
   const clearPrediction = useStore(s => s.clearPrediction);
@@ -29,6 +36,7 @@ export function PredictionRow({
   const startMs = new Date(match.utc).getTime();
   const lockAt = startMs - LOCK_MIN * 60 * 1000;
   const locked = now >= lockAt;
+  const editable = !locked || !!adminMode;
   const minsToLock = Math.max(0, Math.floor((lockAt - now) / 60000));
 
   const isKnockout = match.stage !== "GROUP";
@@ -44,11 +52,15 @@ export function PredictionRow({
     if (prediction) {
       setH(String(prediction.homeScore));
       setA(String(prediction.awayScore));
-      if ((prediction as any).predictedWinner) {
-        setWinnerCode((prediction as any).predictedWinner);
-      }
+      setWinnerCode((prediction as any).predictedWinner || "");
+    } else {
+      // No prediction for this match (e.g. admin switched to a different
+      // user who hasn't predicted it yet) — don't leave stale values shown.
+      setH("");
+      setA("");
+      setWinnerCode("");
     }
-  }, [prediction?.homeScore, prediction?.awayScore, (prediction as any)?.predictedWinner]);
+  }, [prediction, prediction?.homeScore, prediction?.awayScore, (prediction as any)?.predictedWinner]);
 
   /* Auto-derive KO winner from score when not tied. */
   useEffect(() => {
@@ -74,7 +86,11 @@ export function PredictionRow({
     setSaveState("saving");
     setErrMsg(null);
     try {
-      await setPrediction(match.id, hi, ai, false, isKnockout ? newWinner : undefined);
+      if (adminMode && onAdminSave) {
+        await onAdminSave(match.id, hi, ai, isKnockout ? newWinner : undefined);
+      } else {
+        await setPrediction(match.id, hi, ai, false, isKnockout ? newWinner : undefined);
+      }
       setSaveState("saved");
       onSaved();
       setTimeout(() => setSaveState("idle"), 1500);
@@ -86,7 +102,7 @@ export function PredictionRow({
 
   /* Debounced autosave */
   useEffect(() => {
-    if (locked || isPlaceholder) return;
+    if (!editable || isPlaceholder) return;
     if (h === "" || a === "") return;
     if (isKnockout && !winnerCode) return;
     if (prediction
@@ -126,8 +142,9 @@ export function PredictionRow({
     );
   }
 
-  /* ----- finished match ----- */
-  if (result) {
+  /* ----- finished match (admin bypasses this — falls through to the
+   *        editable form below, with the actual result shown for context) ----- */
+  if (result && !adminMode) {
     const hitClass = score && score.points > 0 ? "is-hit" : prediction ? "is-miss" : "is-noPred";
     return (
       <div className={`mypred-row mypred-row-finished ${hitClass}`}>
@@ -179,13 +196,21 @@ export function PredictionRow({
 
   /* ----- upcoming / live / pregame match — inline input ----- */
   return (
-    <div className={`mypred-row ${locked ? "mypred-row-locked" : ""} ${status === "live" ? "mypred-row-live" : ""}`}>
+    <div className={`mypred-row ${!editable ? "mypred-row-locked" : ""} ${status === "live" ? "mypred-row-live" : ""}`}>
       <div className="mypred-row-head">
         <span className="muted">{formatIsraelDate(match.utc, { short: true })} · {formatIsraelTime(match.utc)}</span>
         {status === "live"    && <span className="badge badge-live">🔴 שידור חי</span>}
         {status === "pregame" && <span className="badge badge-pregame">קדם-משחק</span>}
         {!locked && minsToLock <= 60 && minsToLock > 0 && (
           <span className="chip chip-strong">⚠ נעילה בעוד {minsToLock} דק׳</span>
+        )}
+        {adminMode && locked && (
+          <span className="chip chip-strong" style={{ background: "rgba(34,197,94,0.15)", color: "var(--green, #22c55e)" }}>
+            🛡️ מצב אדמין — עוקף נעילה
+          </span>
+        )}
+        {result && (
+          <span className="badge badge-finished">הסתיים · {result.home}:{result.away}</span>
         )}
         <span className="chip chip-stage">
           {STAGES[match.stage].name}{match.group ? ` · בית ${match.group}` : ""}
@@ -203,7 +228,7 @@ export function PredictionRow({
           <input
             type="number" inputMode="numeric" min={0} max={20}
             value={h}
-            disabled={locked}
+            disabled={!editable}
             onChange={e => setH(e.target.value)}
             aria-label={`שערי ${home.name}`}
           />
@@ -211,7 +236,7 @@ export function PredictionRow({
           <input
             type="number" inputMode="numeric" min={0} max={20}
             value={a}
-            disabled={locked}
+            disabled={!editable}
             onChange={e => setA(e.target.value)}
             aria-label={`שערי ${away.name}`}
           />
@@ -224,7 +249,7 @@ export function PredictionRow({
       </div>
 
       {/* KO-only: explicit "who advances" picker */}
-      {isKnockout && !locked && (() => {
+      {isKnockout && editable && (() => {
         const hi = parseInt(h, 10);
         const ai = parseInt(a, 10);
         const isTied = !Number.isNaN(hi) && !Number.isNaN(ai) && hi === ai;
@@ -254,7 +279,7 @@ export function PredictionRow({
       })()}
 
       <div className="mypred-row-foot">
-        {locked ? (
+        {!editable ? (
           <span className="pred-msg is-locked" style={{ margin: 0 }}>
             🔒 נעול
             {prediction ? ` · נשמר: ${prediction.homeScore}:${prediction.awayScore}` : " · לא הוזן"}
@@ -270,8 +295,14 @@ export function PredictionRow({
             {saveState === "saving" && <span className="mypred-save-state">💾 שומר…</span>}
             {saveState === "saved"  && <span className="mypred-save-state is-ok">✓ נשמר</span>}
             {saveState === "error"  && <span className="mypred-save-state is-err">⚠ {errMsg}</span>}
-            {saveState === "idle"   && prediction && (
+            {saveState === "idle"   && prediction && !adminMode && (
               <span className="muted mypred-save-state">ניתן לעדכן עד {LOCK_MIN} דק׳ לפני הפתיחה</span>
+            )}
+            {saveState === "idle"   && prediction && adminMode && (
+              <span className="muted mypred-save-state">
+                נשמר: {prediction.homeScore}:{prediction.awayScore}
+                {prediction.editedByAdmin ? " (נערך ע\"י אדמין)" : prediction.auto ? " 🤖" : ""}
+              </span>
             )}
             {saveState === "idle"   && !prediction && (h === "" || a === "") && (
               <span className="muted mypred-save-state">הזן ניחוש — נשמר אוטומטית</span>
@@ -283,7 +314,11 @@ export function PredictionRow({
                 onClick={async () => {
                   if (!confirm("למחוק את הניחוש למשחק זה?")) return;
                   try {
-                    await clearPrediction(match.id);
+                    if (adminMode && onAdminClear) {
+                      await onAdminClear(match.id);
+                    } else {
+                      await clearPrediction(match.id);
+                    }
                     setH(""); setA("");
                     onSaved();
                   } catch (e: any) {
