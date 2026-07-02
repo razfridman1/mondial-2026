@@ -45,7 +45,7 @@ export function ScoringLegend() {
           <li><span className="pts pts-gold">12</span> ניחוש נכון של מלך הבישולים</li>
         </ul>
         <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-          ניחוש זוכה ניתן לשינוי עד תחילת שלב 8 האחרונות.
+          ניחוש זוכה ניתן לשינוי עד סיום רבע הגמר.
           ניחוש מלך השערים/בישולים ניתן לשינוי עד סיום שלב הבתים.
         </div>
       </div>

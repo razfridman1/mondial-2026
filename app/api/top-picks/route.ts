@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  *
  * GET  — returns caller's picks + locked flags.
  * POST — sets topScorer + topAssist (lock: group stage complete).
- *        Also accepts optional champion (lock: R16 complete / QF starts).
+ *        Also accepts optional champion (lock: QF complete).
  * ===================================================================*/
 
 async function getLockState(db: FirebaseFirestore.Firestore): Promise<{
@@ -35,7 +35,7 @@ async function getLockState(db: FirebaseFirestore.Firestore): Promise<{
   const scorerDeadlinePassed = Date.now() > SCORER_DEADLINE;
   return {
     locked: scorerDeadlinePassed && groupStageComplete(results),
-    championLocked: stageComplete("R16", results),
+    championLocked: stageComplete("QF", results),
   };
 }
 
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
     if (championLocked) {
       return NextResponse.json({
         error: "champion_locked",
-        message: "שלב ה-16 האחרונות הסתיים — לא ניתן לשנות את ניחוש הזוכה",
+        message: "רבע הגמר הסתיים — לא ניתן לשנות את ניחוש הזוכה",
       }, { status: 403 });
     }
     if (!champion.teamCode) {

@@ -69,7 +69,7 @@ export default function TopScorersTab() {
       </div>
       <p className="muted" style={{ marginTop: 4, marginBottom: 16, fontSize: 13 }}>
         טבלאות השערים והבישולים מתעדכנות אוטומטית לאחר כל משחק שמסתיים.
-        ניחוש מלך השערים/בישולים ניתן לשינוי עד סיום שלב הבתים. ניחוש זוכת המונדיאל ניתן לשינוי עד תחילת שלב 8 האחרונות.
+        ניחוש מלך השערים/בישולים ניתן לשינוי עד סיום שלב הבתים. ניחוש זוכת המונדיאל ניתן לשינוי עד סיום רבע הגמר.
       </p>
 
       <div className="topscorers-grid">
@@ -289,7 +289,7 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks, topAssists }: {
   const matchResults = useStore(s => s.matchResults);
   const SCORER_DEADLINE = new Date("2026-06-30T23:59:59+03:00").getTime();
   const locked = Date.now() > SCORER_DEADLINE && groupStageComplete(matchResults);
-  const championLocked = stageComplete("R16", matchResults);
+  const championLocked = stageComplete("QF", matchResults);
 
   const [scorerTeam, setScorerTeam] = useState("");
   const [scorerPlayer, setScorerPlayer] = useState("");
@@ -364,7 +364,7 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks, topAssists }: {
           ) : <div className="muted">מלך הבישולים — לא נבחר (נעול).</div>}
         </div>
         <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
-          ניחוש זוכת המונדיאל ניתן לשינוי עד סיום שלב 8 האחרונות.
+          ניחוש זוכת המונדיאל ניתן לשינוי עד סיום רבע הגמר.
         </p>
         <div className="topscorers-pick-form">
           <div className="topscorers-pick-row">
@@ -414,11 +414,10 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks, topAssists }: {
     setError(null);
     setSaved(false);
     try {
-      await setTopPicks(
-        existingScorer || { teamCode: "", playerName: "" },
-        existingAssist || { teamCode: "", playerName: "" },
-        { teamCode: championTeam },
-      );
+      /* Champion pick has its own independent deadline — don't resend
+       * topScorer/topAssist here, or the (already-passed) scorer/assist
+       * lock on the server will reject the whole request. */
+      await setTopPicks(undefined, undefined, { teamCode: championTeam });
       setSaved(true);
     } catch (e: any) {
       setError(e.message || "שגיאה בשמירה");
@@ -459,7 +458,7 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks, topAssists }: {
         <div className="topscorers-pick-row">
           <span className="topscorers-pick-label">🏆 זוכת המונדיאל:</span>
           <select value={championTeam} onChange={e => { setChampionTeam(e.target.value); setSaved(false); }}>
-            <option value="">בחר נבחרת (אופציונלי עד 8 האחרונות)</option>
+            <option value="">בחר נבחרת (אופציונלי עד סיום רבע הגמר)</option>
             {ALL_TEAMS.map(t => <option key={t.code} value={t.code}>{t.flag} {t.name}</option>)}
           </select>
         </div>
