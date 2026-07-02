@@ -27,6 +27,7 @@ interface ProfileRow {
   createdAt?: string;
   lastLoginAt?: string;
   aiBlocked?: boolean;
+  topPicksUnlocked?: boolean;
 }
 interface PredictionRow {
   id: string; uid: string; matchId: string;
@@ -405,6 +406,14 @@ function UserRowEditor({ profile, onPatch, onDelete }: any) {
           style={{ background: profile.aiBlocked ? "rgba(239,68,68,0.15)" : "transparent" }}
         >
           {profile.aiBlocked ? "🤖🚫" : "🤖"}
+        </button>
+        <button
+          className="btn btn-small"
+          title={(profile as any).topPicksUnlocked ? "ניחוש מלך שערים/בישולים פתוח למשתמש זה — לחץ כדי לנעול חזרה" : "אפשר למשתמש זה לבחור/לשנות מלך שערים ומלך בישולים גם אחרי הדדליין"}
+          onClick={() => onPatch(profile.uid, { topPicksUnlocked: !(profile as any).topPicksUnlocked })}
+          style={{ background: (profile as any).topPicksUnlocked ? "rgba(34,197,94,0.15)" : "transparent" }}
+        >
+          {(profile as any).topPicksUnlocked ? "⚽🔓" : "⚽🔒"}
         </button>
         <button className="btn btn-small" onClick={() => onPatch(profile.uid, { disabled: !profile.disabled })}>
           {profile.disabled ? "✓" : "🚫"}

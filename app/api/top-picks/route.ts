@@ -61,7 +61,7 @@ export async function GET(req: Request) {
     topScorerPick: data.topScorerPick || null,
     topAssistPick: data.topAssistPick || null,
     championPick: data.championPick || null,
-    locked,
+    locked: locked && !data.topPicksUnlocked,
     championLocked,
   });
 }
@@ -86,9 +86,10 @@ export async function POST(req: Request) {
 
   /* Scorer + Assist picks */
   if (topScorer || topAssist) {
-    if (locked) {
-      const snap = await ref.get();
-      const data = snap.exists ? (snap.data() || {}) : {};
+    const snap = await ref.get();
+    const data = snap.exists ? (snap.data() || {}) : {};
+    const effectiveLocked = locked && !data.topPicksUnlocked;
+    if (effectiveLocked) {
       return NextResponse.json({
         error: "locked",
         message: "שלב הבתים הסתיים — לא ניתן לשנות את הבחירה",

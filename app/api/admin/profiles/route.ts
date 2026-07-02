@@ -157,6 +157,9 @@ export async function PATCH(req: Request) {
   if (typeof body.bio         === "string") patch.bio         = body.bio.slice(0, 240);
   if (body.theme === "dark" || body.theme === "light") patch.theme = body.theme;
   if (typeof body.aiBlocked   === "boolean") patch.aiBlocked   = body.aiBlocked;
+  /* Per-user override: lets a specific user submit/change their top scorer +
+   * top assist picks even after the global deadline has passed. */
+  if (typeof body.topPicksUnlocked === "boolean") patch.topPicksUnlocked = body.topPicksUnlocked;
 
   await db.collection("profiles").doc(body.uid).set(patch, { merge: true });
 

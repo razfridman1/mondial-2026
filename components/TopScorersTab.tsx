@@ -288,7 +288,10 @@ function TopPicksPanel({ user, profile, liveSquads, setTopPicks, topAssists }: {
 }) {
   const matchResults = useStore(s => s.matchResults);
   const SCORER_DEADLINE = new Date("2026-06-30T23:59:59+03:00").getTime();
-  const locked = Date.now() > SCORER_DEADLINE && groupStageComplete(matchResults);
+  /* Admin can unlock scorer/assist picks per-user (profile.topPicksUnlocked)
+   * for someone who missed the deadline — mirrors the server-side check. */
+  const topPicksUnlocked = !!(profile as any)?.topPicksUnlocked;
+  const locked = Date.now() > SCORER_DEADLINE && groupStageComplete(matchResults) && !topPicksUnlocked;
   const championLocked = stageComplete("QF", matchResults);
 
   const [scorerTeam, setScorerTeam] = useState("");
