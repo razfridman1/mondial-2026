@@ -44,11 +44,14 @@ const DAY_BEFORE_MIN_MS = 12 * 60 * 60 * 1000;
 const DAY_BEFORE_MAX_MS = 36 * 60 * 60 * 1000;
 const FALLBACK_MAX_MS = 6 * 60 * 60 * 1000;
 /* Bump whenever the preview-generation logic changes in a way that could
- * make previously-cached text wrong (e.g. the ESPN relevance filter was
- * too loose and let irrelevant player storylines leak into previews).
- * Any cached entry without a matching version is treated as stale and
- * gets regenerated once, even if its recorded teams are still correct. */
-const PREVIEW_VERSION = 2;
+ * make previously-cached text wrong. v2 tightened the ESPN relevance
+ * filter; v3 removed ESPN news from the prompt entirely (it kept leaking
+ * irrelevant player/team storylines — e.g. a Ronaldo/Messi tangent inside
+ * a Portugal vs Spain preview — even after the v2 filter), and forbade
+ * markdown formatting in the output. Any cached entry without a matching
+ * version is treated as stale and gets regenerated once, even if its
+ * recorded teams are still correct. */
+const PREVIEW_VERSION = 3;
 
 export async function GET(req: Request) {
   if (SECRET) {

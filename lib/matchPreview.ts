@@ -1,20 +1,28 @@
 /* =====================================================================
- * Match Preview — gathers REAL data about an upcoming match (FIFA
- * ranking, odds-derived win probabilities, recent World Cup form, and
- * — only as a supplement — relevant ESPN preview/review articles), then
- * asks Claude (Haiku) to write a short Hebrew preview from that data.
+ * Match Preview — gathers REAL, structured data about an upcoming match
+ * (FIFA ranking, odds-derived win probabilities, recent World Cup form —
+ * all looked up directly by team code), then asks Claude (Haiku) to
+ * write a short Hebrew preview from that data.
+ *
+ * Deliberately does NOT use ESPN's free-text "news" articles as an input
+ * anymore: that supplement repeatedly leaked in facts about players/teams
+ * NOT in the match being previewed (e.g. a "Ronaldo could face Messi in
+ * a World Cup final" storyline showing up in a Portugal vs Spain preview,
+ * even though Messi's Argentina has nothing to do with that fixture).
+ * Every fact fed to the model now comes from data keyed directly by
+ * match.home/match.away, so there is no free-text content that could
+ * smuggle in an irrelevant team or player.
  *
  * No fabrication: every fact fed to the model came from a real source
- * (lib/fifaRanking.ts, oddsToProbabilities, match_results, or ESPN's
- * news API). If a data point is missing it's simply omitted. If there
- * isn't enough real data to say anything meaningful, returns null.
+ * (lib/fifaRanking.ts, oddsToProbabilities, match_results). If a data
+ * point is missing it's simply omitted. If there isn't enough real data
+ * to say anything meaningful, returns null.
  * ===================================================================*/
 import { TEAMS, MATCHES } from "./data";
 import type { Match } from "./types";
 import type { MatchResult } from "./standings";
 import { oddsToProbabilities } from "./utils";
 import { fifaRankingFor, FIFA_RANKING_AS_OF } from "./fifaRanking";
-import { findEspnEventId, fetchEspnMatchNews, type EspnNewsItem } from "./espn";
 
 export interface TeamFormEntry {
   opponent: string;
@@ -29,7 +37,6 @@ export interface MatchPreviewContext {
   away: { code: string; name: string; rank: number | null; form: TeamFormEntry[] };
   probabilities: { home: number; draw: number; away: number } | null;
   rankingAsOf: string;
-  espnNews: EspnNewsItem[];
 }
 
 /** Up to `limit` most-recent FINISHED World Cup results for `teamCode`,
@@ -71,30 +78,21 @@ export async function gatherMatchPreviewContext(match: Match, results: Record<st
   const awayRank = fifaRankingFor(match.away);
   const probabilities = oddsToProbabilities(match.odds);
 
-  let espnNews: EspnNewsItem[] = [];
-  try {
-    const eventId = await findEspnEventId(match.home, match.away, match.utc);
-    if (eventId) espnNews = await fetchEspnMatchNews(eventId, home.nameEn, away.nameEn);
-  } catch {
-    /* best-effort only */
-  }
-
   return {
     matchId: match.id,
     home: { code: match.home, name: home.name, rank: homeRank?.rank ?? null, form: recentWcForm(match.home, results, match.utc) },
     away: { code: match.away, name: away.name, rank: awayRank?.rank ?? null, form: recentWcForm(match.away, results, match.utc) },
     probabilities,
     rankingAsOf: FIFA_RANKING_AS_OF,
-    espnNews,
   };
 }
 
 const PREVIEW_SYSTEM_PROMPT = `אתה אנליסט ספורט לאפליקציית מונדיאל 2026.
-קיבלת נתונים אמיתיים על משחק קרוב בין שתי קבוצות ספציפיות (ששמן ניתן לך במפורש): דירוג עולמי FIFA, הסתברויות ניצחון/תיקו לפי יחסי הימורים, תוצאות אחרונות של הקבוצות במונדיאל, ולעיתים גם ידיעות רקע מ-ESPN.
-כתוב תצוגה מקדימה קצרה וקולחת בעברית (3-5 משפטים) למשחק הזה בלבד, המבוססת אך ורק על הנתונים שניתנו.
+קיבלת נתונים אמיתיים על משחק קרוב בין שתי קבוצות ספציפיות (ששמן ניתן לך במפורש): דירוג עולמי FIFA, הסתברויות ניצחון/תיקו לפי יחסי הימורים, ותוצאות אחרונות של הקבוצות במונדיאל.
+כתוב תצוגה מקדימה קצרה וקולחת בעברית (3-5 משפטים) למשחק הזה בלבד, בין שתי הקבוצות הללו בדיוק ולא אף קבוצה אחרת, המבוססת אך ורק על הנתונים שניתנו.
 אם נתון מסוים חסר — פשוט דלג עליו, אל תנחש ואל תמלא בעצמך.
-אל תזכיר פציעות, הרכבים או שחקנים ספציפיים אלא אם כן הם מוזכרים בפירוש בידיעות שניתנו.
-חשוב מאוד: כל דבר שאתה כותב — כולל כל שחקן, מאמן או עובדה שמוזכרים בידיעות הרקע מ-ESPN — חייב להיות רלוונטי ישירות לשתי הקבוצות שמשחקות זו בזו במשחק הזה בלבד. אם ידיעת רקע כלשהי מזכירה קבוצה שלישית, שחקן מקבוצה שאינה אחת משתי הקבוצות המשחקות, או עימות/תרחיש שאינו בין שתי הקבוצות הללו (למשל שחקן שסביר שלא ייפגש עם היריבה הנוכחית בשלב הזה של הטורניר) — התעלם מהידיעה הזו לחלוטין ואל תזכיר אותה בשום צורה, גם אם היא נשמעת מעניינת.
+אל תזכיר שום שחקן, מאמן, קבוצה שלישית, משחק עתידי (כמו גמר או חצי גמר היפותטי), או עובדה שלא ניתנה לך במפורש בנתונים שלמעלה — גם אם היא נשמעת מעניינת או ידועה לך מכל מקור אחר.
+כתוב טקסט רציף בלבד — בלי כותרות, בלי סימני # או כל עיצוב Markdown, בלי רשימות.
 טון: ספורטיבי, מעניין, תמציתי. אל תמציא נתונים מעבר למה שניתן לך.`;
 
 /** Build a plain-text bullet list of the real facts available — used both
@@ -112,10 +110,6 @@ function buildFactSheet(ctx: MatchPreviewContext): string[] {
   }
   if (ctx.away.form.length) {
     lines.push(`תוצאות אחרונות של ${ctx.away.name} במונדיאל: ${ctx.away.form.map(f => `${f.result} ${f.score} מול ${f.opponent}`).join(", ")}`);
-  }
-  if (ctx.espnNews.length) {
-    lines.push(`ידיעות רקע (ESPN):`);
-    ctx.espnNews.forEach(n => lines.push(`- ${n.headline}${n.description ? `: ${n.description}` : ""}`));
   }
   return lines;
 }
