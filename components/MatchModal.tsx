@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TEAMS, VENUES, CHANNELS, STAGES } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { formatIsraelDate, formatIsraelTime, oddsToProbabilities, matchLiveStatus } from "@/lib/utils";
 import { effMatch } from "@/lib/sim";
+import { resolveAllStages } from "@/lib/bracket";
 import { useOddsMap } from "@/lib/useOddsMap";
 import { MATCHES } from "@/lib/data";
 import { shareToWhatsApp, matchShareText } from "@/lib/share";
@@ -153,10 +154,24 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
   }, [matchId, isLive, selectedGroupId, user?.uid]);
 
   const oddsMap = useOddsMap();
+  /* Resolve knockout placeholders ("W R32-9" etc.) to the actual teams that
+   * qualified, using live results — same resolver used by the match list. */
+  const resolved = useMemo(() => resolveAllStages(matchResults), [matchResults]);
   const base = MATCHES.find(m => m.id === matchId);
   if (!base) return null;
   const eff = effMatch(base, overrides[matchId], simConfig);
-  const m = { ...eff, odds: oddsMap[matchId] || eff.odds };
+  const isKO = base.stage !== "GROUP";
+  const r = resolved[matchId];
+  const homeCode = isKO ? (r?.home || eff.home) : eff.home;
+  const awayCode = isKO ? (r?.away || eff.away) : eff.away;
+  const m = {
+    ...eff,
+    odds: oddsMap[matchId] || eff.odds,
+    home: homeCode,
+    away: awayCode,
+    homeIsPlaceholder: isKO && !r?.home,
+    awayIsPlaceholder: isKO && !r?.away,
+  };
   const home = TEAMS[m.home] || { code: m.home, name: m.home, flag: "❓" };
   const away = TEAMS[m.away] || { code: m.away, name: m.away, flag: "❓" };
   const venue = VENUES[m.venue] || { name: m.venue, city: "", country: "", flag: "", capacity: 0 };
