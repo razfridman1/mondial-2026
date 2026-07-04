@@ -3,6 +3,7 @@ import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { MATCHES } from "@/lib/data";
 import { effectiveUtc, type SimConfig } from "@/lib/sim";
 import { applyOverride } from "@/lib/utils";
+import { resolveAllStages } from "@/lib/bracket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -97,13 +98,19 @@ export async function GET(req: Request) {
    * predictions visible for finished matches and (b) let the client
    * compute each member's points per match. */
   const resultsSnap = await db.collection("match_results").get();
-  const results: Record<string, { home: number; away: number; winner?: string }> = {};
+  const results: Record<string, { home: number; away: number; winner?: string; finishedAt: number }> = {};
   resultsSnap.forEach(d => {
     const data = d.data() as any;
     if (data?.home != null && data?.away != null) {
-      results[d.id] = { home: data.home, away: data.away, ...(data.winner ? { winner: data.winner } : {}) };
+      results[d.id] = { home: data.home, away: data.away, finishedAt: data.finishedAt || 0, ...(data.winner ? { winner: data.winner } : {}) };
     }
   });
+
+  /* Resolve knockout placeholders ("W R32-9" etc.) to the actual teams
+   * that qualified, using the live results — otherwise the per-match
+   * predictions table shows raw bracket placeholders instead of team
+   * names for R16 and later stages. */
+  const resolved = resolveAllStages(results);
 
   /* 5. Build rows for matches that have at least 1 prediction.
    *    Super-admins see EVERY prediction regardless of timing (no privacy redaction). */
@@ -115,6 +122,9 @@ export async function GET(req: Request) {
     .filter(mt => allPreds.some(p => p.matchId === mt.id))
     .map(mt => {
       const result = results[mt.id] || null;
+      const r = mt.stage !== "GROUP" ? resolved[mt.id] : null;
+      const homeCode = r?.home || mt.home;
+      const awayCode = r?.away || mt.away;
       /* Finished matches (real result entered manually or synced from the
        * live feed) always reveal every member's prediction permanently —
        * regardless of the normal 2-minutes-before-kickoff timing rule. */
@@ -143,8 +153,8 @@ export async function GET(req: Request) {
                      || a.displayName.localeCompare(b.displayName, "he"));
       return {
         matchId: mt.id,
-        home: mt.home,
-        away: mt.away,
+        home: homeCode,
+        away: awayCode,
         utc: mt.effUtc,
         stage: mt.stage,
         group: mt.group,
