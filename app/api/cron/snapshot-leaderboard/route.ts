@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
 import { userTotals } from "@/lib/scoring";
 import { computeSpecialPickBonuses } from "@/lib/special-picks-bonus";
+import { resolveAllStages, resolvePlaceholder } from "@/lib/bracket";
 import type { LeaderRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -47,6 +48,18 @@ async function snapshot(triggeredBy: string) {
     results[d.id] = entry;
   });
 
+  /* Predictions made on a knockout match BEFORE its bracket slot resolved
+   * were saved with `predictedWinner` set to the raw placeholder string
+   * ("W R32-4" etc.), permanently stored as-is — it would never equal the
+   * real winner code in `results` and would silently score 0 even for a
+   * correct pick. Resolve it here at read time using the current bracket
+   * state before scoring. */
+  const resolvedBracket = resolveAllStages(results);
+  function withResolvedWinner<T extends { predictedWinner?: string }>(p: T): T {
+    if (!p.predictedWinner) return p;
+    return { ...p, predictedWinner: resolvePlaceholder(p.predictedWinner, results, resolvedBracket) || p.predictedWinner };
+  }
+
   /* Load all profiles */
   const profSnap = await db.collection("profiles").get();
   const allUids = profSnap.docs.map(d => d.id);
@@ -61,7 +74,7 @@ async function snapshot(triggeredBy: string) {
     for (const uid of uids) {
       const prof = profByUid[uid] || {};
       const predSnap = await db.collection("predictions").where("uid", "==", uid).get();
-      const preds = predSnap.docs.map(d => d.data() as any);
+      const preds = predSnap.docs.map(d => withResolvedWinner(d.data() as any));
       const specialBonus = specialBonuses.get(uid) || 0;
       const t = userTotals(preds, results, specialBonus);
       rows.push({

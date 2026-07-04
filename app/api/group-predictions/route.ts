@@ -3,7 +3,7 @@ import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { MATCHES } from "@/lib/data";
 import { effectiveUtc, type SimConfig } from "@/lib/sim";
 import { applyOverride } from "@/lib/utils";
-import { resolveAllStages } from "@/lib/bracket";
+import { resolveAllStages, resolvePlaceholder } from "@/lib/bracket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -112,6 +112,18 @@ export async function GET(req: Request) {
    * names for R16 and later stages. */
   const resolved = resolveAllStages(results);
 
+  /* Predictions made on a knockout match BEFORE its bracket slot resolved
+   * were saved with `predictedWinner` set to the raw placeholder string
+   * ("W R32-4" etc.) that was on screen at the time — that string is
+   * permanently stored as-is in Firestore. It's still a resolvable
+   * formula though (independent of when it was saved), so resolve it here
+   * at read time using the CURRENT bracket state instead of showing the
+   * raw code forever. */
+  function resolvePredictedWinner(pw: string | null | undefined): string | null {
+    if (!pw) return null;
+    return resolvePlaceholder(pw, results, resolved) || pw;
+  }
+
   /* 5. Build rows for matches that have at least 1 prediction.
    *    Super-admins see EVERY prediction regardless of timing (no privacy redaction). */
   const now = Date.now();
@@ -140,7 +152,7 @@ export async function GET(req: Request) {
             avatarId: profByUid[p.uid]?.avatarId || "messi",
             homeScore: reveal ? p.homeScore : null,
             awayScore: reveal ? p.awayScore : null,
-            predictedWinner: reveal ? (p.predictedWinner ?? null) : null,
+            predictedWinner: reveal ? resolvePredictedWinner(p.predictedWinner) : null,
             joker: reveal ? !!p.joker : false,
             auto: reveal ? !!p.auto : false,
             hidden: !reveal,

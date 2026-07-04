@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { userTotals } from "@/lib/scoring";
 import { MATCHES } from "@/lib/data";
+import { resolveAllStages, resolvePlaceholder } from "@/lib/bracket";
 import type { LeaderRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -100,6 +101,18 @@ export async function GET(req: Request) {
     results[d.id] = entry;
   });
 
+  /* Predictions made on a knockout match BEFORE its bracket slot resolved
+   * were saved with `predictedWinner` set to the raw placeholder string
+   * ("W R32-4" etc.) that was on screen at the time, which is permanently
+   * stored as-is — it would never equal the real winner code in `results`
+   * and would silently score 0 even for a correct pick. Resolve it here
+   * at read time using the current bracket state before scoring. */
+  const resolvedBracket = resolveAllStages(results);
+  function withResolvedWinner<T extends { predictedWinner?: string }>(p: T): T {
+    if (!p.predictedWinner) return p;
+    return { ...p, predictedWinner: resolvePlaceholder(p.predictedWinner, results, resolvedBracket) || p.predictedWinner };
+  }
+
   /* 2b. Load bonus awards (manual admin adjustments) and sum per user */
   const bonusSnap = await db.collection("bonus_awards").get();
   const bonusByUid: Record<string, number> = {};
@@ -138,7 +151,7 @@ export async function GET(req: Request) {
     const prof = await db.collection("profiles").doc(uid).get();
     const profData = prof.data() as any || {};
     const predSnap = await db.collection("predictions").where("uid", "==", uid).get();
-    const preds = predSnap.docs.map(d => d.data() as any);
+    const preds = predSnap.docs.map(d => withResolvedWinner(d.data() as any));
     const t = userTotals(preds, results, bonusByUid[uid] || 0);
     const authMeta = authMetaByUid[uid] || {};
     /* Resolution order: Firestore profile → Firebase Auth (Google name)

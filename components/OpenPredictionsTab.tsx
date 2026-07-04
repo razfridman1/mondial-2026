@@ -4,6 +4,7 @@ import { useStore } from "@/lib/store";
 import { MATCHES } from "@/lib/data";
 import { applyOverride } from "@/lib/utils";
 import { effectiveUtc } from "@/lib/sim";
+import { resolveAllStages, resolvePlaceholder } from "@/lib/bracket";
 import { PredictionRow, type MatchResult } from "./PredictionRow";
 
 const GRACE_MS = 5 * 60 * 1000;   // show for 5 min after saving
@@ -64,9 +65,41 @@ export default function OpenPredictionsTab() {
     return () => { cancelled = true; };
   }, []);
 
+  /* Resolve knockout placeholders ("W R32-9" etc.) to the actual teams
+   * that qualified. Without this, `m.homeIsPlaceholder`/`awayIsPlaceholder`
+   * (computed once, statically, from the raw fixture list) are ALWAYS
+   * true for every knockout match regardless of whether the bracket slot
+   * has actually resolved — so this tab would never show a single R16+
+   * match, even fully-decided ones. */
+  const resolved = useMemo(() => resolveAllStages(results), [results]);
+
+  /* A prediction saved before its match's bracket slot resolved has
+   * `predictedWinner` stored as the raw placeholder ("W R32-4" etc.) that
+   * was on screen at the time. Resolve it here via the current bracket
+   * state so it isn't shown/scored as wrong later. */
+  const resolvedPredictions = useMemo(() => {
+    const out: typeof predictions = {};
+    for (const [matchId, p] of Object.entries(predictions)) {
+      const pw = (p as any)?.predictedWinner;
+      out[matchId] = pw ? ({ ...p, predictedWinner: resolvePlaceholder(pw, results, resolved) || pw } as any) : p;
+    }
+    return out;
+  }, [predictions, results, resolved]);
+
   const openMatches = useMemo(() => {
     const cutoff = now + NEXT_DAYS * 24 * 60 * 60 * 1000;
-    const allMatches = MATCHES.map(m => applyOverride(m, overrides[m.id]));
+    const allMatches = MATCHES.map(m => {
+      const withOv = applyOverride(m, overrides[m.id]);
+      if (m.stage === "GROUP") return withOv;
+      const r = resolved[m.id];
+      return {
+        ...withOv,
+        home: r?.home || withOv.home,
+        away: r?.away || withOv.away,
+        homeIsPlaceholder: !r?.home,
+        awayIsPlaceholder: !r?.away,
+      };
+    });
     return allMatches.filter(m => {
       const startMs = new Date(effectiveUtc(m.utc, simConfig)).getTime();
       const lockAt  = startMs - 3 * 60 * 1000;
@@ -84,7 +117,7 @@ export default function OpenPredictionsTab() {
       const savedAt = recentlySaved[m.id];
       return !!savedAt && (now - savedAt < GRACE_MS);
     });
-  }, [overrides, predictions, recentlySaved, now, simConfig]);
+  }, [overrides, predictions, recentlySaved, now, simConfig, resolved]);
 
   function handleSaved(matchId: string) {
     // Only grant grace to matches that were unpredicted when tab opened
@@ -138,7 +171,7 @@ export default function OpenPredictionsTab() {
             <PredictionRow
               key={m.id}
               match={m}
-              prediction={predictions[m.id]}
+              prediction={resolvedPredictions[m.id]}
               result={results[m.id]}
               now={now}
               onSaved={() => handleSaved(m.id)}

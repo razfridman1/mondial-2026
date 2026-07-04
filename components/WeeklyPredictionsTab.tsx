@@ -6,7 +6,7 @@ import { getFirebase } from "@/lib/firebase";
 import { MATCHES, TEAMS } from "@/lib/data";
 import { applyOverride, israelDateKey, HEB_MONTHS } from "@/lib/utils";
 import { effectiveUtc } from "@/lib/sim";
-import { resolveAllStages } from "@/lib/bracket";
+import { resolveAllStages, resolvePlaceholder } from "@/lib/bracket";
 import { PredictionRow, type MatchResult } from "./PredictionRow";
 
 async function adminAuthHeaders() {
@@ -157,6 +157,19 @@ export default function WeeklyPredictionsTab() {
 
   /* Resolve knockout placeholders */
   const resolved = useMemo(() => resolveAllStages(results), [results]);
+
+  /* A prediction saved before its match's bracket slot resolved has
+   * `predictedWinner` stored as the raw placeholder ("W R32-4" etc.) that
+   * was on screen at the time. Resolve it here via the current bracket
+   * state so a correct historical pick isn't shown/scored as wrong. */
+  const resolvedEffectivePredictions = useMemo(() => {
+    const out: typeof effectivePredictions = {};
+    for (const [matchId, p] of Object.entries(effectivePredictions)) {
+      const pw = (p as any)?.predictedWinner;
+      out[matchId] = pw ? ({ ...p, predictedWinner: resolvePlaceholder(pw, results, resolved) || pw } as any) : p;
+    }
+    return out;
+  }, [effectivePredictions, results, resolved]);
 
   /* Effective matches with sim overrides */
   const matches = useMemo(
@@ -359,7 +372,7 @@ export default function WeeklyPredictionsTab() {
             <PredictionRow
               key={m.id}
               match={m}
-              prediction={effectivePredictions[m.id]}
+              prediction={resolvedEffectivePredictions[m.id]}
               result={results[m.id]}
               now={now}
               onSaved={load}

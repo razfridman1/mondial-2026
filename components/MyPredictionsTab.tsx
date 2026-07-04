@@ -7,7 +7,7 @@ import { MATCHES, TEAMS, STAGES } from "@/lib/data";
 import { applyOverride } from "@/lib/utils";
 import { effectiveUtc } from "@/lib/sim";
 import { scorePrediction } from "@/lib/scoring";
-import { resolveAllStages } from "@/lib/bracket";
+import { resolveAllStages, resolvePlaceholder } from "@/lib/bracket";
 import type { StageId, Match, LeaderRow } from "@/lib/types";
 import { AvatarDisplay } from "./AvatarPicker";
 import { PredictionRow, type MatchResult } from "./PredictionRow";
@@ -128,6 +128,20 @@ export default function MyPredictionsTab() {
    * complete (FIFA rule: next stage opens only when all previous-stage results are in). */
   const resolved = useMemo(() => resolveAllStages(results), [results]);
 
+  /* A prediction saved before its match's bracket slot resolved has
+   * `predictedWinner` stored as the raw placeholder ("W R32-4" etc.) that
+   * was on screen at the time — that string is permanently stored as-is.
+   * Resolve it here (once) via the current bracket state so scoring and
+   * the "עולה" display don't treat a correct historical pick as wrong. */
+  const resolvedPredictions = useMemo(() => {
+    const out: typeof predictions = {};
+    for (const [matchId, p] of Object.entries(predictions)) {
+      const pw = (p as any).predictedWinner;
+      out[matchId] = pw ? ({ ...p, predictedWinner: resolvePlaceholder(pw, results, resolved) || pw } as any) : p;
+    }
+    return out;
+  }, [predictions, results, resolved]);
+
   const matches = useMemo(
     () => MATCHES.map(m => {
       const eff = applyOverride(m, overrides[m.id]);
@@ -207,7 +221,7 @@ export default function MyPredictionsTab() {
   /* Accuracy: % of FINISHED predictions that earned at least 3 pts */
   const accuracy = useMemo(() => {
     let total = 0, hit = 0;
-    Object.values(predictions).forEach(p => {
+    Object.values(resolvedPredictions).forEach(p => {
       const r = results[p.matchId];
       if (!r) return;
       total++;
@@ -223,7 +237,7 @@ export default function MyPredictionsTab() {
       if (sc.points > 0) hit++;
     });
     return { total, hit, pct: total ? Math.round((hit / total) * 100) : 0 };
-  }, [predictions, results]);
+  }, [resolvedPredictions, results]);
 
   /* Gap to #1 in the group leaderboard */
   const gapToFirst = useMemo(() => {
@@ -363,7 +377,7 @@ export default function MyPredictionsTab() {
             <PredictionRow
               key={m.id}
               match={m}
-              prediction={predictions[m.id]}
+              prediction={resolvedPredictions[m.id]}
               result={results[m.id]}
               now={now}
               onSaved={() => load()}
