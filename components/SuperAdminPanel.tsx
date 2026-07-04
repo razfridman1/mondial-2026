@@ -8,6 +8,7 @@ import { formatIsraelDate, formatIsraelTime } from "@/lib/utils";
 import { AVATARS } from "@/lib/avatars";
 import { scorePrediction, userTotals } from "@/lib/scoring";
 import { squadFor } from "@/lib/players";
+import { resolveAllStages } from "@/lib/bracket";
 
 const ALL_TEAMS_SORTED = Object.values(TEAMS).sort((a, b) => a.name.localeCompare(b.name, "he"));
 
@@ -151,6 +152,12 @@ function ResultsAdmin() {
   const byMatchId = useMemo(() => Object.fromEntries(results.map(r => [r.matchId, r])), [results]);
   const [filter, setFilter] = useState("");
 
+  /* Resolve knockout placeholders ("W R32-9" etc.) to the actual teams that
+   * qualified, using the live match results — same resolver used by the
+   * public match list / bracket views. */
+  const matchResults = useStore(s => s.matchResults);
+  const resolved = useMemo(() => resolveAllStages(matchResults), [matchResults]);
+
   async function load() {
     setBusy(true);
     try {
@@ -196,7 +203,7 @@ function ResultsAdmin() {
           <tbody>
             {matchesFiltered.map(m => {
               const r = byMatchId[m.id];
-              return <ResultRowEditor key={m.id} match={m} result={r} onSave={saveResult} onDelete={deleteResult} onRestored={load} />;
+              return <ResultRowEditor key={m.id} match={m} result={r} resolvedTeams={resolved[m.id]} onSave={saveResult} onDelete={deleteResult} onRestored={load} />;
             })}
           </tbody>
         </table>
@@ -206,7 +213,7 @@ function ResultsAdmin() {
   );
 }
 
-function ResultRowEditor({ match, result, onSave, onDelete, onRestored }: any) {
+function ResultRowEditor({ match, result, resolvedTeams, onSave, onDelete, onRestored }: any) {
   const [home, setHome] = useState(result?.home ?? "");
   const [away, setAway] = useState(result?.away ?? "");
   const [winner, setWinner] = useState(result?.winner ?? "");
@@ -219,8 +226,12 @@ function ResultRowEditor({ match, result, onSave, onDelete, onRestored }: any) {
     setAway(result?.away ?? "");
     setWinner(result?.winner ?? "");
   }, [result?.home, result?.away, result?.winner]);
-  const homeTeam = TEAMS[match.home];
-  const awayTeam = TEAMS[match.away];
+  /* For knockout matches, `match.home`/`match.away` are placeholders like
+   * "W R32-9" until resolved to the team that actually qualified. */
+  const homeCode = resolvedTeams?.home || match.home;
+  const awayCode = resolvedTeams?.away || match.away;
+  const homeTeam = TEAMS[homeCode];
+  const awayTeam = TEAMS[awayCode];
 
   async function loadHistory() {
     setHistoryBusy(true);
@@ -255,7 +266,7 @@ function ResultRowEditor({ match, result, onSave, onDelete, onRestored }: any) {
       <tr>
         <td rowSpan={isKO ? 2 : 1}>
           <small className="muted">{match.id}</small><br />
-          {homeTeam?.flag} {homeTeam?.name || match.home} <span className="muted">נגד</span> {awayTeam?.name || match.away} {awayTeam?.flag}
+          {homeTeam?.flag} {homeTeam?.name || homeCode} <span className="muted">נגד</span> {awayTeam?.name || awayCode} {awayTeam?.flag}
         </td>
         <td rowSpan={isKO ? 2 : 1} className="muted" style={{ fontSize: 11 }}>
           {formatIsraelDate(match.utc, { short: true })}<br />{formatIsraelTime(match.utc)}
@@ -283,8 +294,8 @@ function ResultRowEditor({ match, result, onSave, onDelete, onRestored }: any) {
             <select value={winner} onChange={e => setWinner(e.target.value)}
                     style={{ fontSize: 12, padding: "2px 6px", background: "var(--bg-elev)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 4 }}>
               <option value="">— בחר מנצחת —</option>
-              <option value={match.home}>{homeTeam?.flag} {homeTeam?.name || match.home}</option>
-              <option value={match.away}>{awayTeam?.flag} {awayTeam?.name || match.away}</option>
+              <option value={homeCode}>{homeTeam?.flag} {homeTeam?.name || homeCode}</option>
+              <option value={awayCode}>{awayTeam?.flag} {awayTeam?.name || awayCode}</option>
             </select>
           </td>
           <td style={{ paddingTop: 6, paddingBottom: 6 }}>
