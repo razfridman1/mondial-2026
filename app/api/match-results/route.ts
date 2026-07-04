@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
 import { runResultsSync, isWithinActiveWindow } from "@/lib/sync-results-core";
+import { withResolvedWinners } from "@/lib/bracket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,11 @@ export async function GET() {
       out[d.id] = entry;
     });
 
+    /* Self-heal any knockout result whose `winner` was stored as a raw
+     * bracket placeholder ("W R32-4") instead of the real team code —
+     * see withResolvedWinners for why that silently breaks scoring. */
+    const healed = withResolvedWinners(out);
+
     /* Redundant cron-failure backup: if a match is in its active results
      * window but the cron hasn't run recently, run the sync ourselves. */
     if (isWithinActiveWindow()) {
@@ -52,7 +58,7 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json(out);
+    return NextResponse.json(healed);
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

@@ -3,7 +3,7 @@ import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { MATCHES } from "@/lib/data";
 import { effectiveUtc, type SimConfig } from "@/lib/sim";
 import { applyOverride } from "@/lib/utils";
-import { resolveAllStages, resolvePlaceholder } from "@/lib/bracket";
+import { resolveAllStages, resolvePlaceholder, withResolvedWinners } from "@/lib/bracket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,13 +98,21 @@ export async function GET(req: Request) {
    * predictions visible for finished matches and (b) let the client
    * compute each member's points per match. */
   const resultsSnap = await db.collection("match_results").get();
-  const results: Record<string, { home: number; away: number; winner?: string; finishedAt: number }> = {};
+  let results: Record<string, { home: number; away: number; winner?: string; finishedAt: number }> = {};
   resultsSnap.forEach(d => {
     const data = d.data() as any;
     if (data?.home != null && data?.away != null) {
       results[d.id] = { home: data.home, away: data.away, finishedAt: data.finishedAt || 0, ...(data.winner ? { winner: data.winner } : {}) };
     }
   });
+
+  /* Self-heal any knockout result whose `winner` was stored as a raw
+   * bracket placeholder ("W R32-4") instead of the real team code — see
+   * withResolvedWinners for why that silently breaks scoring for every
+   * prediction on that match, including correct ones. This also fixes the
+   * `result.winner` sent to the client, which FriendsRanking/MatchModal
+   * use for their own scorePrediction() calls. */
+  results = withResolvedWinners(results);
 
   /* Resolve knockout placeholders ("W R32-9" etc.) to the actual teams
    * that qualified, using the live results — otherwise the per-match

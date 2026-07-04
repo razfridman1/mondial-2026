@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
 import { userTotals } from "@/lib/scoring";
 import { computeSpecialPickBonuses } from "@/lib/special-picks-bonus";
-import { resolveAllStages, resolvePlaceholder } from "@/lib/bracket";
+import { resolveAllStages, resolvePlaceholder, withResolvedWinners } from "@/lib/bracket";
 import type { LeaderRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -37,7 +37,7 @@ async function snapshot(triggeredBy: string) {
   const stageById = new Map<string, string>();
   const { MATCHES } = await import("@/lib/data");
   for (const m of MATCHES) stageById.set(m.id, m.stage);
-  const results: Record<string, { home: number; away: number; finishedAt: number; winner?: string; isKnockout?: boolean }> = {};
+  let results: Record<string, { home: number; away: number; finishedAt: number; winner?: string; isKnockout?: boolean }> = {};
   resSnap.forEach(d => {
     const data = d.data() as any;
     const stage = stageById.get(d.id);
@@ -47,6 +47,12 @@ async function snapshot(triggeredBy: string) {
     if (isKO) entry.isKnockout = true;
     results[d.id] = entry;
   });
+
+  /* Self-heal any knockout result whose `winner` was stored as a raw
+   * bracket placeholder ("W R32-4") instead of the real team code — see
+   * withResolvedWinners for why that silently breaks scoring for every
+   * prediction on that match, including correct ones. */
+  results = withResolvedWinners(results);
 
   /* Predictions made on a knockout match BEFORE its bracket slot resolved
    * were saved with `predictedWinner` set to the raw placeholder string

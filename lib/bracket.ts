@@ -196,3 +196,32 @@ export function resolveAllStages(
 
   return out;
 }
+
+/** Returns a copy of `results` where every match's `winner` field is
+ * overwritten with the value `resolveAllStages` derives from the real
+ * resolved teams + score, instead of whatever raw string is stored in the
+ * match_results doc.
+ *
+ * Why this matters: when a knockout result is saved WITHOUT an explicit
+ * winner (e.g. admin only fills in the score), some code paths fall back
+ * to deriving `winner` from the match's placeholder codes at save time —
+ * which, for a knockout match, can end up storing the raw bracket
+ * placeholder string ("W R32-4") instead of the real team code ("MAR").
+ * That placeholder can never equal a real predictedWinner team code, so
+ * EVERY prediction for that match — including correct ones — silently
+ * scores 0 points. `resolveAllStages` already only trusts a stored
+ * `winner` when it matches one of the two real resolved team codes,
+ * otherwise it re-derives the winner from the score — so reapplying its
+ * output here self-heals the bug at read time, for any already-corrupted
+ * match_results doc, with no data migration needed. */
+export function withResolvedWinners<T extends { winner?: string }>(
+  results: Record<string, T>
+): Record<string, T> {
+  const resolved = resolveAllStages(results as unknown as Record<string, MatchResult>);
+  const out: Record<string, T> = {};
+  for (const [id, r] of Object.entries(results)) {
+    const w = resolved[id]?.winner;
+    out[id] = w ? { ...r, winner: w } : r;
+  }
+  return out;
+}

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { MATCHES } from "@/lib/data";
+import { resolveAllStages } from "@/lib/bracket";
+import type { MatchResult } from "@/lib/standings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,13 +43,40 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid scores" }, { status: 400 });
   }
   const isKnockout = match.stage !== "GROUP";
-  /* winner: explicit team code (e.g. "FRA") — required for draws in KO;
-   * auto-derived from score when one team leads. */
-  const winner = isKnockout
-    ? (body.winner || (home > away ? match.home : away > home ? match.away : null))
-    : null;
 
   const { db } = getAdmin();
+
+  /* winner: explicit team code (e.g. "FRA") — required for draws in KO;
+   * auto-derived from score when one team leads. IMPORTANT: `match.home`/
+   * `match.away` from the static MATCHES list can still be raw bracket
+   * placeholders ("W R32-4") for a knockout match — auto-deriving from
+   * those directly would store the placeholder string as `winner`, which
+   * can never equal a real predictedWinner team code and would silently
+   * zero out every prediction for this match. Resolve to the real teams
+   * (using the OTHER already-saved results) before deriving. */
+  let winner: string | null = null;
+  if (isKnockout) {
+    if (body.winner) {
+      winner = body.winner;
+    } else if (home !== away) {
+      const existingSnap = await db.collection("match_results").get();
+      const existingResults: Record<string, MatchResult> = {};
+      existingSnap.forEach(d => {
+        const data = d.data() as any;
+        if (data?.home != null && data?.away != null) {
+          existingResults[d.id] = {
+            home: data.home, away: data.away, finishedAt: data.finishedAt || 0,
+            ...(data.winner ? { winner: data.winner } : {}),
+          };
+        }
+      });
+      const resolved = resolveAllStages(existingResults);
+      const r = resolved[body.matchId];
+      const homeCode = r?.home || match.home;
+      const awayCode = r?.away || match.away;
+      winner = home > away ? homeCode : awayCode;
+    }
+  }
   const ref = db.collection("match_results").doc(body.matchId);
 
   /* Auto-backup: snapshot the result as it was BEFORE this edit, so it can

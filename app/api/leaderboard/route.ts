@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { userTotals } from "@/lib/scoring";
 import { MATCHES } from "@/lib/data";
-import { resolveAllStages, resolvePlaceholder } from "@/lib/bracket";
+import { resolveAllStages, resolvePlaceholder, withResolvedWinners } from "@/lib/bracket";
 import type { LeaderRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -82,7 +82,7 @@ export async function GET(req: Request) {
 
   /* 2. Load match results — including KO-specific fields (winner, isKnockout) */
   const resSnap = await db.collection("match_results").get();
-  const results: Record<string, { home: number; away: number; finishedAt: number; winner?: string; isKnockout?: boolean }> = {};
+  let results: Record<string, { home: number; away: number; finishedAt: number; winner?: string; isKnockout?: boolean }> = {};
   /* Build a stage lookup so we can flag knockouts even if the DB doc didn't
    * store isKnockout (older docs). */
   const stageById = new Map<string, string>();
@@ -100,6 +100,12 @@ export async function GET(req: Request) {
     if (isKO) entry.isKnockout = true;
     results[d.id] = entry;
   });
+
+  /* Self-heal any knockout result whose `winner` was stored as a raw
+   * bracket placeholder ("W R32-4") instead of the real team code — see
+   * withResolvedWinners for why that silently breaks scoring for every
+   * prediction on that match, including correct ones. */
+  results = withResolvedWinners(results);
 
   /* Predictions made on a knockout match BEFORE its bracket slot resolved
    * were saved with `predictedWinner` set to the raw placeholder string
