@@ -87,7 +87,12 @@ export async function GET(req: Request) {
       };
     })
     .filter(m => {
-      if (existingPreviews[m.id]) return false; // already generated
+      const existing = existingPreviews[m.id];
+      /* Regenerate if a preview was already cached for this matchId but for
+       * DIFFERENT teams than are currently resolved (e.g. the bracket slot
+       * got re-resolved after a result correction upstream) — otherwise a
+       * stale preview about the wrong teams would keep showing forever. */
+      if (existing && existing.home === m.home && existing.away === m.away) return false;
       if (matchLiveStatus(m) === "live" || matchLiveStatus(m) === "finished") return false;
       if (m.homeIsPlaceholder || m.awayIsPlaceholder) return false;
       const diff = new Date(m.utc).getTime() - now;
@@ -108,7 +113,7 @@ export async function GET(req: Request) {
       if (!ctx) continue;
       const text = await generatePreviewNarrative(ctx);
       if (!text) continue;
-      updates[match.id] = { text, generatedAt: Date.now(), matchUtc: match.utc };
+      updates[match.id] = { text, generatedAt: Date.now(), matchUtc: match.utc, home: match.home, away: match.away };
       generated++;
     } catch {
       // skip this match, try again next run

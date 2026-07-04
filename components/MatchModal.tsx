@@ -16,7 +16,7 @@ import PredictionForm from "./PredictionForm";
 import Pitch from "./Pitch";
 import { AvatarDisplay } from "./AvatarPicker";
 
-interface PreviewEntry { text: string; generatedAt: number; matchUtc: string }
+interface PreviewEntry { text: string; generatedAt: number; matchUtc: string; home?: string; away?: string }
 interface SummaryEntry { text: string; generatedAt: number }
 interface FriendPrediction {
   uid: string;
@@ -229,7 +229,13 @@ export default function MatchModal({ matchId, onClose }: { matchId: string; onCl
           </section>
         )}
 
-        {!summary && preview && (
+        {/* Only show the cached preview if it was generated for the SAME
+         * two teams currently resolved for this match. A preview cached
+         * before a bracket slot was (re-)resolved to different teams — e.g.
+         * after a result correction upstream — would otherwise show a
+         * preview about the wrong teams. Previews cached before this field
+         * existed (no home/away recorded) are treated as stale too. */}
+        {!summary && preview && preview.home === m.home && preview.away === m.away && (
           <section className="modal-section">
             <h3>🔮 סקירת המשחק</h3>
             <p style={{ margin: 0, lineHeight: 1.7, whiteSpace: "pre-line" }}>{preview.text}</p>
