@@ -296,8 +296,8 @@ const KNOCKOUT_FIXTURES: KnockoutFixture[] = [
    *   RIGHT-BOT (→QF M100): M095 W(ARG) vs W(AUS)    +  M096 W(SUI) vs W(K1)
    */
   /* LEFT-TOP (→ QF M097) */
-  { stage: "R16", utc: "2026-07-04T17:00:00Z", home: "W R32-3",  away: "W R32-6"  },
-  { stage: "R16", utc: "2026-07-04T21:00:00Z", home: "W R32-1",  away: "W R32-4"  },
+  { stage: "R16", utc: "2026-07-04T21:00:00Z", home: "W R32-3",  away: "W R32-6"  },
+  { stage: "R16", utc: "2026-07-04T17:00:00Z", home: "W R32-1",  away: "W R32-4"  },
   /* LEFT-BOTTOM (→ QF M098) */
   { stage: "R16", utc: "2026-07-05T20:00:00Z", home: "W R32-12", away: "W R32-11" },
   { stage: "R16", utc: "2026-07-06T00:00:00Z", home: "W R32-10", away: "W R32-9"  },
