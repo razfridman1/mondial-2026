@@ -74,9 +74,21 @@ export async function findEspnEventId(homeCode: string, awayCode: string, utcIso
   return null;
 }
 
-/** Fetch up to `limit` recent editorial news items relevant to either team
- * from ESPN's match-summary endpoint (`news.articles`). Returns [] on any
- * failure or if nothing relevant is found. */
+/** Fetch up to `limit` recent editorial news items that are actually ABOUT
+ * this specific fixture — from ESPN's match-summary endpoint
+ * (`news.articles`). Returns [] on any failure or if nothing relevant is
+ * found.
+ *
+ * Requires BOTH team names to appear in the article's own headline/
+ * description text (not just a loose ESPN category tag match on ONE of
+ * the teams). A category tag matching e.g. "Portugal" is not enough on
+ * its own — ESPN tags plenty of single-team editorial content (player
+ * profiles, cross-tournament "GOAT debate" pieces, etc.) under a team's
+ * category even though the piece has nothing to do with this particular
+ * match. Requiring both names in the text keeps only content that's
+ * genuinely about this head-to-head, so the AI preview can't pick up a
+ * player/team from an unrelated storyline (e.g. a different team's star
+ * player) and present it as relevant to this match. */
 export async function fetchEspnMatchNews(
   eventId: string,
   homeNameEn: string,
@@ -88,20 +100,18 @@ export async function fetchEspnMatchNews(
     if (!r.ok) return [];
     const data = await r.json();
     const articles: any[] = data?.news?.articles || [];
-    const names = [homeNameEn.toLowerCase(), awayNameEn.toLowerCase()];
+    const homeName = homeNameEn.toLowerCase();
+    const awayName = awayNameEn.toLowerCase();
 
     const out: EspnNewsItem[] = [];
     for (const a of articles) {
-      const cats: any[] = a.categories || [];
-      const relevant = cats.some((c: any) => {
-        const desc = String(c?.description || "").toLowerCase();
-        if (!desc) return false;
-        return names.some(n => desc.includes(n) || n.includes(desc));
-      });
-      if (!relevant) continue;
       const headline = String(a.headline || "").trim();
       if (!headline) continue;
-      out.push({ headline, description: String(a.description || "").trim() });
+      const description = String(a.description || "").trim();
+      const text = `${headline} ${description}`.toLowerCase();
+      const mentionsBothTeams = text.includes(homeName) && text.includes(awayName);
+      if (!mentionsBothTeams) continue;
+      out.push({ headline, description });
       if (out.length >= limit) break;
     }
     return out;

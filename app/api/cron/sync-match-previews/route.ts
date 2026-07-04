@@ -18,15 +18,20 @@ export const maxDuration = 60;
  * (MatchModal) reads the cache via /api/match-previews — this cron is
  * the only thing that calls the AI.
  *
- * Timing: runs hourly. For each match that doesn't have a cached
- * preview yet:
- *   - "day before" window: kickoff is between 12h and 36h away → generate.
- *   - fallback window: kickoff is within the next 6h and STILL no
- *     preview (e.g. a knockout matchup that only got resolved late) →
- *     generate.
+ * Timing: runs hourly. For each match:
+ *   - never generated yet → "day before" window: kickoff is between 12h
+ *     and 36h away → generate. Fallback window: kickoff is within the
+ *     next 6h and STILL no preview (e.g. a knockout matchup that only
+ *     got resolved late) → generate.
+ *   - already generated but for DIFFERENT teams than are currently
+ *     resolved (a bracket slot got re-resolved, e.g. after a result
+ *     correction) → regenerate immediately, ignoring the timing windows
+ *     above, since the cached text is actively wrong and MatchModal
+ *     hides it client-side until it's fixed.
  * Only matches whose teams are already known (not placeholders) are
- * eligible. Processes at most MAX_PER_RUN matches per invocation to
- * stay within the function timeout (each one may call ESPN + the AI).
+ * eligible. Processes at most MAX_PER_RUN matches per invocation
+ * (stale/wrong ones first) to stay within the function timeout (each
+ * one may call ESPN + the AI).
  *
  * Configuration: CRON_SECRET (optional, same as other crons),
  * ANTHROPIC_API_KEY (optional — without it, a plain factual fallback
@@ -34,10 +39,16 @@ export const maxDuration = 60;
  * ===================================================================*/
 
 const SECRET = process.env.CRON_SECRET || "";
-const MAX_PER_RUN = 3;
+const MAX_PER_RUN = 5;
 const DAY_BEFORE_MIN_MS = 12 * 60 * 60 * 1000;
 const DAY_BEFORE_MAX_MS = 36 * 60 * 60 * 1000;
 const FALLBACK_MAX_MS = 6 * 60 * 60 * 1000;
+/* Bump whenever the preview-generation logic changes in a way that could
+ * make previously-cached text wrong (e.g. the ESPN relevance filter was
+ * too loose and let irrelevant player storylines leak into previews).
+ * Any cached entry without a matching version is treated as stale and
+ * gets regenerated once, even if its recorded teams are still correct. */
+const PREVIEW_VERSION = 2;
 
 export async function GET(req: Request) {
   if (SECRET) {
@@ -87,21 +98,37 @@ export async function GET(req: Request) {
       };
     })
     .filter(m => {
-      const existing = existingPreviews[m.id];
-      /* Regenerate if a preview was already cached for this matchId but for
-       * DIFFERENT teams than are currently resolved (e.g. the bracket slot
-       * got re-resolved after a result correction upstream) — otherwise a
-       * stale preview about the wrong teams would keep showing forever. */
-      if (existing && existing.home === m.home && existing.away === m.away) return false;
       if (matchLiveStatus(m) === "live" || matchLiveStatus(m) === "finished") return false;
       if (m.homeIsPlaceholder || m.awayIsPlaceholder) return false;
       const diff = new Date(m.utc).getTime() - now;
       if (diff < 0) return false;
+
+      const existing = existingPreviews[m.id];
+      const isStale = !!existing && (
+        existing.home !== m.home ||
+        existing.away !== m.away ||
+        existing.version !== PREVIEW_VERSION
+      );
+      /* Already cached for the CURRENT teams — nothing to do. */
+      if (existing && !isStale) return false;
+      /* Stale (cached for different teams, e.g. re-resolved after a result
+       * correction upstream, or cached before we tracked home/away at all) —
+       * fix it right away regardless of the day-before/fallback timing
+       * windows below, so a wrong preview doesn't keep showing. */
+      if (isStale) return true;
+
       const inDayBefore = diff >= DAY_BEFORE_MIN_MS && diff <= DAY_BEFORE_MAX_MS;
       const inFallback = diff <= FALLBACK_MAX_MS;
       return inDayBefore || inFallback;
     })
-    .sort((a, b) => new Date(a.utc).getTime() - new Date(b.utc).getTime())
+    .sort((a, b) => {
+      /* Fixing a wrong/stale preview takes priority over generating a
+       * brand-new one, since the wrong one is actively visible to users. */
+      const aStale = existingPreviews[a.id] ? 1 : 0;
+      const bStale = existingPreviews[b.id] ? 1 : 0;
+      if (aStale !== bStale) return bStale - aStale;
+      return new Date(a.utc).getTime() - new Date(b.utc).getTime();
+    })
     .slice(0, MAX_PER_RUN);
 
   let generated = 0;
@@ -113,7 +140,10 @@ export async function GET(req: Request) {
       if (!ctx) continue;
       const text = await generatePreviewNarrative(ctx);
       if (!text) continue;
-      updates[match.id] = { text, generatedAt: Date.now(), matchUtc: match.utc, home: match.home, away: match.away };
+      updates[match.id] = {
+        text, generatedAt: Date.now(), matchUtc: match.utc,
+        home: match.home, away: match.away, version: PREVIEW_VERSION,
+      };
       generated++;
     } catch {
       // skip this match, try again next run
