@@ -296,33 +296,33 @@ const KNOCKOUT_FIXTURES: KnockoutFixture[] = [
    *   RIGHT-BOT (→QF M100): M095 W(ARG) vs W(AUS)    +  M096 W(SUI) vs W(K1)
    */
   /* LEFT-TOP (→ QF M097) */
-  { stage: "R16", utc: "2026-07-04T21:00:00Z", home: "W R32-3",  away: "W R32-6"  },
-  { stage: "R16", utc: "2026-07-04T17:00:00Z", home: "W R32-1",  away: "W R32-4"  },
+  { stage: "R16", utc: "2026-07-04T21:00:00Z", home: "W R32-3",  away: "W R32-6",  venue: "PHI" },
+  { stage: "R16", utc: "2026-07-04T17:00:00Z", home: "W R32-1",  away: "W R32-4",  venue: "HOU" },
   /* LEFT-BOTTOM (→ QF M098) */
-  { stage: "R16", utc: "2026-07-05T20:00:00Z", home: "W R32-12", away: "W R32-11" },
-  { stage: "R16", utc: "2026-07-06T00:00:00Z", home: "W R32-10", away: "W R32-9"  },
+  { stage: "R16", utc: "2026-07-05T20:00:00Z", home: "W R32-12", away: "W R32-11", venue: "NYC" },
+  { stage: "R16", utc: "2026-07-06T00:00:00Z", home: "W R32-10", away: "W R32-9",  venue: "AZT" },
   /* RIGHT-TOP (→ QF M099) */
-  { stage: "R16", utc: "2026-07-06T19:00:00Z", home: "W R32-2",  away: "W R32-5"  },
-  { stage: "R16", utc: "2026-07-07T00:00:00Z", home: "W R32-7",  away: "W R32-8"  },
+  { stage: "R16", utc: "2026-07-06T19:00:00Z", home: "W R32-2",  away: "W R32-5",  venue: "DAL" },
+  { stage: "R16", utc: "2026-07-07T00:00:00Z", home: "W R32-7",  away: "W R32-8",  venue: "SEA" },
   /* RIGHT-BOTTOM (→ QF M100) */
-  { stage: "R16", utc: "2026-07-07T16:00:00Z", home: "W R32-15", away: "W R32-14" },
-  { stage: "R16", utc: "2026-07-07T20:00:00Z", home: "W R32-13", away: "W R32-16" },
+  { stage: "R16", utc: "2026-07-07T16:00:00Z", home: "W R32-15", away: "W R32-14", venue: "ATL" },
+  { stage: "R16", utc: "2026-07-07T20:00:00Z", home: "W R32-13", away: "W R32-16", venue: "VAN" },
 
   /* ---- Quarter-finals (4 matches) ---- */
-  { stage: "QF",  utc: "2026-07-09T20:00:00Z", home: "W R16-1",     away: "W R16-2"      },
-  { stage: "QF",  utc: "2026-07-10T19:00:00Z", home: "W R16-3",     away: "W R16-4"      },
-  { stage: "QF",  utc: "2026-07-11T21:00:00Z", home: "W R16-5",     away: "W R16-6"      },
-  { stage: "QF",  utc: "2026-07-12T01:00:00Z", home: "W R16-7",     away: "W R16-8"      },
+  { stage: "QF",  utc: "2026-07-09T20:00:00Z", home: "W R16-1",     away: "W R16-2",      venue: "BOS" },
+  { stage: "QF",  utc: "2026-07-10T19:00:00Z", home: "W R16-3",     away: "W R16-4",      venue: "LAX" },
+  { stage: "QF",  utc: "2026-07-11T21:00:00Z", home: "W R16-5",     away: "W R16-6",      venue: "MIA" },
+  { stage: "QF",  utc: "2026-07-12T01:00:00Z", home: "W R16-7",     away: "W R16-8",      venue: "KAN" },
 
   /* ---- Semi-finals (2 matches) ---- */
-  { stage: "SF",  utc: "2026-07-14T19:00:00Z", home: "W QF-1",      away: "W QF-2"       },
-  { stage: "SF",  utc: "2026-07-15T19:00:00Z", home: "W QF-3",      away: "W QF-4"       },
+  { stage: "SF",  utc: "2026-07-14T19:00:00Z", home: "W QF-1",      away: "W QF-2",       venue: "DAL" },
+  { stage: "SF",  utc: "2026-07-15T19:00:00Z", home: "W QF-3",      away: "W QF-4",       venue: "ATL" },
 
   /* ---- Third-place play-off ---- */
-  { stage: "THIRD", utc: "2026-07-18T21:00:00Z", home: "L SF-1",    away: "L SF-2"       },
+  { stage: "THIRD", utc: "2026-07-18T21:00:00Z", home: "L SF-1",    away: "L SF-2",       venue: "MIA" },
 
   /* ---- Final ---- */
-  { stage: "FINAL", utc: "2026-07-19T19:00:00Z", home: "W SF-1",    away: "W SF-2"       },
+  { stage: "FINAL", utc: "2026-07-19T19:00:00Z", home: "W SF-1",    away: "W SF-2",       venue: "NYC" },
 ];
 
 const STAGE_STUDIO_SHOW: Record<StageId, string | null> = {

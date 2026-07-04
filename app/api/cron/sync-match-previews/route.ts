@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
 import { MATCHES } from "@/lib/data";
 import { applyOverride, matchLiveStatus } from "@/lib/utils";
+import { resolveAllStages } from "@/lib/bracket";
 import { gatherMatchPreviewContext, generatePreviewNarrative } from "@/lib/matchPreview";
 import type { MatchResult } from "@/lib/standings";
 
@@ -65,9 +66,26 @@ export async function GET(req: Request) {
 
   const existingPreviews: Record<string, any> = prevSnap.exists ? (prevSnap.data() || {}) : {};
 
+  /* Resolve knockout placeholders ("W R32-9" etc.) to the actual teams that
+   * qualified, using the live results — without this, `TEAMS[match.home]`
+   * lookups in gatherMatchPreviewContext always fail for KO-stage matches
+   * and no preview is ever generated for them. */
+  const resolved = resolveAllStages(results);
+
   const now = Date.now();
   const candidates = MATCHES
-    .map(mt => applyOverride(mt, overrides[mt.id]))
+    .map(mt => {
+      const withOverride = applyOverride(mt, overrides[mt.id]);
+      if (mt.stage === "GROUP") return withOverride;
+      const r = resolved[mt.id];
+      return {
+        ...withOverride,
+        home: r?.home || withOverride.home,
+        away: r?.away || withOverride.away,
+        homeIsPlaceholder: !r?.home,
+        awayIsPlaceholder: !r?.away,
+      };
+    })
     .filter(m => {
       if (existingPreviews[m.id]) return false; // already generated
       if (matchLiveStatus(m) === "live" || matchLiveStatus(m) === "finished") return false;
