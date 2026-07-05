@@ -282,28 +282,32 @@ const KNOCKOUT_FIXTURES: KnockoutFixture[] = [
   /*
    * R32→R16 pairings per official FIFA bracket (Wikipedia confirmed).
    * "W R32-N" = winner of the Nth R32 match in UTC chronological order:
-   *   R32-1=M073 RSA/CAN  R32-2=M074 BRA/JPN  R32-3=M075 GER/PAR
-   *   R32-4=M076 NED/MAR  R32-5=M077 CIV/NOR  R32-6=M078 FRA/SWE
-   *   R32-7=M079 MEX/TBD  R32-8=M080 ENG/TBD  R32-9=M081 BEL/TBD
-   *   R32-10=M082 USA/BIH R32-11=M083 H1/J2   R32-12=M084 K2/L2
-   *   R32-13=M085 SUI/ALG R32-14=M086 AUS/EGY R32-15=M087 ARG/CPV
-   *   R32-16=M088 K1/TBD
+   *   R32-1=RSA/CAN   R32-2=BRA/JPN   R32-3=GER/PAR
+   *   R32-4=NED/MAR   R32-5=CIV/NOR   R32-6=FRA/SWE
+   *   R32-7=MEX/ECU   R32-8=ENG/COD   R32-9=BEL/SEN
+   *   R32-10=USA/BIH  R32-11=ESP/AUT  R32-12=POR/CRO
+   *   R32-13=SUI/ALG  R32-14=AUS/EGY  R32-15=ARG/CPV
+   *   R32-16=COL/GHA
    *
-   * Bracket halves (feeds QF via "W R16-N"):
-   *   LEFT-TOP  (→QF M097): M089 W(GER) vs W(FRA)    +  M090 W(RSA) vs W(NED)
-   *   LEFT-BOT  (→QF M098): M091 W(K2L2) vs W(H1J2)  +  M092 W(USA) vs W(BEL)
-   *   RIGHT-TOP (→QF M099): M093 W(BRA) vs W(CIV)    +  M094 W(MEX) vs W(ENG)
-   *   RIGHT-BOT (→QF M100): M095 W(ARG) vs W(AUS)    +  M096 W(SUI) vs W(K1)
+   * Corrected 2026-07-05: the LEFT-BOTTOM and RIGHT-TOP venue/kickoff
+   * pairs were swapped relative to the real FIFA schedule (verified
+   * against beIN Sports + Yahoo Sports' official R16 schedule) — e.g.
+   * Brazil/Norway (July 5, MetLife/NYC) was showing at the Portugal/Spain
+   * slot (July 6, AT&T/Dallas) and vice versa, and Mexico/England
+   * (July 5, Azteca) was showing at the USA/Belgium slot (July 6, Lumen)
+   * and vice versa. Fixed by swapping utc+venue between the two pairs
+   * below; the R32→R16→QF grouping itself (which pair feeds which QF)
+   * was already correct and is unchanged.
    */
   /* LEFT-TOP (→ QF M097) */
   { stage: "R16", utc: "2026-07-04T21:00:00Z", home: "W R32-3",  away: "W R32-6",  venue: "PHI" },
   { stage: "R16", utc: "2026-07-04T17:00:00Z", home: "W R32-1",  away: "W R32-4",  venue: "HOU" },
-  /* LEFT-BOTTOM (→ QF M098) */
-  { stage: "R16", utc: "2026-07-05T20:00:00Z", home: "W R32-12", away: "W R32-11", venue: "NYC" },
-  { stage: "R16", utc: "2026-07-06T00:00:00Z", home: "W R32-10", away: "W R32-9",  venue: "AZT" },
-  /* RIGHT-TOP (→ QF M099) */
-  { stage: "R16", utc: "2026-07-06T19:00:00Z", home: "W R32-2",  away: "W R32-5",  venue: "DAL" },
-  { stage: "R16", utc: "2026-07-07T00:00:00Z", home: "W R32-7",  away: "W R32-8",  venue: "SEA" },
+  /* LEFT-BOTTOM (→ QF M098): Portugal/Spain (Dallas) + USA/Belgium (Seattle) */
+  { stage: "R16", utc: "2026-07-06T19:00:00Z", home: "W R32-12", away: "W R32-11", venue: "DAL" },
+  { stage: "R16", utc: "2026-07-07T00:00:00Z", home: "W R32-10", away: "W R32-9",  venue: "SEA" },
+  /* RIGHT-TOP (→ QF M099): Brazil/Norway (NYC) + Mexico/England (Azteca) */
+  { stage: "R16", utc: "2026-07-05T20:00:00Z", home: "W R32-2",  away: "W R32-5",  venue: "NYC" },
+  { stage: "R16", utc: "2026-07-06T00:00:00Z", home: "W R32-7",  away: "W R32-8",  venue: "AZT" },
   /* RIGHT-BOTTOM (→ QF M100) */
   { stage: "R16", utc: "2026-07-07T16:00:00Z", home: "W R32-15", away: "W R32-14", venue: "ATL" },
   { stage: "R16", utc: "2026-07-07T20:00:00Z", home: "W R32-13", away: "W R32-16", venue: "VAN" },
