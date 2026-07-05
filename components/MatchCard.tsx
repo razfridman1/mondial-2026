@@ -9,6 +9,7 @@ import {
 import { shareToWhatsApp, matchShareText } from "@/lib/share";
 import { scorePrediction } from "@/lib/scoring";
 import { computeGroupStandings } from "@/lib/standings";
+import { resolveAllStages, resolvePlaceholder } from "@/lib/bracket";
 import type { Match } from "@/lib/types";
 import { playerNameHe } from "@/lib/players";
 import { flagUrl } from "@/lib/flag-url";
@@ -188,19 +189,32 @@ export default function MatchCard({ match, onOpen, live }: { match: Match; onOpe
 
 
 
-  /* Compute score if both prediction and result available */
+  /* Compute score if both prediction and result available.
+   *
+   * A prediction saved BEFORE this match's bracket slot resolved has
+   * `predictedWinner` stored as the raw placeholder ("W R32-4" etc.) that
+   * was on screen at the time — permanently stored as-is. It's still a
+   * resolvable formula though, so resolve it here via the current bracket
+   * state before scoring; otherwise it can never equal the real winner
+   * code and a correct historical pick silently shows 0 points on the
+   * card, even though the (already-fixed) leaderboard shows it correctly. */
+  const resolvedBracket = useMemo(() => resolveAllStages(matchResults), [matchResults]);
   const myScore = useMemo(() => {
     if (!myPrediction || !matchResult) return null;
+    const rawWinner = (myPrediction as any).predictedWinner ?? null;
+    const predictedWinner = rawWinner
+      ? (resolvePlaceholder(rawWinner, matchResults, resolvedBracket) || rawWinner)
+      : null;
     return scorePrediction({
       predictedHome: myPrediction.homeScore,
       predictedAway: myPrediction.awayScore,
       actualHome: matchResult.home,
       actualAway: matchResult.away,
-      predictedWinner: (myPrediction as any).predictedWinner ?? null,
+      predictedWinner,
       actualWinner:    (matchResult as any).winner ?? null,
       isKnockout,
     });
-  }, [myPrediction, matchResult, isKnockout]);
+  }, [myPrediction, matchResult, matchResults, resolvedBracket, isKnockout]);
 
   function scoreLabel(): string {
     if (!myScore) return "";
