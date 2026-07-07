@@ -48,10 +48,22 @@ export function stageComplete(stage: StageId, results: Record<string, MatchResul
   return ms.length > 0 && ms.every(m => results[m.id]);
 }
 
-/** Index a stage's matches so "W R32-1" can map to the 1st R32 match. */
+/** Index a stage's matches so "W R32-1" can map to the 1st R32 match.
+ *
+ *  IMPORTANT: this must NOT sort by kickoff time. The "N" in placeholders
+ *  like "W R16-3" refers to the match's position in the bracket structure
+ *  (left-top, left-bottom, right-top, right-bottom — the order the fixture
+ *  is declared in KNOCKOUT_FIXTURES), not to chronological kickoff order.
+ *  R32 happens to be declared chronologically so sorting used to look
+ *  harmless, but R16 is declared in bracket order with kickoff times that
+ *  don't follow that same order (see the 2026-07-05 date-swap note in
+ *  data.ts) — sorting by date there silently renumbers matches 3–6 and
+ *  wires later rounds to the wrong side of the bracket (e.g. a QF slot on
+ *  the left pulling in right-side winners, and vice versa). Preserving
+ *  MATCHES' original insertion order (== KNOCKOUT_FIXTURES declaration
+ *  order) is what keeps "W R16-N" pointing at the correct bracket slot. */
 function listStageMatchesOrdered(stage: StageId): Match[] {
-  return MATCHES.filter(m => m.stage === stage)
-    .sort((a, b) => +new Date(a.utc) - +new Date(b.utc));
+  return MATCHES.filter(m => m.stage === stage);
 }
 
 /** Resolve a single placeholder string to an actual team code (or null).
