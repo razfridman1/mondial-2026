@@ -119,14 +119,22 @@ export async function GET(req: Request) {
     return { ...p, predictedWinner: resolvePlaceholder(p.predictedWinner, results, resolvedBracket) || p.predictedWinner };
   }
 
-  /* 2b. Load bonus awards (manual admin adjustments) and sum per user */
+  /* 2b. Load bonus awards (manual admin adjustments + the auto "ניקוד סופי"
+   * awards for champion/scorer/assist picks) and sum per user — both the
+   * grand total (used for scoring) and a per-category breakdown (used to
+   * render the "ניקוד סופי" table on the user stats modal). */
   const bonusSnap = await db.collection("bonus_awards").get();
   const bonusByUid: Record<string, number> = {};
+  const bonusBreakdownByUid: Record<string, { champion: number; scorer: number; assist: number; other: number }> = {};
   bonusSnap.forEach(d => {
     const data = d.data() as any;
-    if (typeof data.points === "number") {
-      bonusByUid[data.uid] = (bonusByUid[data.uid] || 0) + data.points;
-    }
+    if (typeof data.points !== "number") return;
+    bonusByUid[data.uid] = (bonusByUid[data.uid] || 0) + data.points;
+    const b = bonusBreakdownByUid[data.uid] || (bonusBreakdownByUid[data.uid] = { champion: 0, scorer: 0, assist: 0, other: 0 });
+    if (data.category === "champion") b.champion += data.points;
+    else if (data.category === "scorer") b.scorer += data.points;
+    else if (data.category === "assist") b.assist += data.points;
+    else b.other += data.points;
   });
 
   /* 2c. Batch-load Firebase Auth metadata for every uid we'll show.
@@ -167,11 +175,16 @@ export async function GET(req: Request) {
       authMeta.displayName ||
       (authMeta.email ? authMeta.email.split("@")[0] : null) ||
       "משתמש";
+    const bd = bonusBreakdownByUid[uid];
     rows.push({
       uid,
       displayName,
       avatarId: profData.avatarId || "messi",
       ...t,
+      bonusChampion: bd?.champion || 0,
+      bonusScorer: bd?.scorer || 0,
+      bonusAssist: bd?.assist || 0,
+      bonusOther: bd?.other || 0,
     });
   }
 

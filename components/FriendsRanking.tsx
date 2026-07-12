@@ -861,6 +861,58 @@ function UserStatsModal({
           />
         </div>
 
+        {/* Final score breakdown: predictions + the three special picks */}
+        <div style={{
+          marginTop: 16, padding: 10,
+          background: "var(--bg-elev)",
+          border: "1px solid var(--border-soft)",
+          borderRadius: 10,
+        }}>
+          <h3 className="sec-title" style={{ margin: "0 0 8px", fontSize: 14 }}>🏆 ניקוד סופי</h3>
+          {(() => {
+            const bonusChampion = row.bonusChampion || 0;
+            const bonusScorer   = row.bonusScorer   || 0;
+            const bonusAssist   = row.bonusAssist   || 0;
+            const bonusOther    = row.bonusOther    || 0;
+            const predictionPoints = row.totalPoints - bonusChampion - bonusScorer - bonusAssist - bonusOther;
+            const rowsDef = [
+              { label: "🔮 ניקוד ניחושי תוצאות", value: predictionPoints, decided: true },
+              { label: "⚽ מלך השערים",           value: bonusScorer,     decided: bonusScorer > 0 },
+              { label: "🍳 מלך הבישולים",         value: bonusAssist,     decided: bonusAssist > 0 },
+              { label: "👑 זוכת המונדיאל",        value: bonusChampion,   decided: bonusChampion > 0 },
+              ...(bonusOther !== 0 ? [{ label: "🎁 בונוס נוסף", value: bonusOther, decided: true }] : []),
+            ];
+            return (
+              <>
+                {rowsDef.map(r => (
+                  <div key={r.label} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "6px 4px", borderBottom: "1px solid var(--border-soft)",
+                    fontSize: 13,
+                  }}>
+                    <span>{r.label}</span>
+                    {r.decided
+                      ? <strong style={{ color: r.value > 0 ? "var(--green)" : "var(--text)" }}>
+                          {r.value > 0 ? `+${r.value}` : r.value}
+                        </strong>
+                      : <span className="muted" style={{ fontSize: 11 }}>טרם נקבע</span>}
+                  </div>
+                ))}
+                <div style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "8px 4px 2px", marginTop: 2, fontSize: 14, fontWeight: 800,
+                }}>
+                  <span>סך הכל</span>
+                  <span style={{ color: "var(--accent)" }}>{row.totalPoints} נק׳</span>
+                </div>
+                <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+                  💡 מלך השערים, מלך הבישולים וזוכת המונדיאל מתעדכנים אחרי שהאדמין לוחץ "ניקוד סופי" בלוח הניהול.
+                </div>
+              </>
+            );
+          })()}
+        </div>
+
         {/* Explanation of scoring */}
         <details style={{
           marginTop: 16, padding: 10,

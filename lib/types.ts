@@ -158,6 +158,13 @@ export interface LeaderRow {
   finishedCount: number;    // predictions for matches that have a result
   streak: number;
   rank?: number;
+  /* Bonus breakdown (all already included in totalPoints — these are for
+   * display only, e.g. the "ניקוד סופי" table on the user stats modal). */
+  bonusPoints?: number;      // sum of ALL bonus_awards docs for this user
+  bonusChampion?: number;    // 👑 correct "זוכת המונדיאל" (championPick) pick
+  bonusScorer?: number;      // ⚽ correct "מלך השערים" pick
+  bonusAssist?: number;      // 🍳 correct "מלך הבישולים" pick
+  bonusOther?: number;       // any other manually-awarded bonus/penalty
 }
 
 /* Activity feed event */
