@@ -38,13 +38,27 @@ export interface SpecialPickProfile {
   topAssistPick?: { playerName: string; teamCode?: string } | null;
 }
 
-export async function computeSpecialPickBonuses(
-  db: FirebaseFirestore.Firestore,
-  profiles: SpecialPickProfile[],
-  results: Record<string, { home?: number; away?: number; winner?: string }>,
-): Promise<Map<string, number>> {
-  const bonuses = new Map<string, number>();
+export interface SpecialPickActuals {
+  /* Team code of the FINAL winner, or null if not decided yet. */
+  actualChampion: string | null;
+  /* Normalized (lowercased, punctuation-stripped) names, for comparison. */
+  topScorerNorm: string[];
+  topAssistNorm: string[];
+  /* Human-readable (translated) names, for display in admin UI. Deduped,
+   * can contain more than one name if there's a tie for the max. */
+  topScorerNames: string[];
+  topAssistNames: string[];
+}
 
+/* Computes the "ground truth" for the three special picks — the actual
+ * tournament champion (from the FINAL match result) and the actual top
+ * scorer(s) / top assist(s) (from live match_goals data). Shared by
+ * computeSpecialPickBonuses (leaderboard/snapshot scoring) and the
+ * "ניקוד סופי" admin action (lib/special-picks-bonus consumers). */
+export async function computeSpecialPickActuals(
+  db: FirebaseFirestore.Firestore,
+  results: Record<string, { home?: number; away?: number; winner?: string }>,
+): Promise<SpecialPickActuals> {
   /* 1. Champion: winner of the FINAL match */
   const finalMatch = MATCHES.find(m => m.stage === "FINAL");
   let actualChampion: string | null = null;
@@ -60,6 +74,8 @@ export async function computeSpecialPickBonuses(
   /* 2. Top scorer / assist: read match_goals + name cache */
   let topScorerNorm: string[] = [];
   let topAssistNorm: string[] = [];
+  let topScorerNames: string[] = [];
+  let topAssistNames: string[] = [];
   try {
     const [goalsSnap, nameSnap] = await Promise.all([
       db.collection("live_data").doc("match_goals").get(),
@@ -87,26 +103,38 @@ export async function computeSpecialPickBonuses(
     const maxA = assistCounts.size ? Math.max(...assistCounts.values()) : 0;
 
     if (maxS > 0) {
-      topScorerNorm = [...scorerCounts.entries()]
-        .filter(([, c]) => c === maxS)
-        .map(([n]) => normalizePickName(translate(n)));
+      topScorerNames = [...new Set(
+        [...scorerCounts.entries()].filter(([, c]) => c === maxS).map(([n]) => translate(n))
+      )];
+      topScorerNorm = topScorerNames.map(normalizePickName);
     }
     if (maxA > 0) {
-      topAssistNorm = [...assistCounts.entries()]
-        .filter(([, c]) => c === maxA)
-        .map(([n]) => normalizePickName(translate(n)));
+      topAssistNames = [...new Set(
+        [...assistCounts.entries()].filter(([, c]) => c === maxA).map(([n]) => translate(n))
+      )];
+      topAssistNorm = topAssistNames.map(normalizePickName);
     }
   } catch { /* non-fatal */ }
 
-  /* 3. Award bonuses */
+  return { actualChampion, topScorerNorm, topAssistNorm, topScorerNames, topAssistNames };
+}
+
+export async function computeSpecialPickBonuses(
+  db: FirebaseFirestore.Firestore,
+  profiles: SpecialPickProfile[],
+  results: Record<string, { home?: number; away?: number; winner?: string }>,
+): Promise<Map<string, number>> {
+  const bonuses = new Map<string, number>();
+  const actuals = await computeSpecialPickActuals(db, results);
+
   for (const prof of profiles) {
     let bonus = 0;
-    if (actualChampion && prof.championPick?.teamCode === actualChampion) bonus += 12;
-    if (prof.topScorerPick && topScorerNorm.length) {
-      if (topScorerNorm.includes(normalizePickName(prof.topScorerPick.playerName))) bonus += 12;
+    if (actuals.actualChampion && prof.championPick?.teamCode === actuals.actualChampion) bonus += 12;
+    if (prof.topScorerPick && actuals.topScorerNorm.length) {
+      if (actuals.topScorerNorm.includes(normalizePickName(prof.topScorerPick.playerName))) bonus += 12;
     }
-    if (prof.topAssistPick && topAssistNorm.length) {
-      if (topAssistNorm.includes(normalizePickName(prof.topAssistPick.playerName))) bonus += 12;
+    if (prof.topAssistPick && actuals.topAssistNorm.length) {
+      if (actuals.topAssistNorm.includes(normalizePickName(prof.topAssistPick.playerName))) bonus += 12;
     }
     if (bonus > 0) bonuses.set(prof.uid, bonus);
   }

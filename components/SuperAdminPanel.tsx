@@ -140,6 +140,10 @@ export default function SuperAdminPanel() {
         <BonusAwardsPanel />
       </details>
 
+      <details className="adm-section">
+        <summary>🏆 ניקוד סופי — מלך שערים / מלך בישולים / מנצחת מונדיאל</summary>
+        <FinalScorePanel />
+      </details>
 
     </section>
   );
@@ -2128,6 +2132,115 @@ function BonusAwardsPanel() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/* ============================ 11. FINAL SCORE ============================ */
+interface FinalScoreResult {
+  ok: boolean;
+  actualChampion: string | null;
+  actualChampionName: string | null;
+  topScorerNames: string[];
+  topAssistNames: string[];
+  awarded: Array<{ uid: string; displayName: string; categories: string[]; points: number }>;
+  usersAwarded: number;
+  newlyAwarded: number;
+  removed: number;
+}
+
+function FinalScorePanel() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<FinalScoreResult | null>(null);
+
+  async function run() {
+    if (!confirm(
+      "לחשב ולתת ניקוד סופי עכשיו?\n\n" +
+      "כל משתמש שניחש נכון את מלך השערים, מלך הבישולים, ו/או המנצחת במונדיאל " +
+      "יקבל 12 נק' בונוס על כל ניחוש נכון — הנקודות יתווספו מיד ללוח התוצאות של כולם.\n\n" +
+      "אפשר ללחוץ שוב בכל שלב (למשל אחרי שמלך השערים ידוע, ושוב אחרי הגמר) — " +
+      "לא יינתנו נקודות כפולות."
+    )) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch("/api/admin/final-score", { method: "POST", headers: await adminAuthHeaders() });
+      const data = await r.json();
+      if (!r.ok) { setError(data.error || "שגיאה"); return; }
+      setResult(data);
+    } catch (e: any) {
+      setError(e.message || "שגיאה");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="adm-body">
+      <p className="muted" style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 14 }}>
+        💡 כפתור זה נותן <strong>12 נק'</strong> לכל משתמש על כל ניחוש נכון מתוך שלושה:
+        {" "}<strong>⚽ מלך השערים</strong>, <strong>🍳 מלך הבישולים</strong>, ו‑<strong>👑 המנצחת במונדיאל</strong>
+        (מי שמנצחת בגמר). הניקוד נקבע לפי תוצאת הגמר (עם מנצחת שנשמרה בלשונית "תוצאות משחקים")
+        ולפי נתוני הכניסות/בישולים בפועל. הפעולה בטוחה להרצה חוזרת — לא תיתן נקודות כפולות,
+        ותסיר בונוס אם תוצאה תוקנה בדיעבד.
+      </p>
+
+      <div className="mc-actions">
+        <button className="btn btn-primary" onClick={run} disabled={busy}>
+          {busy ? "…מחשב" : "🏆 חשב ותן ניקוד סופי"}
+        </button>
+      </div>
+
+      {error && <p className="pred-msg is-locked" style={{ marginTop: 10 }}>⚠ {error}</p>}
+
+      {result && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{
+            padding: 12, marginBottom: 12,
+            background: "rgba(34,197,94,0.08)", border: "1px solid #22c55e", borderRadius: 10,
+          }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>✓ הניקוד עודכן</div>
+            <div className="muted" style={{ fontSize: 12 }}>
+              {result.usersAwarded} משתמשים עם ניחוש נכון לפחות אחד ·
+              {" "}{result.newlyAwarded} בונוסים חדשים נוספו הפעם ·
+              {" "}{result.removed} בונוסים הוסרו (אם היו שגויים)
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8, marginBottom: 14 }}>
+            <div style={{ padding: 10, background: "var(--bg-elev)", borderRadius: 8, fontSize: 12 }}>
+              <div className="muted" style={{ marginBottom: 4 }}>👑 מנצחת המונדיאל</div>
+              <strong>{result.actualChampionName || "טרם ידוע (הגמר לא הוזן)"}</strong>
+            </div>
+            <div style={{ padding: 10, background: "var(--bg-elev)", borderRadius: 8, fontSize: 12 }}>
+              <div className="muted" style={{ marginBottom: 4 }}>⚽ מלך השערים</div>
+              <strong>{result.topScorerNames.length ? result.topScorerNames.join(", ") : "טרם ידוע"}</strong>
+            </div>
+            <div style={{ padding: 10, background: "var(--bg-elev)", borderRadius: 8, fontSize: 12 }}>
+              <div className="muted" style={{ marginBottom: 4 }}>🍳 מלך הבישולים</div>
+              <strong>{result.topAssistNames.length ? result.topAssistNames.join(", ") : "טרם ידוע"}</strong>
+            </div>
+          </div>
+
+          <div className="adm-table-wrap" style={{ maxHeight: 360, overflowY: "auto" }}>
+            <table className="admin-table">
+              <thead><tr><th>משתמש</th><th>ניחושים נכונים</th><th>נק'</th></tr></thead>
+              <tbody>
+                {result.awarded.map(a => (
+                  <tr key={a.uid}>
+                    <td>{a.displayName}</td>
+                    <td style={{ fontSize: 12 }}>{a.categories.join(" · ")}</td>
+                    <td><strong style={{ color: "#22c55e" }}>+{a.points}</strong></td>
+                  </tr>
+                ))}
+                {!result.awarded.length && (
+                  <tr><td colSpan={3} className="muted" style={{ textAlign: "center", padding: 20 }}>
+                    אף אחד עדיין לא ניחש נכון (או שהתוצאות עדיין לא ידועות).
+                  </td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
