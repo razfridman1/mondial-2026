@@ -191,7 +191,7 @@ function AllPicksTable() {
                       <>
                         {row.topScorerPick.playerName}
                         {scorerTeam && <> ({scorerTeam.flag} {scorerTeam.name})</>}
-                        {data.finished && (row.scorerCorrect ? " ✅" : " ❌")}
+                        {row.scorerCorrect !== null && (row.scorerCorrect ? " ✅" : " ❌")}
                       </>
                     ) : "—"}
                   </td>
@@ -200,7 +200,7 @@ function AllPicksTable() {
                       <>
                         {row.topAssistPick.playerName}
                         {assistTeam && <> ({assistTeam.flag} {assistTeam.name})</>}
-                        {data.finished && (row.assistCorrect ? " ✅" : " ❌")}
+                        {row.assistCorrect !== null && (row.assistCorrect ? " ✅" : " ❌")}
                       </>
                     ) : "—"}
                   </td>
@@ -208,7 +208,7 @@ function AllPicksTable() {
                     {row.championPick ? (
                       <>
                         {(() => { const t = TEAMS[row.championPick.teamCode]; return t ? <>{t.flag} {t.name}</> : row.championPick.teamCode; })()}
-                        {data.finished && (row.championCorrect ? " ✅" : " ❌")}
+                        {row.championCorrect !== null && (row.championCorrect ? " ✅" : " ❌")}
                       </>
                     ) : "—"}
                   </td>

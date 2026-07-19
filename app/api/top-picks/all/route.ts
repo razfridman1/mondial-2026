@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdmin } from "@/lib/firebase-admin";
-import { getScorerLeaderboards, type ScorerEntry } from "@/lib/scorers-core";
+import { computeSpecialPickActuals, normalizePickName } from "@/lib/special-picks-bonus";
 import { MATCHES } from "@/lib/data";
 import type { TopPick } from "@/lib/types";
 
@@ -11,37 +11,17 @@ export const maxDuration = 60;
 /* =====================================================================
  * GET /api/top-picks/all
  * Public — shows everyone's top-scorer/top-assist/champion picks.
- * Correctness markers (✅/❌) appear once the tournament is finished.
+ * Correctness (✅/❌) is computed via the EXACT SAME ground truth as the
+ * admin "ניקוד סופי" bonus (lib/special-picks-bonus.ts) — same FIFA-scraped
+ * leaderboard priority, same match_goals fallback, same manual override.
+ * Each category shows ✅/❌ as soon as IT is individually decided, not
+ * gated on the whole tournament being finished — matching how bonuses are
+ * actually awarded (mid-tournament, per category).
  * ===================================================================*/
 
-function normalizeHe(s: string | null | undefined): string {
-  return (s || "")
-    .normalize("NFKC")
-    .replace(/['"\u05F3\u05F4]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function topLeaders(entries: ScorerEntry[]): ScorerEntry[] {
-  if (!entries.length || entries[0].count <= 0) return [];
-  const max = entries[0].count;
-  return entries.filter(e => e.count === max);
-}
-
-function isPickCorrect(pick: TopPick | null | undefined, leaders: ScorerEntry[]): boolean | null {
-  if (!pick || !leaders.length) return null;
-  return leaders.some(l => l.teamCode === pick.teamCode && normalizeHe(l.name) === normalizeHe(pick.playerName));
-}
-
-async function getChampionTeamCode(db: FirebaseFirestore.Firestore): Promise<string | null> {
-  /* The champion is the winner of the FINAL match */
-  const finalMatch = MATCHES.find(m => m.stage === "FINAL");
-  if (!finalMatch) return null;
-  const resSnap = await db.collection("match_results").doc(finalMatch.id).get();
-  if (!resSnap.exists) return null;
-  const data = resSnap.data() as any;
-  if (!data?.winner) return null;
-  return data.winner as string;
+function isPickCorrect(pick: TopPick | null | undefined, normNames: string[]): boolean | null {
+  if (!pick || !normNames.length) return null;
+  return normNames.includes(normalizePickName(pick.playerName));
 }
 
 export async function GET(req: Request) {
@@ -49,17 +29,17 @@ export async function GET(req: Request) {
     const { db, auth } = getAdmin();
     const groupId = new URL(req.url).searchParams.get("groupId");
 
-    /* 1. Is the tournament over? */
+    /* 1. Ground truth — same call the admin "ניקוד סופי" button makes, so
+     * the ✅/❌ shown here always matches what actually gets scored. */
     const resultsSnap = await db.collection("match_results").get();
     const finished = resultsSnap.size >= MATCHES.length && MATCHES.length > 0;
-
-    /* 2. Current leaderboard + champion winner (if known). */
-    const [{ topScorers, topAssists }, championCode] = await Promise.all([
-      getScorerLeaderboards(db),
-      getChampionTeamCode(db),
-    ]);
-    const topScorerLeaders = topLeaders(topScorers);
-    const topAssistLeaders = topLeaders(topAssists);
+    const results: Record<string, { home?: number; away?: number; winner?: string }> = {};
+    resultsSnap.forEach(d => {
+      const data = d.data() as any;
+      results[d.id] = { home: data.home, away: data.away, winner: data.winner };
+    });
+    const actuals = await computeSpecialPickActuals(db, results);
+    const championCode = actuals.actualChampion;
 
     /* 3. Optional group scope */
     let groupUids: Set<string> | null = null;
@@ -105,7 +85,7 @@ export async function GET(req: Request) {
         "משתמש";
 
       const championCorrect =
-        finished && championCode && championPick
+        championCode && championPick
           ? championPick.teamCode === championCode
           : null;
 
@@ -116,8 +96,8 @@ export async function GET(req: Request) {
         topScorerPick,
         topAssistPick,
         championPick,
-        scorerCorrect: finished ? isPickCorrect(topScorerPick, topScorerLeaders) : null,
-        assistCorrect: finished ? isPickCorrect(topAssistPick, topAssistLeaders) : null,
+        scorerCorrect: isPickCorrect(topScorerPick, actuals.topScorerNorm),
+        assistCorrect: isPickCorrect(topAssistPick, actuals.topAssistNorm),
         championCorrect,
       };
     });
@@ -129,7 +109,12 @@ export async function GET(req: Request) {
       return score(b) - score(a) || a.displayName.localeCompare(b.displayName, "he");
     });
 
-    return NextResponse.json({ finished, topScorerLeaders, topAssistLeaders, rows });
+    return NextResponse.json({
+      finished,
+      topScorerLeaders: actuals.topScorerNames.map(name => ({ name, count: 0 })),
+      topAssistLeaders: actuals.topAssistNames.map(name => ({ name, count: 0 })),
+      rows,
+    });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
