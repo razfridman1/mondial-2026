@@ -71,48 +71,80 @@ export async function computeSpecialPickActuals(
     }
   }
 
-  /* 2. Top scorer / assist: read match_goals + name cache */
+  /* 2. Top scorer / assist: SAME source + priority as the public "מלך השערים"
+   * tab (/api/scorers, lib/scorers-core.ts) — the FIFA-scraped leaderboards
+   * (live_data/fifa_scorers + fifa_assists, populated by `node crawl-fifa.mjs`)
+   * are the primary source, i.e. "whoever is currently in first place".
+   * Only falls back to aggregating match_goals when the FIFA docs aren't
+   * present, so the button's ground truth never disagrees with what users
+   * see on the leaderboard. */
   let topScorerNorm: string[] = [];
   let topAssistNorm: string[] = [];
   let topScorerNames: string[] = [];
   let topAssistNames: string[] = [];
   try {
-    const [goalsSnap, nameSnap] = await Promise.all([
+    const [goalsSnap, nameSnap, fifaScorersSnap, fifaAssistsSnap] = await Promise.all([
       db.collection("live_data").doc("match_goals").get(),
       db.collection("live_data").doc("player_name_he").get(),
+      db.collection("live_data").doc("fifa_scorers").get(),
+      db.collection("live_data").doc("fifa_assists").get(),
     ]);
     const goalsData = goalsSnap.exists ? (goalsSnap.data() || {}) : {};
     const nameMap: Record<string, string> = nameSnap.exists ? (nameSnap.data()?.map || {}) : {};
-
-    const scorerCounts = new Map<string, number>();
-    const assistCounts = new Map<string, number>();
-
-    for (const mg of Object.values(goalsData) as any[]) {
-      for (const g of (mg.goals || []) as any[]) {
-        if (g.type === "OWN") continue;
-        if (g.scorer) scorerCounts.set(g.scorer, (scorerCounts.get(g.scorer) || 0) + 1);
-        if (g.assist) assistCounts.set(g.assist, (assistCounts.get(g.assist) || 0) + 1);
-      }
-    }
 
     function translate(name: string): string {
       return nameMap[name] || CURATED_HE_BY_EN[normalizeName(name)] || name;
     }
 
-    const maxS = scorerCounts.size ? Math.max(...scorerCounts.values()) : 0;
-    const maxA = assistCounts.size ? Math.max(...assistCounts.values()) : 0;
+    const fifaScorers: { name: string; count: number }[] = fifaScorersSnap.exists
+      ? (fifaScorersSnap.data()?.scorers || []) : [];
+    const fifaAssists: { name: string; count: number }[] = fifaAssistsSnap.exists
+      ? (fifaAssistsSnap.data()?.assists || []) : [];
 
-    if (maxS > 0) {
-      topScorerNames = [...new Set(
-        [...scorerCounts.entries()].filter(([, c]) => c === maxS).map(([n]) => translate(n))
-      )];
-      topScorerNorm = topScorerNames.map(normalizePickName);
-    }
-    if (maxA > 0) {
-      topAssistNames = [...new Set(
-        [...assistCounts.entries()].filter(([, c]) => c === maxA).map(([n]) => translate(n))
-      )];
-      topAssistNorm = topAssistNames.map(normalizePickName);
+    if (fifaScorers.length && fifaAssists.length) {
+      /* Primary: FIFA-scraped leaderboard (same as /api/scorers) */
+      const maxS = Math.max(...fifaScorers.map(s => s.count || 0));
+      const maxA = Math.max(...fifaAssists.map(a => a.count || 0));
+      if (maxS > 0) {
+        topScorerNames = [...new Set(
+          fifaScorers.filter(s => s.count === maxS).map(s => translate(s.name))
+        )];
+        topScorerNorm = topScorerNames.map(normalizePickName);
+      }
+      if (maxA > 0) {
+        topAssistNames = [...new Set(
+          fifaAssists.filter(a => a.count === maxA).map(a => translate(a.name))
+        )];
+        topAssistNorm = topAssistNames.map(normalizePickName);
+      }
+    } else {
+      /* Fallback: aggregate from raw match_goals events */
+      const scorerCounts = new Map<string, number>();
+      const assistCounts = new Map<string, number>();
+
+      for (const mg of Object.values(goalsData) as any[]) {
+        for (const g of (mg.goals || []) as any[]) {
+          if (g.type === "OWN") continue;
+          if (g.scorer) scorerCounts.set(g.scorer, (scorerCounts.get(g.scorer) || 0) + 1);
+          if (g.assist) assistCounts.set(g.assist, (assistCounts.get(g.assist) || 0) + 1);
+        }
+      }
+
+      const maxS = scorerCounts.size ? Math.max(...scorerCounts.values()) : 0;
+      const maxA = assistCounts.size ? Math.max(...assistCounts.values()) : 0;
+
+      if (maxS > 0) {
+        topScorerNames = [...new Set(
+          [...scorerCounts.entries()].filter(([, c]) => c === maxS).map(([n]) => translate(n))
+        )];
+        topScorerNorm = topScorerNames.map(normalizePickName);
+      }
+      if (maxA > 0) {
+        topAssistNames = [...new Set(
+          [...assistCounts.entries()].filter(([, c]) => c === maxA).map(([n]) => translate(n))
+        )];
+        topAssistNorm = topAssistNames.map(normalizePickName);
+      }
     }
   } catch { /* non-fatal */ }
 

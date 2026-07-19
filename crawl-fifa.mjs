@@ -63,11 +63,27 @@ async function waitFor(sel, timeout = 20000) {
   catch { return false; }
 }
 
+// ── DEBUG: dump screenshot + full HTML so we can see WHY a page is stuck ──────
+import { writeFileSync } from "fs";
+async function debugDump(name) {
+  try {
+    await page.screenshot({ path: `debug-${name}.png`, fullPage: true });
+    const html = await page.content();
+    writeFileSync(`debug-${name}.html`, html);
+    const title = await page.title();
+    console.log(`  🐛 debug-${name}.png / .html written | title="${title}" | url=${page.url()}`);
+  } catch (e) {
+    console.log(`  🐛 debugDump(${name}) failed:`, e.message);
+  }
+}
+
 // ── SCORERS / ASSISTS ─────────────────────────────────────────────────────────
 async function scrapePlayerStats(type) {
   console.log((type === "scorers" ? "⚽" : "🎯") + " Scraping " + type + "...");
-  await page.goto(URLS[type], { waitUntil: "load", timeout: 60000 });
+  const resp = await page.goto(URLS[type], { waitUntil: "load", timeout: 60000 });
+  console.log("  HTTP status:", resp ? resp.status() : "no response");
   await page.waitForTimeout(5000);
+  await debugDump(type);
 
   if (type === "assists") {
     // Try JS click on any element whose exact text is "Assists"
@@ -117,7 +133,8 @@ async function scrapePlayerStats(type) {
 // ── SHARED: extract all matches from scores-fixtures page ─────────────────────
 async function extractAllMatches() {
   const url = BASE + "/scores-fixtures";
-  await page.goto(url, { waitUntil: "load", timeout: 60000 });
+  const resp = await page.goto(url, { waitUntil: "load", timeout: 60000 });
+  console.log("  HTTP status:", resp ? resp.status() : "no response");
   await page.waitForTimeout(6000);
   await page.evaluate(function() {
     var sdk = document.getElementById("onetrust-consent-sdk");
@@ -126,6 +143,7 @@ async function extractAllMatches() {
     if (f) f.remove();
   });
   await waitFor("[class*=match-row_score]", 15000);
+  await debugDump("matchcentre");
 
   return await page.evaluate(function() {
     function txt(el) { return el ? el.textContent.trim().replace(/\s+/g, " ") : ""; }
@@ -239,8 +257,10 @@ async function scrapeFixtures() {
   console.log("📅 Scraping fixtures...");
   // Use country=&wtw-filter=ALL to get all matches (not filtered by region)
   const url = BASE + "/scores-fixtures?country=&wtw-filter=ALL";
-  await page.goto(url, { waitUntil: "load", timeout: 60000 });
+  const resp = await page.goto(url, { waitUntil: "load", timeout: 60000 });
+  console.log("  HTTP status:", resp ? resp.status() : "no response");
   await page.waitForTimeout(8000);
+  await debugDump("fixtures");
   await page.evaluate(function() {
     var sdk = document.getElementById("onetrust-consent-sdk");
     if (sdk) sdk.remove();
