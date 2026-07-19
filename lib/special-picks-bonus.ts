@@ -59,10 +59,21 @@ export async function computeSpecialPickActuals(
   db: FirebaseFirestore.Firestore,
   results: Record<string, { home?: number; away?: number; winner?: string }>,
 ): Promise<SpecialPickActuals> {
-  /* 1. Champion: winner of the FINAL match */
+  /* Manual admin override (live_data/final_score_override) — fetched once,
+   * up front, and takes priority over every scraped/computed source for all
+   * three categories. Lets the admin pin down champion/scorer/assist by
+   * hand (e.g. before match_results has a FINAL row, or when the FIFA
+   * scrape disagrees), via set-final-score-override.mjs. */
+  let overrideData: any = {};
+  try {
+    const overrideSnap = await db.collection("live_data").doc("final_score_override").get();
+    overrideData = overrideSnap.exists ? (overrideSnap.data() || {}) : {};
+  } catch { /* non-fatal */ }
+
+  /* 1. Champion: winner of the FINAL match (or the override). */
   const finalMatch = MATCHES.find(m => m.stage === "FINAL");
-  let actualChampion: string | null = null;
-  if (finalMatch) {
+  let actualChampion: string | null = overrideData.champion?.teamCode || null;
+  if (!actualChampion && finalMatch) {
     const r = results[finalMatch.id];
     if (r?.winner) {
       actualChampion = r.winner;
@@ -96,54 +107,75 @@ export async function computeSpecialPickActuals(
       return nameMap[name] || CURATED_HE_BY_EN[normalizeName(name)] || name;
     }
 
+    /* 0. Manual admin override for scorer/assist (same overrideData fetched
+     * above for champion) — highest priority. Set independently per
+     * category via set-final-score-override.mjs; each holds every known
+     * name variant (Hebrew + English) so it matches regardless of which
+     * form a given user's pick was stored in. */
+    const scorerOverride: string[] = Array.isArray(overrideData.scorer?.names) ? overrideData.scorer.names : [];
+    const assistOverride: string[] = Array.isArray(overrideData.assist?.names) ? overrideData.assist.names : [];
+    if (scorerOverride.length) {
+      topScorerNames = [...new Set(scorerOverride)];
+      topScorerNorm = topScorerNames.map(normalizePickName);
+    }
+    if (assistOverride.length) {
+      topAssistNames = [...new Set(assistOverride)];
+      topAssistNorm = topAssistNames.map(normalizePickName);
+    }
+
     const fifaScorers: { name: string; count: number }[] = fifaScorersSnap.exists
       ? (fifaScorersSnap.data()?.scorers || []) : [];
     const fifaAssists: { name: string; count: number }[] = fifaAssistsSnap.exists
       ? (fifaAssistsSnap.data()?.assists || []) : [];
 
-    if (fifaScorers.length && fifaAssists.length) {
-      /* Primary: FIFA-scraped leaderboard (same as /api/scorers) */
-      const maxS = Math.max(...fifaScorers.map(s => s.count || 0));
-      const maxA = Math.max(...fifaAssists.map(a => a.count || 0));
-      if (maxS > 0) {
-        topScorerNames = [...new Set(
-          fifaScorers.filter(s => s.count === maxS).map(s => translate(s.name))
-        )];
-        topScorerNorm = topScorerNames.map(normalizePickName);
-      }
-      if (maxA > 0) {
-        topAssistNames = [...new Set(
-          fifaAssists.filter(a => a.count === maxA).map(a => translate(a.name))
-        )];
-        topAssistNorm = topAssistNames.map(normalizePickName);
-      }
-    } else {
-      /* Fallback: aggregate from raw match_goals events */
-      const scorerCounts = new Map<string, number>();
-      const assistCounts = new Map<string, number>();
+    const needScorer = !scorerOverride.length;
+    const needAssist = !assistOverride.length;
 
-      for (const mg of Object.values(goalsData) as any[]) {
-        for (const g of (mg.goals || []) as any[]) {
-          if (g.type === "OWN") continue;
-          if (g.scorer) scorerCounts.set(g.scorer, (scorerCounts.get(g.scorer) || 0) + 1);
-          if (g.assist) assistCounts.set(g.assist, (assistCounts.get(g.assist) || 0) + 1);
+    if (needScorer || needAssist) {
+      if (fifaScorers.length && fifaAssists.length) {
+        /* Primary: FIFA-scraped leaderboard (same as /api/scorers) */
+        const maxS = Math.max(...fifaScorers.map(s => s.count || 0));
+        const maxA = Math.max(...fifaAssists.map(a => a.count || 0));
+        if (needScorer && maxS > 0) {
+          topScorerNames = [...new Set(
+            fifaScorers.filter(s => s.count === maxS).map(s => translate(s.name))
+          )];
+          topScorerNorm = topScorerNames.map(normalizePickName);
         }
-      }
+        if (needAssist && maxA > 0) {
+          topAssistNames = [...new Set(
+            fifaAssists.filter(a => a.count === maxA).map(a => translate(a.name))
+          )];
+          topAssistNorm = topAssistNames.map(normalizePickName);
+        }
+      } else {
+        /* Fallback: aggregate from raw match_goals events */
+        const scorerCounts = new Map<string, number>();
+        const assistCounts = new Map<string, number>();
 
-      const maxS = scorerCounts.size ? Math.max(...scorerCounts.values()) : 0;
-      const maxA = assistCounts.size ? Math.max(...assistCounts.values()) : 0;
+        for (const mg of Object.values(goalsData) as any[]) {
+          for (const g of (mg.goals || []) as any[]) {
+            if (g.type === "OWN") continue;
+            if (g.scorer) scorerCounts.set(g.scorer, (scorerCounts.get(g.scorer) || 0) + 1);
+            if (g.assist) assistCounts.set(g.assist, (assistCounts.get(g.assist) || 0) + 1);
+          }
+        }
 
-      if (maxS > 0) {
-        topScorerNames = [...new Set(
-          [...scorerCounts.entries()].filter(([, c]) => c === maxS).map(([n]) => translate(n))
-        )];
-        topScorerNorm = topScorerNames.map(normalizePickName);
-      }
-      if (maxA > 0) {
-        topAssistNames = [...new Set(
-          [...assistCounts.entries()].filter(([, c]) => c === maxA).map(([n]) => translate(n))
-        )];
-        topAssistNorm = topAssistNames.map(normalizePickName);
+        const maxS = scorerCounts.size ? Math.max(...scorerCounts.values()) : 0;
+        const maxA = assistCounts.size ? Math.max(...assistCounts.values()) : 0;
+
+        if (needScorer && maxS > 0) {
+          topScorerNames = [...new Set(
+            [...scorerCounts.entries()].filter(([, c]) => c === maxS).map(([n]) => translate(n))
+          )];
+          topScorerNorm = topScorerNames.map(normalizePickName);
+        }
+        if (needAssist && maxA > 0) {
+          topAssistNames = [...new Set(
+            [...assistCounts.entries()].filter(([, c]) => c === maxA).map(([n]) => translate(n))
+          )];
+          topAssistNorm = topAssistNames.map(normalizePickName);
+        }
       }
     }
   } catch { /* non-fatal */ }
