@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdmin, verifyIdToken, isAdminEmail } from "@/lib/firebase-admin";
 import { userTotals } from "@/lib/scoring";
+import { computeSpecialPickActuals } from "@/lib/special-picks-bonus";
 import { MATCHES } from "@/lib/data";
 import { resolveAllStages, resolvePlaceholder, withResolvedWinners } from "@/lib/bracket";
 import type { LeaderRow } from "@/lib/types";
@@ -137,7 +138,18 @@ export async function GET(req: Request) {
     else b.other += data.points;
   });
 
-  /* 2c. Batch-load Firebase Auth metadata for every uid we'll show.
+  /* 2c. Is each special-pick category actually decided yet? Needed so the
+   * "ניקוד סופי" breakdown can tell "0 — you guessed wrong" apart from
+   * "not decided yet" (both currently look identical as bonus=0, which
+   * showed "טרם נקבע" even for users whose pick was already scored as
+   * incorrect once the category WAS decided). Same ground truth as the
+   * "ניקוד סופי" button / "כל הניחושים" table. */
+  const actuals = await computeSpecialPickActuals(db, results);
+  const championDecided = actuals.actualChampion !== null;
+  const scorerDecided = actuals.topScorerNorm.length > 0;
+  const assistDecided = actuals.topAssistNorm.length > 0;
+
+  /* 2d. Batch-load Firebase Auth metadata for every uid we'll show.
    * This catches Google sign-ins whose Firestore profile doc was never
    * written, so we can fall back to the Google displayName / email
    * instead of the generic "משתמש". */
@@ -185,6 +197,9 @@ export async function GET(req: Request) {
       bonusScorer: bd?.scorer || 0,
       bonusAssist: bd?.assist || 0,
       bonusOther: bd?.other || 0,
+      championDecided,
+      scorerDecided,
+      assistDecided,
     });
   }
 

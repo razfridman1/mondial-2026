@@ -877,9 +877,9 @@ function UserStatsModal({
             const predictionPoints = row.totalPoints - bonusChampion - bonusScorer - bonusAssist - bonusOther;
             const rowsDef = [
               { label: "🔮 ניקוד ניחושי תוצאות", value: predictionPoints, decided: true },
-              { label: "⚽ מלך השערים",           value: bonusScorer,     decided: bonusScorer > 0 },
-              { label: "🍳 מלך הבישולים",         value: bonusAssist,     decided: bonusAssist > 0 },
-              { label: "👑 זוכת המונדיאל",        value: bonusChampion,   decided: bonusChampion > 0 },
+              { label: "⚽ מלך השערים",           value: bonusScorer,     decided: !!row.scorerDecided },
+              { label: "🍳 מלך הבישולים",         value: bonusAssist,     decided: !!row.assistDecided },
+              { label: "👑 זוכת המונדיאל",        value: bonusChampion,   decided: !!row.championDecided },
               ...(bonusOther !== 0 ? [{ label: "🎁 בונוס נוסף", value: bonusOther, decided: true }] : []),
             ];
             return (

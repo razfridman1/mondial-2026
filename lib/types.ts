@@ -165,6 +165,12 @@ export interface LeaderRow {
   bonusScorer?: number;      // ⚽ correct "מלך השערים" pick
   bonusAssist?: number;      // 🍳 correct "מלך הבישולים" pick
   bonusOther?: number;       // any other manually-awarded bonus/penalty
+  /* Whether each special-pick category has been decided at all (a real
+   * player/team is known) — independent of THIS user's bonus. Lets the UI
+   * show "0 — guessed wrong" instead of "טרם נקבע" once decided. */
+  championDecided?: boolean;
+  scorerDecided?: boolean;
+  assistDecided?: boolean;
 }
 
 /* Activity feed event */

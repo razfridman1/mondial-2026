@@ -139,15 +139,40 @@ export async function POST(req: Request) {
   }));
   awarded.sort((a, b) => b.points - a.points || a.displayName.localeCompare(b.displayName, "he"));
 
+  /* Diagnostic: for every profile that HAS a scorer/assist pick, show the
+   * raw stored string next to its normalized form and whether it matched
+   * — makes formatting mismatches (extra space, different apostrophe, HE
+   * vs EN spelling) visible instead of a silent "not awarded". */
+  const debugPicks: Array<{ uid: string; displayName: string; category: "scorer" | "assist";
+    raw: string; norm: string; matched: boolean }> = [];
+  for (const doc of profSnap.docs) {
+    const uid = doc.id;
+    const data = doc.data() as any;
+    const displayName = data.displayName || uid.slice(0, 10);
+    if (data.topScorerPick?.playerName) {
+      const raw = data.topScorerPick.playerName;
+      const norm = normalizePickName(raw);
+      debugPicks.push({ uid, displayName, category: "scorer", raw, norm, matched: actuals.topScorerNorm.includes(norm) });
+    }
+    if (data.topAssistPick?.playerName) {
+      const raw = data.topAssistPick.playerName;
+      const norm = normalizePickName(raw);
+      debugPicks.push({ uid, displayName, category: "assist", raw, norm, matched: actuals.topAssistNorm.includes(norm) });
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     actualChampion: actuals.actualChampion,
     actualChampionName: actuals.actualChampion ? (TEAMS as any)[actuals.actualChampion]?.name || actuals.actualChampion : null,
     topScorerNames: actuals.topScorerNames,
+    topScorerNorm: actuals.topScorerNorm,
     topAssistNames: actuals.topAssistNames,
+    topAssistNorm: actuals.topAssistNorm,
     awarded,
     usersAwarded: awarded.length,
     newlyAwarded,
     removed,
+    debugPicks,
   });
 }
