@@ -3,44 +3,6 @@
   "buildCommand": "next build",
   "installCommand": "npm install",
   "regions": ["fra1"],
-  "crons": [
-    {
-      "path": "/api/cron/snapshot-leaderboard",
-      "schedule": "0 21 * * *"
-    },
-    {
-      "path": "/api/cron/sync-results",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/auto-predict",
-      "schedule": "*/2 * * * *"
-    },
-    {
-      "path": "/api/admin/simulation/tick",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/sync-squads",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron/sync-player-details",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/sync-match-previews",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/sync-odds",
-      "schedule": "0 */2 * * *"
-    },
-    {
-      "path": "/api/cron/daily-backup",
-      "schedule": "0 1 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
